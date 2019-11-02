@@ -254,7 +254,7 @@ class VerbalAskAgent(AskAgent):
                     traj[i]['teacher_nav'].append(nav_target_list[i])  #TODO: added
                     traj[i]['teacher_ask'].append(ask_target_list[i])
                     traj[i]['agent_ask'].append(q_t_list[i])
-                    traj[i]['agent_ask'].append(ask_logits_list[i])  #TODO: added
+                    traj[i]['agent_ask_logits'].append(ask_logits_list[i])  #TODO: added
                     traj[i]['teacher_ask_reason'].append(ask_reason[i])
                     traj[i]['subgoals'].append(verbal_subgoals[i])
 
