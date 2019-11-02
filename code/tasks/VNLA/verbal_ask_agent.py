@@ -62,10 +62,16 @@ class VerbalAskAgent(AskAgent):
             'instr_id': ob['instr_id'],
             'agent_path': [(ob['viewpoint'], ob['heading'], ob['elevation'])],
             'agent_ask': [],
+            'agent_ask_logits': [],  #TODO: added
             'teacher_ask': [],
+            'teacher_nav': [],  #TODO: added
             'teacher_ask_reason': [],
-            'agent_nav' : [],
-            'subgoals': []
+            'agent_nav': [],
+            'agent_nav_logits_initial': [],  #TODO: added
+            'agent_nav_softmax_initial': [],  #TODO: added
+            'agent_nav_logits_final': [],  #TODO: added
+            'agent_nav_softmax_final': [],  #TODO: added
+            'subgoals': [],
         } for ob in obs]
 
         # Encode initial command
@@ -129,6 +135,11 @@ class VerbalAskAgent(AskAgent):
                 a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask,
                 ask_logit_mask, budget=b_t, cov=cov)
 
+            # TODO : log these
+            nav_logits_initial_list = nav_logit.data.tolist()
+            nav_softmax_initial_list = nav_softmax.data.tolist()
+            ask_logits_list = ask_logit.data.tolist()
+
             self._populate_agent_state_to_obs(obs, nav_softmax, queries_unused,
                 traj, ended, time_step)
 
@@ -191,6 +202,10 @@ class VerbalAskAgent(AskAgent):
                 a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask,
                 budget=b_t, cov=cov)
 
+            # TODO : log these
+            nav_logits_final_list = nav_logit.data.tolist()
+            nav_softmax_final_list = nav_logit.data.tolist()
+
             # Repopulate agent state
             # NOTE: queries_unused may have changed but it's fine since nav_teacher does not use it!
             self._populate_agent_state_to_obs(obs, nav_softmax, queries_unused,
@@ -199,6 +214,10 @@ class VerbalAskAgent(AskAgent):
             # Ask teacher for next nav action
             nav_target = self.teacher.next_nav(obs)
             nav_target = torch.tensor(nav_target, dtype=torch.long, device=self.device)
+
+            # TODO : log this
+            nav_target_list = nav_target.data.tolist()
+
             # Nav loss
             if not self.is_eval:
                 self.nav_loss += self.nav_criterion(nav_logit, nav_target)
@@ -228,8 +247,14 @@ class VerbalAskAgent(AskAgent):
                 if not ended[i]:
                     traj[i]['agent_path'].append((ob['viewpoint'], ob['heading'], ob['elevation']))
                     traj[i]['agent_nav'].append(env_action[i])
+                    traj[i]['agent_nav_logits_initial'].append(nav_logits_initial_list[i])  #TODO: added
+                    traj[i]['agent_nav_softmax_initial'].append(nav_softmax_initial_list[i])  # TODO: added
+                    traj[i]['agent_nav_logits_final'].append(nav_logits_final_list[i])  # TODO: added
+                    traj[i]['agent_nav_softmax_final'].append(nav_softmax_final_list[i])  # TODO: added
+                    traj[i]['teacher_nav'].append(nav_target_list[i])  #TODO: added
                     traj[i]['teacher_ask'].append(ask_target_list[i])
                     traj[i]['agent_ask'].append(q_t_list[i])
+                    traj[i]['agent_ask'].append(ask_logits_list[i])  #TODO: added
                     traj[i]['teacher_ask_reason'].append(ask_reason[i])
                     traj[i]['subgoals'].append(verbal_subgoals[i])
 
