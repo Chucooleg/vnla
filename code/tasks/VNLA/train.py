@@ -174,7 +174,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
 
             # Get validation distance from goal under test evaluation conditions
             traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False)
-
+            import pdb; pdb.set_trace()
             agent.results_path = os.path.join(hparams.exp_dir,
                 '%s_%s_for_eval.json' % (hparams.model_prefix, env_name))
             agent.write_results(traj)

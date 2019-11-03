@@ -271,7 +271,7 @@ class VerbalAskAgent(AskAgent):
 
         if not self.is_eval:
             self._compute_loss()
-        import pdb; pdb.set_trace()
+
         return traj
 
 
