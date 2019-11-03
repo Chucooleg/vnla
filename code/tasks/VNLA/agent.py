@@ -56,7 +56,10 @@ class BaseAgent(object):
                                 'scan'       : t['scan'],
                                 'agent_nav'  : t['agent_nav'],
                             }
-                        for k in ['agent_ask', 'teacher_ask', 'teacher_ask_reason']:
+                        for k in ['agent_ask', 'teacher_ask', 'teacher_ask_reason',
+                                  'agent_nav_logits_initial', 'agent_nav_softmax_initial',
+                                  'agent_nav_logits_final', 'agent_nav_softmax_final',
+                                  'teacher_nav', 'agent_ask_logits']:
                             if k in t:
                                 self.results[t['instr_id']][k] = t[k]
                         if 'subgoals' in t:
