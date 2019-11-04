@@ -204,7 +204,7 @@ class VerbalAskAgent(AskAgent):
 
             # TODO : log these
             nav_logits_final_list = nav_logit.data.tolist()
-            nav_softmax_final_list = nav_logit.data.tolist()
+            nav_softmax_final_list = nav_softmax.data.tolist()
 
             # Repopulate agent state
             # NOTE: queries_unused may have changed but it's fine since nav_teacher does not use it!
