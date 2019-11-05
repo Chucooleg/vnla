@@ -2,7 +2,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
-import scipy
+import scipy.stats
 
 
 class OutputData(object):
