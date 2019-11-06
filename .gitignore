@@ -3,3 +3,6 @@ tasks/VNLA/snapshots/
 tasks/VNLA/results/
 tasks/VNLA/plots/
 data/*
+code/build/*
+*.ckpt
+code/data/*
