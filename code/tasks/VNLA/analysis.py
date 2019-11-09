@@ -11,6 +11,15 @@ import utils
 NAV_ACTIONS =  ['left', 'right', 'up', 'down', 'forward', '<end>']
 ASK_ACTIONS = ['dont_ask', 'ask']
 
+# cyan, magenta, yellow
+# blue, green, red
+# violet, turquoise, orange
+# ocean, raspberry, spring green
+REF_COLORS = np.array([ '#00FFFF', '#FF00FF', '#FFFF00',
+                        '#0000FF', '#00FF00', '#FF0000',
+                        '#7700FF', '#00FF77', '#FF7700',
+                        '#0077FF', '#FF0077', '#77FF00'] * 10)
+
 class OutputData(object):
 
     def __init__(self, output_data):
@@ -92,15 +101,6 @@ class OutputData(object):
 
 class PlotUtils(object):
 
-    # cyan, magenta, yellow
-    # blue, green, red
-    # violet, turquoise, orange
-    # ocean, raspberry, spring green
-    dataset_colors = np.array(['#00FFFF', '#FF00FF', '#FFFF00',
-                                '#0000FF', '#00FF00', '#FF0000',
-                                '#7700FF', '#00FF77', '#FF7700',
-                                '#0077FF', '#FF0077', '#77FF00'])
-
     @classmethod
     def _parse_action_type(cls, action_type, cross_ent_bool=False):
         """
@@ -159,7 +159,7 @@ class PlotUtils(object):
         """
         step_str = "trajectory"
         scan_str = "scan"
-        viewpt_flattened = np.array([traj_step[0] for datapt in data for traj_step in datapt[step_str]])
+        viewpt_flattened = np.array([traj_step[0] for datapt in data for traj_step in datapt[step_str][:-1]])
         scan_flattened = []
         for datapt in data:
             # number of locations = number of decisions + 1
@@ -178,14 +178,14 @@ class PlotUtils(object):
         Returns:
             room_flattened -- 1-D numpy array of shape (sum_datapt(num timesteps at datapt i), )
         """
-        viewpt_flattened, scan_flattened = cls.flatten_locations(data=output_data_list[i])
+        viewpt_flattened, scan_flattened = cls.flatten_locations(data=data)
         # panos_to_region[scan][viewpt id] = `<abbreviated roomtag>`
         panos_to_region = {}
         scan_set = set(scan_flattened)
         for scan in scan_set:
             panos_to_region[scan] = utils.load_panos_to_region(scan,"")
         room_flattened = [panos_to_region[scan][viewpt] for scan, viewpt in zip(scan_flattened, viewpt_flattened)]
-        return room_flattened
+        return np.array(room_flattened)
 
     @classmethod
     def _split_ent_data(cls, flattened_data, by_timestep=False):
@@ -236,7 +236,7 @@ class PlotUtils(object):
 
     @classmethod
     def plot_bad_decisions_by_action_type(cls, output_data_list, output_data_labels, 
-    action_type, action_reference, timestep_specific, room_specific):
+    action_type, action_reference, timestep_specific, room_specific, cutoff_denom=4):
         """Make one single plot to visualize the fraction of good/bad decision quality such as 
         (wrong, confident) for each category type, such as timestep indices or room labels.
         
@@ -259,7 +259,7 @@ class PlotUtils(object):
         # compute the entropy cut-off to qualify for being a bad decision entropy
         even_dist_entropy = - np.log(1./len(action_reference)) # - log(p(x))
         # what should count as confidently wrong?
-        bad_entropy_cutoff = even_dist_entropy/4 # cutoff at first quantile
+        bad_entropy_cutoff = even_dist_entropy/cutoff_denom # cutoff at first quantile
         
         # get flattened lists
         assert len(output_data_list) == len(output_data_labels)
@@ -310,27 +310,33 @@ class PlotUtils(object):
         # order the categories first
         if timestep_specific:
             category_ids = sorted(list(categories))
-        else:
+            category_name = "timestep"
+        elif room_specific:
             category_ids = sorted(list(categories))  # TODO deal too many room types
+            category_name = "room tag"
         # confidently wrong in test seen, confidently wrong in test unseen
+        for i in range(len(output_data_labels)):
+            import pdb; pdb.set_trace()
+            subarr = [counts[output_data_labels[i]][cat][0] for cat in category_ids]
+
+        #import pdb; pdb.set_trace()
         arr_a = np.array([[counts[output_data_labels[i]][cat][0] for cat in category_ids] \
             for i in range(len(output_data_labels))])
         # otherwise in test seen, otherwise in test unseen
         arr_b = np.array([[counts[output_data_labels[i]][cat][1] for cat in category_ids] \
             for i in range(len(output_data_labels))])
+        assert len(arr_a) == len(output_data_labels)
         # plot normalized bar chart, plot raw count bar chart 
         for norm in (True, False):
             cls.plot_grouped_bar_comparison(
                 category_ids=category_ids,
                 arr_a=arr_a, 
                 arr_b=arr_b,
+                category_name=category_name,
                 quality_labels = ["confidently wrong", "otherwise"],
                 output_data_labels=output_data_labels,
-                figsize=(20, 12), normalized=True,
+                figsize=(20, 12), normalized=norm,
                 h_line=True, dataset_colors=None)
-        
-        # TODO 
-        # double check if array a and array b are correct
 
     @classmethod
     def _filter_and_split_ent_by_decision_quality(cls, flattened_data, filter):
@@ -467,7 +473,7 @@ class PlotUtils(object):
                                                         **kwargs)
 
     @classmethod
-    def plot_grouped_bar_comparison(cls, category_ids, arr_a, arr_b,
+    def plot_grouped_bar_comparison(cls, category_ids, arr_a, arr_b, category_name,
                                     quality_labels, output_data_labels,
                                     figsize=(20, 12), normalized=True,
                                     h_line=True, dataset_colors=None):
@@ -479,6 +485,7 @@ class PlotUtils(object):
                          e.g. ['h', 'r', '-', ...] for room tags
         :param arr_a: numpy array (num output datasets, num categories)
         :param arr_b: numpy array (num output datasets, num categories)
+        :param arr_b: string to label x-axis. Such as "time" or "room tag"
         :param quality_labels: 2-string tuple. e.g. ('confidently wrong', 'otherwise')
         :param output_data_labels: multi-string tuple. e.g. ('test_seen', 'test_unseen')
         :param figsize: numeric tuple.
@@ -499,7 +506,7 @@ class PlotUtils(object):
         # b & w
         colors = ['#000000', '#ffffff']
         if dataset_colors is None:
-            dataset_colors = dataset_colors
+            dataset_colors = REF_COLORS
         dataset_colors = np.array(dataset_colors)
 
         if normalized:
@@ -519,9 +526,9 @@ class PlotUtils(object):
         for i in range(arr_a.shape[0]):  # per experiment
             # backdrop to differentiate experiments
             p0 = plt.bar(rs[i], np.repeat(limit + 500, arr_a.shape[1]),
-                         width=bar_width + bar_width / float(1.5),
-                         edgecolor=dataset_colors[i], label=output_data_labels[i],
-                         color=dataset_colors[i], alpha=0.2)
+                        width=bar_width + bar_width / float(1.5),
+                        edgecolor=dataset_colors[i], label=output_data_labels[i],
+                        color=dataset_colors[i], alpha=0.2)
             p_exp.append(p0[0])  # for legends
             # actual data
             p1 = plt.bar(rs[i], arr_a[i], width=bar_width,
@@ -550,7 +557,7 @@ class PlotUtils(object):
             fontweight='bold', fontsize=20
         )
 
-        plt.xlabel('trials', fontweight='bold',
+        plt.xlabel(category_name, fontweight='bold',
                    fontsize=14)
         plt.ylabel('normalized cts' if normalized else 'data point cts',
                    fontweight='bold',
