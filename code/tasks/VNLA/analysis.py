@@ -290,7 +290,7 @@ class PlotUtils(object):
         # categories is a set. {1, 2, ... max time step} or {"-", "h". "r", ...}
         ##splits = {}
         counts = {}
-        categories = set()
+        categories = None
         for i in range(len(output_data_labels)):
             agent_entropies_flattened = flattened[output_data_labels[i]]['agent_entropies_flattened']
             if timestep_specific:
@@ -304,7 +304,11 @@ class PlotUtils(object):
                     filter=flattened[output_data_labels[i]]['filter_wrong_and_confident'])
             ##splits[output_data_labels[i]] = split_data
             counts[output_data_labels[i]] = count_data
-            categories = categories | set(categories_flattened)   
+            # we want to narrow down to the common set of categories between the different output datasets
+            if categories is None:
+                categories = set(categories_flattened)
+            else:
+                categories = categories & set(categories_flattened)
 
         # plot grouped bar chart below
         # order the categories first
@@ -314,17 +318,15 @@ class PlotUtils(object):
         elif room_specific:
             category_ids = sorted(list(categories))  # TODO deal too many room types
             category_name = "room tag"
-        # confidently wrong in test seen, confidently wrong in test unseen
-        for i in range(len(output_data_labels)):
-            import pdb; pdb.set_trace()
-            subarr = [counts[output_data_labels[i]][cat][0] for cat in category_ids]
 
-        #import pdb; pdb.set_trace()
-        arr_a = np.array([[counts[output_data_labels[i]][cat][0] for cat in category_ids] \
-            for i in range(len(output_data_labels))])
+        # confidently wrong in test seen, confidently wrong in test unseen
+        arr_a = [[counts[output_data_labels[i]][cat][0] for cat in category_ids] \
+            for i in range(len(output_data_labels))]
+        arr_a = np.vstack((arr_a[0], arr_a[1]))
         # otherwise in test seen, otherwise in test unseen
         arr_b = np.array([[counts[output_data_labels[i]][cat][1] for cat in category_ids] \
             for i in range(len(output_data_labels))])
+        arr_b = np.vstack((arr_b[0], arr_b[1]))
         assert len(arr_a) == len(output_data_labels)
         # plot normalized bar chart, plot raw count bar chart 
         for norm in (True, False):
@@ -361,7 +363,7 @@ class PlotUtils(object):
         qualified_categories = categories_flattened[filter]
 
         split_data = defaultdict(list)
-        count_data = defaultdict(int)
+        count_data = defaultdict(tuple)
 
         # split_data[time step 3] = [ent val 1, ent val 2, ent val 3,...]
         for i in range(len(qualified_entropies)):
