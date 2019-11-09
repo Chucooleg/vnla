@@ -50,10 +50,35 @@ class OutputData(object):
 
     @classmethod
     def compute_entropy_per_datapt(cls, datapt):
+        """For every timestep of a datapt, compute an entropy value based on its predicted logits
+        
+        Arguments:
+            datapt {dictionary} -- a datapt should record info for an entire episode with a unique instr_id`
+
+        Returns:
+            3 numpy arrays for navigation inital entropy, navigation final entropy, asking entropy
+            each of shape (num timestep,)
+        """
         nav_ent_initial_list = [cls.compute_entropy(time_step) for time_step in datapt['agent_nav_logits_initial']]
         nav_ent_final_list = [cls.compute_entropy(time_step) for time_step in datapt['agent_nav_logits_final']]
         ask_ent_final_list = [cls.compute_entropy(time_step) for time_step in datapt['agent_ask_logits']]
-        return nav_ent_initial_list, nav_ent_final_list, ask_ent_final_list
+        return nav_ent_initial_list, nav_ent_final_list, ask_ent_list
+
+    @classmethod
+    def compute_softmax_per_datapt(cls, datapt):
+        """For every timestep of a datapt, compute a softmax vector based on its predicted logits
+        
+        Arguments:
+            datapt {dictionary} -- a datapt should record info for an entire episode with a unique instr_id`
+
+        Returns:
+            3 numpy arrays for navigation inital softmax, navigation final softmax, asking softmax
+            each of shape (num timestep, num decision classes)
+        """
+        nav_softmax_initial_list = [cls.compute_softmax(time_step) for time_step in datapt['agent_nav_logits_initial']]
+        nav_softmax_final_list = [cls.compute_softmax(time_step) for time_step in datapt['agent_nav_logits_final']]
+        ask_softmax_list = [cls.compute_softmax(time_step) for time_step in datapt['agent_ask_logits']]
+        return nav_softmax_initial_list, nav_softmax_final_list, ask_softmax_list
 
     @classmethod
     def compute_cross_entropy_per_datapt(cls, datapt):
@@ -64,25 +89,33 @@ class OutputData(object):
         nav_cross_ent_final_list = [
             cls.compute_cross_entropy(datapt['agent_nav_logits_final'][i], datapt['teacher_nav'][i]) for i in
             range(num_decisions)]
-        ask_cross_ent_final_list = [cls.compute_cross_entropy(datapt['agent_ask_logits'][i], datapt['teacher_ask'][i])
+        ask_cross_ent_list = [cls.compute_cross_entropy(datapt['agent_ask_logits'][i], datapt['teacher_ask'][i])
                                     for i in range(num_decisions)]
-        return nav_cross_ent_initial_list, nav_cross_ent_final_list, ask_cross_ent_final_list
+        return nav_cross_ent_initial_list, nav_cross_ent_final_list, ask_cross_ent_list
 
     def compute_entropy_output_data(self):
         for i in range(len(self.output_data)):
-            nav_ent_initial_list, nav_ent_final_list, ask_ent_final_list = \
+            nav_ent_initial_list, nav_ent_final_list, ask_ent_list = \
                 self.compute_entropy_per_datapt(self.output_data[i])
             self.output_data[i]['agent_nav_ent_initial'] = nav_ent_initial_list
             self.output_data[i]['agent_nav_ent_final'] = nav_ent_final_list
-            self.output_data[i]['agent_ask_ent'] = ask_ent_final_list
+            self.output_data[i]['agent_ask_ent'] = ask_ent_list
 
     def compute_cross_entropy_output_data(self):
         for i in range(len(self.output_data)):
-            nav_cross_ent_initial_list, nav_cross_ent_final_list, ask_cross_ent_final_list = \
+            nav_cross_ent_initial_list, nav_cross_ent_final_list, ask_cross_ent_list = \
                 self.compute_cross_entropy_per_datapt(self.output_data[i])
             self.output_data[i]['agent_nav_cross_ent_initial'] = nav_cross_ent_initial_list
             self.output_data[i]['agent_nav_cross_ent_final'] = nav_cross_ent_final_list
-            self.output_data[i]['agent_ask_cross_ent'] = ask_cross_ent_final_list
+            self.output_data[i]['agent_ask_cross_ent'] = ask_cross_ent_list
+
+    def compute_softmax_output_data(self):
+         for i in range(len(self.output_data)):
+            nav_softmax_initial_list, nav_softmax_final_list, ask_softmax_list = \
+                self.compute_softmax_per_datapt(self.output_data[i])
+            self.output_data[i]['agent_nav_softmax_initial'] = nav_cross_ent_initial_list
+            self.output_data[i]['agent_nav_softmax_final'] = nav_cross_ent_final_list
+            self.output_data[i]['agent_ask_softmax_ent'] = ask_cross_ent_list       
 
     def compute_nav_argmax_output_data(self):
         for i in range(len(self.output_data)):
@@ -115,6 +148,7 @@ class PlotUtils(object):
             teacher_target_str = 'teacher_nav'
             agent_argmax_str = 'agent_nav_argmax'
             agent_ent_str = 'agent_nav_ent'
+            agent_softmax_str = 'agent_nav_softmax'
             # for verbal ask agent, the agent has to predict navigation twice
             if 'initial' in action_type:
                 agent_argmax_str += "_initial"
@@ -126,25 +160,45 @@ class PlotUtils(object):
             teacher_target_str = "teacher_ask"
             agent_argmax_str = "agent_ask"
             agent_ent_str = "agent_ask_ent"
+            agent_softmax_str = 'agent_ask_softmax'
         # compute cross entropy instead of entropy
         if cross_ent_bool:
             agent_ent_str = agent_ent_str.replace("_ent", "_cross_ent")
-        return teacher_target_str, agent_argmax_str, agent_ent_str
+        return teacher_target_str, agent_argmax_str, agent_ent_str, agent_softmax_str
 
     @classmethod
-    def flatten_targets_argmaxes_entropies(cls, data, action_type, cross_ent_bool=False):
+    def flatten_targets_softmaxes_timesteps(cls, data, action_type):
         """
-        flatten targets, argmaxes and entropy values.
+        flatten targets, softmax values and timestep
+        :param data: an OutputData data object.
+        :param action_type: string. should contain pattern to specific whether nav or ask. initial or final (nav)
+
+        :return: 3 numpy arrays. 
+                 teacher_targets_flattened, timesteps_flattened each has shape (sum_datapt(timesteps in datapt i), )
+                 agent_softmaxes_flattened has shape (sum_datapt(timesteps in datapt i), num prediction classes)
+        """
+        # teacher_target_str, agent_argmax_str, agent_ent_str, agent_softmax_str = cls._parse_action_type(action_type, cross_ent_bool)
+        teacher_target_str, _, _, agent_softmax_str = cls._parse_action_type(action_type, cross_ent_bool)
+        teacher_targets_flattened = np.array([target for datapt in data for target in datapt[teacher_target_str]])
+        # agent_softmaxes_flattened shape (sum_datapt(timesteps in datapt i), num prediction classes)
+        agent_softmaxes_flattened = np.array([softmax_arr for datapt in data for softmax_arr in datapt[agent_softmax_str]])
+        timesteps_flattened = np.array([timestep for datapt in data for timestep in range(len(datapt[teacher_target_str]))])
+        return teacher_targets_flattened, agent_softmaxes_flattened, timesteps_flattened
+
+    @classmethod
+    def flatten_targets_argmaxes_entropies_timesteps(cls, data, action_type, cross_ent_bool=False):
+        """
+        flatten targets, argmaxes, entropy values and timestep
         :param data: an OutputData data object.
         :param action_type: string. should contain pattern to specific whether nav or ask. initial or final (nav)
         :param cross_ent_bool: (o) boolean. True if we want to look at cross-entropy instead of entropy
-        :return: 3 numpy arrays. each of shape (sum_datapt(timesteps in datapt i), )
+        :return: 4 numpy arrays. each of shape (sum_datapt(timesteps in datapt i), )
         """
-        teacher_target_str, agent_argmax_str, agent_ent_str = cls._parse_action_type(action_type, cross_ent_bool)
+        teacher_target_str, agent_argmax_str, agent_ent_str, _ = cls._parse_action_type(action_type, cross_ent_bool)
         teacher_targets_flattened = np.array([target for datapt in data for target in datapt[teacher_target_str]])
         agent_argmaxes_flattened = np.array([argmax for datapt in data for argmax in datapt[agent_argmax_str]])
         agent_entropies_flattened = np.array([entropy for datapt in data for entropy in datapt[agent_ent_str]])
-        timesteps_flattened = np.array([timestep for datapt in data for timestep in range(len(datapt[agent_ent_str]))])
+        timesteps_flattened = np.array([timestep for datapt in data for timestep in range(len(datapt[teacher_target_str]))])
         return teacher_targets_flattened, agent_argmaxes_flattened, agent_entropies_flattened, timesteps_flattened
 
     @classmethod
@@ -192,7 +246,7 @@ class PlotUtils(object):
         """
         split data by tuple keys (teacher gold target, agent predicted argmax target)
         :param flattened_data: a list of the three or four(if by_timestep=True) array 
-                               elements returned from  cls.flatten_targets_argmaxes_entropies()
+                               elements returned from  cls.flatten_targets_argmaxes_entropies_timesteps()
         :param by_timestep: bool. True will further split the data by timestep in the episode.
         """
         if by_timestep:
@@ -269,7 +323,7 @@ class PlotUtils(object):
             flattened[output_data_labels[i]]['agent_argmaxes_flattened'], \
             flattened[output_data_labels[i]]['agent_entropies_flattened'], \
             flattened[output_data_labels[i]]['timesteps_flattened'] = \
-                cls.flatten_targets_argmaxes_entropies(output_data_list[i], action_type)
+                cls.flatten_targets_argmaxes_entropies_timesteps(output_data_list[i], action_type)
 
         # create new agent entropy array based on whether agent was confidently wrong
         # condition 1 : agent is wrong. condition 2 : entropy is below cutoff
@@ -409,7 +463,7 @@ class PlotUtils(object):
             flattened[output_data_labels[i]]['agent_argmaxes_flattened'], \
             flattened[output_data_labels[i]]['agent_entropies_flattened'], \
             flattened[output_data_labels[i]]['timesteps_flattened'] = \
-                cls.flatten_targets_argmaxes_entropies(output_data_list[i], action_type, cross_ent_bool)
+                cls.flatten_targets_argmaxes_entropies_timesteps(output_data_list[i], action_type, cross_ent_bool)
 
         # plot overall entropy histogram (all action targets)
         kwargs = dict(alpha=0.5, bins=bins, density=True, stacked=True)
@@ -473,6 +527,51 @@ class PlotUtils(object):
                                                         xlab="Per agent decision entropy",
                                                         ylab="Density",
                                                         **kwargs)
+
+    @classmethod
+    def plot_calibration_graph_by_action_type(cls, output_data_list, output_data_labels, action_type, 
+    action_reference=None, time_step_specific=False):
+        """Plot and visualize a calibration graph for each action.
+        i.e. one graph for "forward", one grahp for "right",... if action type is nav
+        i.e. one graph for "dont_ask, one grahp for "ask",... if action type is ask
+        
+        Arguments:
+            output_data_list {list} -- a list of 1+ OutputData objects. Usually one for test seen and one for test unseen.
+            output_data_labels {list} -- a list of strings naming the output datasets stored in output_data_list. e.g. ["test_seen", "test_unseen"]
+            action_type {string} -- Should contain pattern to specific whether `nav` or `ask`. `initial` or `final` in additional to `nav`.
+        
+        Keyword Arguments:
+            action_reference {list} -- A single list/array of strings each describing an action by the index.
+            time_step_specific {bool} -- If true, overlay predictions split by time step on top of graph (default: {False})
+        """
+        print("Action Type : {}".format(action_type))
+        if not action_reference:
+            if "nav" in action_type:
+                action_reference = NAV_ACTIONS
+            elif "ask" in action_type:
+                action_reference = ASK_ACTIONS
+        print("Action Reference : {}".format(action_reference))   
+        
+        # flattened data into arrays of shape (sum_datapt(num time steps at datapt i), )
+        # flattened['test_unseen']['teacher_targets_flattened'] is a 1-D numeric array
+        # flattened['test_unseen']['agent_softmaxes_flattened'] is 2-D numeric array, with shape (sum_datapt(num time steps at datapt i), num prediction classes)
+        assert len(output_data_list) == len(output_data_labels)
+        flattened = defaultdict(lambda : defaultdict(list))
+        for i in range(len(output_data_labels)):
+            # shape (sum_datapt(timesteps in datapt i), )
+            # shape (sum_datapt(timesteps in datapt i), )
+            # shape (sum_datapt(timesteps in datapt i), num prediction classes)
+            flattened[output_data_labels[i]]['teacher_targets_flattened'], \ 
+            flattened[output_data_labels[i]]['agent_softmaxes_flattened'], \
+            flattened[output_data_labels[i]]['timesteps_flattened'] = \
+                cls.flatten_targets_softmaxes_timesteps(output_data_list[i], action_type, cross_ent_bool)
+
+        # split by action, and softmax range for that action
+        # for each action, we need: 1. teacher_targets 1/0 2.agent_softmax single val 3.timesteps
+        # splits['forward']['bin 0.00-0.05'] = {'agent_softmax_vals':[...], 'teacher_target_bools': [.....], 'time_steps':[...]}
+        # HERE!
+
+        pass
 
     @classmethod
     def plot_grouped_bar_comparison(cls, category_ids, arr_a, arr_b, category_name,
