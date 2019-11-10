@@ -61,7 +61,7 @@ class OutputData(object):
         """
         nav_ent_initial_list = [cls.compute_entropy(time_step) for time_step in datapt['agent_nav_logits_initial']]
         nav_ent_final_list = [cls.compute_entropy(time_step) for time_step in datapt['agent_nav_logits_final']]
-        ask_ent_final_list = [cls.compute_entropy(time_step) for time_step in datapt['agent_ask_logits']]
+        ask_ent_list = [cls.compute_entropy(time_step) for time_step in datapt['agent_ask_logits']]
         return nav_ent_initial_list, nav_ent_final_list, ask_ent_list
 
     @classmethod
@@ -153,9 +153,11 @@ class PlotUtils(object):
             if 'initial' in action_type:
                 agent_argmax_str += "_initial"
                 agent_ent_str += "_initial"
+                agent_softmax_str += "_initial" 
             elif 'final' in action_type:
                 agent_argmax_str += "_final"
                 agent_ent_str += "_final"
+                agent_softmax_str += "_final"
         elif 'ask' in action_type:
             teacher_target_str = "teacher_ask"
             agent_argmax_str = "agent_ask"
@@ -178,7 +180,7 @@ class PlotUtils(object):
                  agent_softmaxes_flattened has shape (sum_datapt(timesteps in datapt i), num prediction classes)
         """
         # teacher_target_str, agent_argmax_str, agent_ent_str, agent_softmax_str = cls._parse_action_type(action_type, cross_ent_bool)
-        teacher_target_str, _, _, agent_softmax_str = cls._parse_action_type(action_type, cross_ent_bool)
+        teacher_target_str, _, _, agent_softmax_str = cls._parse_action_type(action_type, False)
         teacher_targets_flattened = np.array([target for datapt in data for target in datapt[teacher_target_str]])
         # agent_softmaxes_flattened shape (sum_datapt(timesteps in datapt i), num prediction classes)
         agent_softmaxes_flattened = np.array([softmax_arr for datapt in data for softmax_arr in datapt[agent_softmax_str]])
@@ -277,8 +279,7 @@ class PlotUtils(object):
             split_data[forward index]= {'agent_softmax_vals':[...], 'teacher_target_bools': [.....], 'timesteps':[...]}
         """
         assert len(flattened_data) == 3
-        teacher_targets_flattened, agent_softmaxes_flattened, 
-        timesteps_flattened  = \
+        teacher_targets_flattened, agent_softmaxes_flattened, timesteps_flattened  = \
             flattened_data[0], flattened_data[1], flattened_data[2]
         
         # TODO double check
@@ -300,7 +301,7 @@ class PlotUtils(object):
         Returns:
             bin_data {dict} -- has 4 keys. i.e. {'agent_softmax_avg':[..<num bin vals>..], 'agent_softmax_std':[..<num bin vals>..], 'teacher_target_avg':[..<num bin vals>..], 'teacher_target_std':[..<num bin vals>..], 'timesteps' : [[...], [...], [...], [...], ...]}. 
         """
-        agent_softmax_vals = np.array(vals_dict['agent_softmax_vals'])
+        agent_softmax_vals = np.array(vals_dict['agent_softmax_val'])
         teacher_target_bools = np.array(vals_dict['teacher_target_bools'])
         timesteps = np.array(vals_dict['timesteps'])
 
@@ -313,19 +314,21 @@ class PlotUtils(object):
         agent_softmax_std = np.zeros(len(intervals))
         teacher_target_avg = np.zeros(len(intervals))
         techer_target_std = np.zeros(len(intervals))
-        timesteps = [ None for i in range(len(intervals))]
+        timesteps_filtered = [ None for i in range(len(intervals))]
 
-        for i, interval in enumerate(i, intervals):
-            # filter down to values within the interval
-            filter = agent_softmax_vals >= interval[0] & agent_softmax_vals < interval[1]
+        for i, interval in enumerate(intervals):
+            # filter down to values within the interval         
+            lower = agent_softmax_vals >= interval[0] 
+            upper = agent_softmax_vals < interval[1]
+            filter = lower & upper
             # compute stats for these values
-            agent_softmax_avg[i] = np.avg(agent_softmax_vals[filter])
+            agent_softmax_avg[i] = np.mean(agent_softmax_vals[filter])
             agent_softmax_std[i] = np.std(agent_softmax_vals[filter])
-            teacher_target_avg[i] = np.avg(teacher_target_bools[filter])
+            teacher_target_avg[i] = np.mean(teacher_target_bools[filter])
             techer_target_std[i] = np.std(teacher_target_bools[filter])
-            timesteps[i] = timesteps[filter]
+            timesteps_filtered[i] = timesteps[filter]
        
-        bin_data = dict{}
+        bin_data = dict()
         bin_data['agent_softmax_avg'] = agent_softmax_avg
         bin_data['agent_softmax_std'] = agent_softmax_std
         bin_data['teacher_target_avg'] = teacher_target_avg
@@ -349,7 +352,7 @@ class PlotUtils(object):
             print ("Count {} = {}".format(label_list[i], len(arr_list[i])))
         plt.figure(figsize=(12,6))
         for i, arr in enumerate(arr_list):
-            plt.hist(arr, color=dataset_colors[i], label=label_list[i], **kwargs)
+            plt.hist(arr, color=REF_COLORS[i], label=label_list[i], **kwargs)
         plt.title(title)
         plt.xlabel(xlab)
         plt.ylabel(ylab)
@@ -630,10 +633,7 @@ class PlotUtils(object):
             # shape (sum_datapt(timesteps in datapt i), )
             # shape (sum_datapt(timesteps in datapt i), )
             # shape (sum_datapt(timesteps in datapt i), num prediction classes)
-            flattened[output_data_labels[i]]['teacher_targets_flattened'], \ 
-            flattened[output_data_labels[i]]['agent_softmaxes_flattened'], \
-            flattened[output_data_labels[i]]['timesteps_flattened'] = \
-                cls.flatten_targets_softmaxes_timesteps(output_data_list[i], action_type, cross_ent_bool)
+            flattened[output_data_labels[i]]['teacher_targets_flattened'], flattened[output_data_labels[i]]['agent_softmaxes_flattened'], flattened[output_data_labels[i]]['timesteps_flattened'] = cls.flatten_targets_softmaxes_timesteps(output_data_list[i], action_type)
 
         # splits['test_seen'][forward idx=0] = {'agent_softmax_vals':[...], 'teacher_target_bools': [.....], 'timesteps':[...]}
         splits = {}
@@ -649,10 +649,10 @@ class PlotUtils(object):
 
         # binning, compute average and compute variance within bin
         # binned['test_seen'][forward idx=0] = {'agent_softmax_avg':[..<num bin vals>..], 'agent_softmax_std':[..<num bin vals>..], 'teacher_target_avg':[..<num bin vals>..], 'teacher_target_std':[..<num bin vals>..]}
-        binned = {}
+        binned = defaultdict(lambda : defaultdict(dict))
         for i in range(len(output_data_labels)):
             for j in range(len(action_reference)):
-                binned[output_data_labels[i]][j] = cls._bin_softmax_compute_stats(splits[output_data_labels[i]][j])
+                binned[output_data_labels[i]][j] = cls._bin_softmax_compute_stats(splits[output_data_labels[i]][j], num_bins)
 
         # HERE -- plot 
         # y axis = teacher avg and variance
