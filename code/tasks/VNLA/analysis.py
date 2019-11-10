@@ -245,8 +245,9 @@ class PlotUtils(object):
     def _split_ent_data(cls, flattened_data, by_timestep=False):
         """
         split data by tuple keys (teacher gold target, agent predicted argmax target)
-        :param flattened_data: a list of the three or four(if by_timestep=True) array 
-                               elements returned from  cls.flatten_targets_argmaxes_entropies_timesteps()
+
+        :param flattened_data: a list of the three or four(if by_timestep=True) array elements returned from cls.flatten_targets_argmaxes_entropies_timesteps()
+
         :param by_timestep: bool. True will further split the data by timestep in the episode.
         """
         if by_timestep:
@@ -263,6 +264,30 @@ class PlotUtils(object):
                 split_data[(teacher_targets_flattened[i], agent_argmaxes_flattened[i], timesteps_flattened[i])].append(agent_entropies_flattened[i])
             else:
                 split_data[(teacher_targets_flattened[i], agent_argmaxes_flattened[i])].append(agent_entropies_flattened[i])
+        return split_data
+
+    @classmethod
+    def _split_softmax_data_by_action_class(cls, flattened_data, action_reference):
+        """[summary]
+        
+        :param flattened_data: a list of the three array elements returned from cls.flatten_targets_softmaxes_timesteps()
+
+        Returns:
+            A nested dictionary.
+            split_data[forward index]= {'agent_softmax_vals':[...], 'teacher_target_bools': [.....], 'time_steps':[...]}
+        """
+        assert len(flattened_data) == 3
+        teacher_targets_flattened, agent_softmaxes_flattened, 
+        timesteps_flattened  = \
+            flattened_data[0], flattened_data[1], flattened_data[2]
+        
+        # TODO double check
+        split_data = defaultdict(lambda : defaultdict(list))
+        for i in range(len(timesteps_flattened)):
+            for j in range(len(action_reference)):
+                split_data[j]['agent_softmax_val'].append(agent_softmaxes_flattened[i][j])
+                split_data[j]['teacher_target_bools'].append(int(teacher_targets_flattened[i]) == j)
+                split_data[j]['time_steps'].append(timesteps_flattened[i])
         return split_data
 
     @classmethod
@@ -504,8 +529,8 @@ class PlotUtils(object):
             # splits['test_unseen'][(teacher target=1, agent argmax=1, time steps=5)] should give an array
             splits = {}
             for i in range(len(output_data_labels)):
-                splits[output_data_labels[i]] = cls._split_ent_data(flattened_data=
-                    [flattened[output_data_labels[i]]['teacher_targets_flattened'],
+                splits[output_data_labels[i]] = cls._split_ent_data(flattened_data= [
+                    flattened[output_data_labels[i]]['teacher_targets_flattened'],
                     flattened[output_data_labels[i]]['agent_argmaxes_flattened'],
                     flattened[output_data_labels[i]]['agent_entropies_flattened'],
                     flattened[output_data_labels[i]]['timesteps_flattened']
@@ -530,7 +555,7 @@ class PlotUtils(object):
 
     @classmethod
     def plot_calibration_graph_by_action_type(cls, output_data_list, output_data_labels, action_type, 
-    action_reference=None, time_step_specific=False):
+    action_reference=None, time_step_specific=False, num_bins=10):
         """Plot and visualize a calibration graph for each action.
         i.e. one graph for "forward", one grahp for "right",... if action type is nav
         i.e. one graph for "dont_ask, one grahp for "ask",... if action type is ask
@@ -539,6 +564,7 @@ class PlotUtils(object):
             output_data_list {list} -- a list of 1+ OutputData objects. Usually one for test seen and one for test unseen.
             output_data_labels {list} -- a list of strings naming the output datasets stored in output_data_list. e.g. ["test_seen", "test_unseen"]
             action_type {string} -- Should contain pattern to specific whether `nav` or `ask`. `initial` or `final` in additional to `nav`.
+            num_bins {int} -- Indicate how fine we want to split softmax prob from 0.0-1.0 into calibration bins.
         
         Keyword Arguments:
             action_reference {list} -- A single list/array of strings each describing an action by the index.
@@ -566,10 +592,28 @@ class PlotUtils(object):
             flattened[output_data_labels[i]]['timesteps_flattened'] = \
                 cls.flatten_targets_softmaxes_timesteps(output_data_list[i], action_type, cross_ent_bool)
 
-        # split by action, and softmax range for that action
-        # for each action, we need: 1. teacher_targets 1/0 2.agent_softmax single val 3.timesteps
-        # splits['forward']['bin 0.00-0.05'] = {'agent_softmax_vals':[...], 'teacher_target_bools': [.....], 'time_steps':[...]}
-        # HERE!
+        # splits['test_seen']['forward'] = {'agent_softmax_vals':[...], 'teacher_target_bools': [.....], 'time_steps':[...]}
+        splits = {}
+        for i in range(len(output_data_labels)):
+            splits[output_data_labels[i]] = cls._split_softmax_data_by_action_class(
+                flattened_data = [
+                    flattened[output_data_labels[i]]['teacher_targets_flattened'],
+                    flattened[output_data_labels[i]]['agent_softmaxes_flattened'],
+                    flattened[output_data_labels[i]]['timesteps_flattened']
+                ],
+                action_reference=action_reference
+            )
+
+        # binning, compute average and compute variance within bin
+        # if split by time step. should also split here, need to create `timed_binned`
+        # binned['test_seen']['forward'] = {'agent_softmax_avg':[...], 'agent_softmax_std':[...], 'teacher_target_avg':[...], 'teacher_target_std':[]}
+        binned = {}
+        # HERE
+
+        # y axis = steacher target 1/0 processed
+        # x = bin processed
+
+
 
         pass
 
