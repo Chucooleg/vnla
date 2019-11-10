@@ -291,6 +291,20 @@ class PlotUtils(object):
         return split_data
 
     @classmethod
+    def _bin_softmax_compute_stats(cls, vals_dict):
+        """bin using softmax ranges to compute stats for teacher target and agent predicted softmax.
+        
+        Arguments:
+            vals_dict {dict} -- has 3 keys. 'agent_softmax_vals', 'teacher_target_bools' and 'time_steps'. Each key linking to a 1-D numeric array with shape (sum_datapt(num timesteps at datapt i), ). Note this is specific to both output dataset and action class. e.g. from `splits["test_seen"][forward action idx=j]`
+
+        Returns:
+            bin_data {dict} -- has 3 keys. i.e. {'agent_softmax_avg':[..<num bin vals>..], 'agent_softmax_std':[..<num bin vals>..], 'teacher_target_avg':[..<num bin vals>..], 'teacher_target_std':[..<num bin vals>..]}. 
+        """
+        # HERE
+
+
+
+    @classmethod
     def plot_overlapping_histograms(cls, arr_list, label_list, title, xlab, ylab, **kwargs):
         """
 
@@ -592,7 +606,7 @@ class PlotUtils(object):
             flattened[output_data_labels[i]]['timesteps_flattened'] = \
                 cls.flatten_targets_softmaxes_timesteps(output_data_list[i], action_type, cross_ent_bool)
 
-        # splits['test_seen']['forward'] = {'agent_softmax_vals':[...], 'teacher_target_bools': [.....], 'time_steps':[...]}
+        # splits['test_seen'][forward idx=0] = {'agent_softmax_vals':[...], 'teacher_target_bools': [.....], 'time_steps':[...]}
         splits = {}
         for i in range(len(output_data_labels)):
             splits[output_data_labels[i]] = cls._split_softmax_data_by_action_class(
@@ -606,11 +620,16 @@ class PlotUtils(object):
 
         # binning, compute average and compute variance within bin
         # if split by time step. should also split here, need to create `timed_binned`
-        # binned['test_seen']['forward'] = {'agent_softmax_avg':[...], 'agent_softmax_std':[...], 'teacher_target_avg':[...], 'teacher_target_std':[]}
+        # binned['test_seen'][forward idx=0] = {'agent_softmax_avg':[..<num bin vals>..], 'agent_softmax_std':[..<num bin vals>..], 'teacher_target_avg':[..<num bin vals>..], 'teacher_target_std':[..<num bin vals>..]}
         binned = {}
-        # HERE
+        # TODO
+        for i in range(len(output_data_labels)):
+            # specific to both output data and action class
+            for j in range(len(action_reference)):
+                binned[output_data_labels[i]][j] = cls._bin_softmax_compute_stats(splits[output_data_labels[i]][j])
 
-        # y axis = steacher target 1/0 processed
+        # y axis = teacher avg and variance
+        # y axis = agent avg and variance
         # x = bin processed
 
 
