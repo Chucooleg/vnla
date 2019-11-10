@@ -274,7 +274,7 @@ class PlotUtils(object):
 
         Returns:
             A nested dictionary.
-            split_data[forward index]= {'agent_softmax_vals':[...], 'teacher_target_bools': [.....], 'time_steps':[...]}
+            split_data[forward index]= {'agent_softmax_vals':[...], 'teacher_target_bools': [.....], 'timesteps':[...]}
         """
         assert len(flattened_data) == 3
         teacher_targets_flattened, agent_softmaxes_flattened, 
@@ -287,7 +287,7 @@ class PlotUtils(object):
             for j in range(len(action_reference)):
                 split_data[j]['agent_softmax_val'].append(agent_softmaxes_flattened[i][j])
                 split_data[j]['teacher_target_bools'].append(int(teacher_targets_flattened[i]) == j)
-                split_data[j]['time_steps'].append(timesteps_flattened[i])
+                split_data[j]['timesteps'].append(timesteps_flattened[i])
         return split_data
 
     @classmethod
@@ -295,18 +295,43 @@ class PlotUtils(object):
         """bin using softmax ranges to compute stats for teacher target and agent predicted softmax.
         
         Arguments:
-            vals_dict {dict} -- has 3 keys. 'agent_softmax_vals', 'teacher_target_bools' and 'time_steps'. Each key linking to a 1-D numeric array with shape (sum_datapt(num timesteps at datapt i), ). Note this is specific to both output dataset and action class. e.g. from `splits["test_seen"][forward action idx=j]`
+            vals_dict {dict} -- has keys 'agent_softmax_vals', 'teacher_target_bools', 'timesteps'. Each key linking to a 1-D numeric array. e.g.set val_dicts as what `splits["test_seen"][forward action idx=j]` returns
 
         Returns:
-            bin_data {dict} -- has 3 keys. i.e. {'agent_softmax_avg':[..<num bin vals>..], 'agent_softmax_std':[..<num bin vals>..], 'teacher_target_avg':[..<num bin vals>..], 'teacher_target_std':[..<num bin vals>..]}. 
+            bin_data {dict} -- has 4 keys. i.e. {'agent_softmax_avg':[..<num bin vals>..], 'agent_softmax_std':[..<num bin vals>..], 'teacher_target_avg':[..<num bin vals>..], 'teacher_target_std':[..<num bin vals>..], 'timesteps' : [[...], [...], [...], [...], ...]}. 
         """
+        agent_softmax_vals = np.array(vals_dict['agent_softmax_vals'])
+        teacher_target_bools = np.array(vals_dict['teacher_target_bools'])
+        timesteps = np.array(vals_dict['timesteps'])
+
+        # set intervals
         bin_width = 1./num_bins
         cuts = list(np.arange(0.0, 1.0, bin_width).round(decimals=2))
         intervals = [(round(cut,2), round(cut + bin_width,2)) for cut in cuts]
-        
 
+        agent_softmax_avg = np.zeros(len(intervals))
+        agent_softmax_std = np.zeros(len(intervals))
+        teacher_target_avg = np.zeros(len(intervals))
+        techer_target_std = np.zeros(len(intervals))
+        timesteps = [ None for i in range(len(intervals))]
 
-
+        for i, interval in enumerate(i, intervals):
+            # filter down to values within the interval
+            filter = agent_softmax_vals >= interval[0] & agent_softmax_vals < interval[1]
+            # compute stats for these values
+            agent_softmax_avg[i] = np.avg(agent_softmax_vals[filter])
+            agent_softmax_std[i] = np.std(agent_softmax_vals[filter])
+            teacher_target_avg[i] = np.avg(teacher_target_bools[filter])
+            techer_target_std[i] = np.std(teacher_target_bools[filter])
+            timesteps[i] = timesteps[filter]
+       
+        bin_data = dict{}
+        bin_data['agent_softmax_avg'] = agent_softmax_avg
+        bin_data['agent_softmax_std'] = agent_softmax_std
+        bin_data['teacher_target_avg'] = teacher_target_avg
+        bin_data['techer_target_std'] = techer_target_std
+        bin_data['timesteps'] = timesteps
+        return bin_data
 
     @classmethod
     def plot_overlapping_histograms(cls, arr_list, label_list, title, xlab, ylab, **kwargs):
@@ -610,7 +635,7 @@ class PlotUtils(object):
             flattened[output_data_labels[i]]['timesteps_flattened'] = \
                 cls.flatten_targets_softmaxes_timesteps(output_data_list[i], action_type, cross_ent_bool)
 
-        # splits['test_seen'][forward idx=0] = {'agent_softmax_vals':[...], 'teacher_target_bools': [.....], 'time_steps':[...]}
+        # splits['test_seen'][forward idx=0] = {'agent_softmax_vals':[...], 'teacher_target_bools': [.....], 'timesteps':[...]}
         splits = {}
         for i in range(len(output_data_labels)):
             splits[output_data_labels[i]] = cls._split_softmax_data_by_action_class(
@@ -623,22 +648,24 @@ class PlotUtils(object):
             )
 
         # binning, compute average and compute variance within bin
-        # if split by time step. should also split here, need to create `timed_binned`
         # binned['test_seen'][forward idx=0] = {'agent_softmax_avg':[..<num bin vals>..], 'agent_softmax_std':[..<num bin vals>..], 'teacher_target_avg':[..<num bin vals>..], 'teacher_target_std':[..<num bin vals>..]}
         binned = {}
-        # TODO
         for i in range(len(output_data_labels)):
-            # specific to both output data and action class
             for j in range(len(action_reference)):
                 binned[output_data_labels[i]][j] = cls._bin_softmax_compute_stats(splits[output_data_labels[i]][j])
 
+        # HERE -- plot 
         # y axis = teacher avg and variance
         # y axis = agent avg and variance
         # x = bin processed
 
+        # plot one graph per action class!
+        for i in range(len(action_reference)):
+            pass
+            # let's try to plot for one dataset first
+            # debug what is written so far then do this in notebook
+        return binned
 
-
-        pass
 
     @classmethod
     def plot_grouped_bar_comparison(cls, category_ids, arr_a, arr_b, category_name,
