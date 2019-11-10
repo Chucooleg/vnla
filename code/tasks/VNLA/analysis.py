@@ -291,7 +291,7 @@ class PlotUtils(object):
         return split_data
 
     @classmethod
-    def _bin_softmax_compute_stats(cls, vals_dict):
+    def _bin_softmax_compute_stats(cls, vals_dict, num_bins):
         """bin using softmax ranges to compute stats for teacher target and agent predicted softmax.
         
         Arguments:
@@ -300,7 +300,11 @@ class PlotUtils(object):
         Returns:
             bin_data {dict} -- has 3 keys. i.e. {'agent_softmax_avg':[..<num bin vals>..], 'agent_softmax_std':[..<num bin vals>..], 'teacher_target_avg':[..<num bin vals>..], 'teacher_target_std':[..<num bin vals>..]}. 
         """
-        # HERE
+        bin_width = 1./num_bins
+        cuts = list(np.arange(0.0, 1.0, bin_width).round(decimals=2))
+        intervals = [(round(cut,2), round(cut + bin_width,2)) for cut in cuts]
+        
+
 
 
 
