@@ -477,6 +477,7 @@ class PlotUtils(object):
                 category_name=category_name,
                 quality_labels = ["confidently wrong", "otherwise"],
                 output_data_labels=output_data_labels,
+                action_type=action_type,
                 figsize=(20, 12), normalized=norm,
                 h_line=True, dataset_colors=None)
 
@@ -555,7 +556,7 @@ class PlotUtils(object):
         kwargs = dict(alpha=0.5, bins=bins, density=True, stacked=True)
         cls.plot_overlapping_histograms(arr_list=[flattened[label]['agent_entropies_flattened'] for label in flattened],
                                         label_list=output_data_labels, # e.g. ['test_seen', 'test_unseen'],
-                                        title="{}Entropy Distribution".format("Cross " if cross_ent_bool else ""),
+                                        title="{} \n {}Entropy Distribution".format(action_type, "Cross " if cross_ent_bool else ""),
                                         xlab="Per agent decision entropy",
                                         ylab="Density",
                                         **kwargs)
@@ -577,7 +578,8 @@ class PlotUtils(object):
                 for agent_argmax_key in actions:
                     cls.plot_overlapping_histograms(arr_list=[splits[label][(teacher_tar_key, agent_argmax_key)] for label in splits],
                                                     label_list=output_data_labels,  # e.g. ['test_seen', 'test_unseen'],
-                                                    title='Teacher {}({}), Agent {}({}), {}Entropy Distribution'.format(
+                                                    title='{} \nTeacher {}({}), Agent {}({}), {}Entropy Distribution'.format(
+                                                        action_type,
                                                         teacher_tar_key, action_reference[teacher_tar_key],
                                                         agent_argmax_key, action_reference[agent_argmax_key],
                                                         "Cross " if cross_ent_bool else ""),
@@ -707,9 +709,9 @@ class PlotUtils(object):
 
     @classmethod
     def plot_grouped_bar_comparison(cls, category_ids, arr_a, arr_b, category_name,
-                                    quality_labels, output_data_labels,
+                                    quality_labels, output_data_labels, action_type,
                                     figsize=(20, 12), normalized=True,
-                                    h_line=True, dataset_colors=None):
+                                    h_line=True, dataset_colors=None, ):
         """
         Compare a set test seen and test unseen outputs by quality of agent decisions.
         Using grouped bar chart.
@@ -783,7 +785,8 @@ class PlotUtils(object):
             rs.append(rs[i] + hoffset)
 
         # title
-        plt.title("{} : {} \n {} - {} split".format(
+        plt.title("{} \n {} : {} \n {} - {} split".format(
+            action_type,
             " vs ".join(output_data_labels),
             str(('normalized' if normalized else 'raw counts')),
             quality_labels[0], quality_labels[1]),
