@@ -299,7 +299,15 @@ class PlotUtils(object):
             vals_dict {dict} -- has keys 'agent_softmax_vals', 'teacher_target_bools', 'timesteps'. Each key linking to a 1-D numeric array. e.g.set val_dicts as what `splits["test_seen"][forward action idx=j]` returns
 
         Returns:
-            bin_data {dict} -- has 4 keys. i.e. {'agent_softmax_avg':[..<num bin vals>..], 'agent_softmax_std':[..<num bin vals>..], 'teacher_target_avg':[..<num bin vals>..], 'teacher_target_std':[..<num bin vals>..], 'timesteps' : [[...], [...], [...], [...], ...]}. 
+            bin_data {dict} -- has 4 keys. 
+                            i.e. {
+                                'agent_softmax_avg':[..<num bin vals>..],
+                                'agent_softmax_std':[..<num bin vals>..],
+                                'teacher_target_avg':[..<num bin vals>..],
+                                'teacher_target_std':[..<num bin vals>..],
+                                'timesteps' : [[...], [...], [...], [...], ...],
+                                'agent_softmax_vals' : [[...], [...], [...], [...], ...],
+                                'teacher_target_vals' : [[...], [...], [...], [...], ...]}. 
         """
         agent_softmax_vals = np.array(vals_dict['agent_softmax_val'])
         teacher_target_bools = np.array(vals_dict['teacher_target_bools'])
@@ -313,27 +321,34 @@ class PlotUtils(object):
         agent_softmax_avg = np.zeros(len(intervals))
         agent_softmax_std = np.zeros(len(intervals))
         teacher_target_avg = np.zeros(len(intervals))
-        techer_target_std = np.zeros(len(intervals))
+        teacher_target_std = np.zeros(len(intervals))
         timesteps_filtered = [ None for i in range(len(intervals))]
+        agent_softmaxes_filtered = [ None for i in range(len(intervals))]
+        teacher_targets_filtered = [ None for i in range(len(intervals))]
 
         for i, interval in enumerate(intervals):
-            # filter down to values within the interval         
+            # filter construction         
             lower = agent_softmax_vals >= interval[0] 
             upper = agent_softmax_vals < interval[1]
             filter = lower & upper
-            # compute stats for these values
+            # filter down to values within the interval
+            timesteps_filtered[i] = timesteps[filter]
+            agent_softmaxes_filtered[i] = agent_softmax_vals[filter]
+            teacher_targets_filtered[i] = teacher_target_bools[filter]
+            # compute stats for these filtered values
             agent_softmax_avg[i] = np.mean(agent_softmax_vals[filter])
             agent_softmax_std[i] = np.std(agent_softmax_vals[filter])
             teacher_target_avg[i] = np.mean(teacher_target_bools[filter])
-            techer_target_std[i] = np.std(teacher_target_bools[filter])
-            timesteps_filtered[i] = timesteps[filter]
-       
+            teacher_target_std[i] = np.std(teacher_target_bools[filter])
+
         bin_data = dict()
         bin_data['agent_softmax_avg'] = agent_softmax_avg
         bin_data['agent_softmax_std'] = agent_softmax_std
         bin_data['teacher_target_avg'] = teacher_target_avg
-        bin_data['techer_target_std'] = techer_target_std
-        bin_data['timesteps'] = timesteps
+        bin_data['teacher_target_std'] = teacher_target_std
+        bin_data['timesteps_filtered'] = timesteps_filtered
+        bin_data['agent_softmaxes_filtered'] = agent_softmaxes_filtered
+        bin_data['teacher_targets_filtered'] = teacher_targets_filtered
         return bin_data
 
     @classmethod
@@ -648,7 +663,14 @@ class PlotUtils(object):
             )
 
         # binning, compute average and compute variance within bin
-        # binned['test_seen'][forward idx=0] = {'agent_softmax_avg':[..<num bin vals>..], 'agent_softmax_std':[..<num bin vals>..], 'teacher_target_avg':[..<num bin vals>..], 'teacher_target_std':[..<num bin vals>..]}
+        # binned['test_seen'][forward idx=0] = {
+                                                # 'agent_softmax_avg':[..<num bin vals>..],
+                                                # 'agent_softmax_std':[..<num bin vals>..],
+                                                # 'teacher_target_avg':[..<num bin vals>..],
+                                                # 'teacher_target_std':[..<num bin vals>..],
+                                                # 'timesteps' : [[...], [...], [...], [...], ...],
+                                                # 'agent_softmax_vals' : [[...], [...], [...], [...], ...],
+                                                # 'teacher_target_vals' : [[...], [...], [...], [...], ...]}
         binned = defaultdict(lambda : defaultdict(dict))
         for i in range(len(output_data_labels)):
             for j in range(len(action_reference)):
@@ -660,12 +682,24 @@ class PlotUtils(object):
         # x = bin processed
 
         # plot one graph per action class!
-        for i in range(len(action_reference)):
-            pass
-            # let's try to plot for one dataset first
-            # debug what is written so far then do this in notebook
-        return binned
-
+        for a in range(len(action_reference)):
+            f, ax = plt.subplots(figsize=(12, 12))
+            # plot vertical lines
+            bin_width = 1./num_bins
+            center = np.arange(bin_width / 2, 1 + bin_width / 2, bin_width)
+            for i in np.append((center - 1./num_bins/2), 1.0):
+                plt.axvline(x=i, ls="--", c="0.5", linewidth=0.1)
+            # plot diagonal
+            ax.plot(ax.get_xlim(), ax.get_ylim(), ls="--", c=".3")
+            # plot teacher gold mean
+            for j in range(len(output_data_labels)):
+                y = binned[output_data_labels[j]][a]['teacher_target_avg']
+                x = center
+                dotsize = [bin_arr.shape[0]*0.75 for bin_arr in binned[output_data_labels[j]][a]['teacher_targets_filtered']]
+                ax.scatter(x, y, s=dotsize, label=output_data_labels[j] + " teacher mean", alpha=0.75)
+            ax.set_title("{}, Action = {}".format(action_type, action_reference[a]))
+            ax.xaxis.set_ticks(np.arange(0.0, 1.0 + bin_width, bin_width*2))
+            ax.legend(markerscale=0.5)
 
     @classmethod
     def plot_grouped_bar_comparison(cls, category_ids, arr_a, arr_b, category_name,
