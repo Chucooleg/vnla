@@ -113,9 +113,9 @@ class OutputData(object):
          for i in range(len(self.output_data)):
             nav_softmax_initial_list, nav_softmax_final_list, ask_softmax_list = \
                 self.compute_softmax_per_datapt(self.output_data[i])
-            self.output_data[i]['agent_nav_softmax_initial'] = nav_cross_ent_initial_list
-            self.output_data[i]['agent_nav_softmax_final'] = nav_cross_ent_final_list
-            self.output_data[i]['agent_ask_softmax_ent'] = ask_cross_ent_list       
+            self.output_data[i]['agent_nav_softmax_initial'] = nav_softmax_initial_list
+            self.output_data[i]['agent_nav_softmax_final'] = nav_softmax_final_list
+            self.output_data[i]['agent_ask_softmax'] = ask_softmax_list       
 
     def compute_nav_argmax_output_data(self):
         for i in range(len(self.output_data)):
@@ -692,14 +692,18 @@ class PlotUtils(object):
             # plot diagonal
             ax.plot(ax.get_xlim(), ax.get_ylim(), ls="--", c=".3")
             # plot teacher gold mean
+            dotsize_collect = []
             for j in range(len(output_data_labels)):
                 y = binned[output_data_labels[j]][a]['teacher_target_avg']
                 x = center
                 dotsize = [bin_arr.shape[0]*0.75 for bin_arr in binned[output_data_labels[j]][a]['teacher_targets_filtered']]
+                dotsize_collect.append(dotsize)
                 ax.scatter(x, y, s=dotsize, label=output_data_labels[j] + " teacher mean", alpha=0.75)
             ax.set_title("{}, Action = {}".format(action_type, action_reference[a]))
             ax.xaxis.set_ticks(np.arange(0.0, 1.0 + bin_width, bin_width*2))
             ax.legend(markerscale=0.5)
+
+        return dotsize_collect
 
     @classmethod
     def plot_grouped_bar_comparison(cls, category_ids, arr_a, arr_b, category_name,
