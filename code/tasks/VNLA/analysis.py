@@ -695,12 +695,12 @@ class PlotUtils(object):
             ax.plot(ax.get_xlim(), ax.get_ylim(), ls="--", c=".3")
             # plot teacher gold mean
             dotsize_collect = []
-            for j in range(len(output_data_labels)):
-                y = binned[output_data_labels[j]][a]['teacher_target_avg']
+            for k in range(len(output_data_labels)):
+                y = binned[output_data_labels[k]][a]['teacher_target_avg']
                 x = center
-                dotsize = [bin_arr.shape[0]*0.75 for bin_arr in binned[output_data_labels[j]][a]['teacher_targets_filtered']]
+                dotsize = [bin_arr.shape[0]*0.75 for bin_arr in binned[output_data_labels[k]][a]['teacher_targets_filtered']]
                 dotsize_collect.append(dotsize)
-                ax.scatter(x, y, s=dotsize, label=output_data_labels[j] + " teacher mean", alpha=0.75)
+                ax.scatter(x, y, s=dotsize, label=output_data_labels[k] + " teacher mean", alpha=0.75)
             ax.set_title("{}, Action = {}".format(action_type, action_reference[a]))
             ax.xaxis.set_ticks(np.arange(0.0, 1.0 + bin_width, bin_width*2))
             ax.legend(markerscale=0.5)
