@@ -446,9 +446,9 @@ class PlotUtils(object):
             counts[output_data_labels[i]] = count_data
             # we want to narrow down to the common set of categories between the different output datasets
             if categories is None:
-                categories = set(categories_flattened)
+                categories = set(count_data.keys())
             else:
-                categories = categories & set(categories_flattened)
+                categories = categories & set(count_data.keys())
 
         # plot grouped bar chart below
         # order the categories first
