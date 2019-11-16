@@ -424,6 +424,7 @@ class PlotUtils(object):
             flattened[output_data_labels[i]]['filter_correct'] = correct
             flattened[output_data_labels[i]]['filter_wrong_and_confident'] = wrong & confident
             flattened[output_data_labels[i]]['filter_wrong_and_not_confident'] = wrong & not_confident
+            flattened[output_data_labels[i]]['filter_correct_and_not_confident'] = correct & not_confident
         
         # add flattened room label list for each output dataset (e.g. "r", "-", "h", "...")
         if room_specific:
@@ -438,6 +439,7 @@ class PlotUtils(object):
         counts_wrong_confident = {}
         counts_wrong_not_confident = {}
         counts_correct = {}
+        counts_correct_not_confident = {}
         categories = None
         for i in range(len(output_data_labels)):
             agent_entropies_flattened = flattened[output_data_labels[i]]['agent_entropies_flattened']
@@ -458,10 +460,15 @@ class PlotUtils(object):
                 cls._filter_and_split_ent_by_decision_quality(
                     flattened_data=[agent_entropies_flattened, categories_flattened], 
                     filter=flattened[output_data_labels[i]]['filter_correct'])
+            _, count_data_correct_not_confident = \
+                cls._filter_and_split_ent_by_decision_quality(
+                    flattened_data=[agent_entropies_flattened, categories_flattened], 
+                    filter=flattened[output_data_labels[i]]['filter_correct_and_not_confident'])
             ##splits[output_data_labels[i]] = split_data
             counts_wrong_confident[output_data_labels[i]] = count_data_wrong_confident
             counts_wrong_not_confident[output_data_labels[i]] = count_data_wrong_not_confident
             counts_correct[output_data_labels[i]] = count_data_correct
+            counts_correct_not_confident[output_data_labels[i]] = count_data_correct_not_confident
             # we want to narrow down to the common set of categories between the different output datasets
             if categories is None:
                 categories = set(count_data_wrong_confident.keys())
@@ -487,10 +494,15 @@ class PlotUtils(object):
             for i in range(len(output_data_labels))])
         arr_b = np.vstack((arr_b[0], arr_b[1]))
 
-        # correct in test seen, wrong, correct in test unseen
+        # correct, all in test seen, wrong, correct, all in test unseen
         arr_c = np.array([[counts_correct[output_data_labels[i]][cat][0] for cat in category_ids] \
             for i in range(len(output_data_labels))])
         arr_c = np.vstack((arr_c[0], arr_c[1]))  
+
+         # correct, not confidently in test seen, wrong, correct, not confidently  in test unseen
+        arr_d = np.array([[counts_correct_not_confident[output_data_labels[i]][cat][0] for cat in category_ids] \
+            for i in range(len(output_data_labels))])
+        arr_d = np.vstack((arr_d[0], arr_d[1]))         
 
         assert len(arr_a) == len(output_data_labels)
         # plot normalized bar chart, plot raw count bar chart 
@@ -500,12 +512,13 @@ class PlotUtils(object):
                 arr_a=arr_a, 
                 arr_b=arr_b,
                 arr_c=arr_c,
+                arr_d=arr_d,
                 category_name=category_name,
                 quality_labels = ['incorrect, confidently', 'incorrect, not-confidently', 'correct'],
                 output_data_labels=output_data_labels,
                 action_type=action_type,
                 figsize=(20, 12), normalized=norm,
-                h_line=False, dataset_colors=None)
+                h_line=True, dataset_colors=None)
 
     @classmethod
     def _filter_and_split_ent_by_decision_quality(cls, flattened_data, filter):
@@ -729,7 +742,7 @@ class PlotUtils(object):
         return dotsize_collect
 
     @classmethod
-    def plot_grouped_bar_comparison(cls, category_ids, arr_a, arr_b, arr_c, category_name,
+    def plot_grouped_bar_comparison(cls, category_ids, arr_a, arr_b, arr_c, arr_d, category_name,
                                     quality_labels, output_data_labels, action_type,
                                     figsize=(20, 12), normalized=True,
                                     h_line=True, dataset_colors=None, ):
@@ -744,8 +757,9 @@ class PlotUtils(object):
         :param arr_b: numpy array (num output datasets, num categories).
                       e.g. (incorrect, not confidently in test seen; incorrect, not confidently in test unseen)
         :param arr_c: numpy array (num output datasets, num categories).
-                      e.g. (correct in test seen, correct in test unseen)
-
+                      e.g. (correct, all in test seen, correct, all in test unseen)
+        :param arr_d: numpy array (num output datasets, num categories). To add a dotted line mark only
+                      e.g. (correct, not confidently in test seen, correct, not confidently in test unseen)
         :param category_name: string to label x-axis. Such as "time" or "room tag"
         :param quality_labels: 3-string iterable. e.g. ('incorrect, confidently', 'incorrect, not-confidently', 'correct')
         :param output_data_labels: multi-string tuple. e.g. ('test_seen', 'test_unseen')
@@ -755,7 +769,7 @@ class PlotUtils(object):
         :param dataset_colors: array of strings. hexcode colors.
         :return:
         """
-        assert (arr_a.shape == arr_b.shape == arr_c.shape and
+        assert (arr_a.shape == arr_b.shape == arr_c.shape == arr_d.shape and
                 arr_a.shape[0] == len(output_data_labels) and
                 arr_a.shape[1] == len(category_ids))
         if dataset_colors is not None:
@@ -772,8 +786,10 @@ class PlotUtils(object):
 
         if normalized:
             tot = arr_a + arr_b + arr_c
-            arr_a, arr_b = np.around(arr_a / tot, 4), np.around(arr_b / tot, 4)
+            arr_a = np.around(arr_a / tot, 4) 
+            arr_b = np.around(arr_b / tot, 4)
             arr_c = 1 - arr_a - arr_b
+            arr_d = np.around(arr_d / tot, 4)
 
         # figure boundary
         plt.subplots(figsize=figsize)
@@ -809,10 +825,12 @@ class PlotUtils(object):
             hoffset = bar_width + bar_width / float(1.5)
 
             # h line
-            if i == 0 and h_line:
+            #if i == 0 and h_line:
+            if h_line:
                 hspan = hoffset * len(output_data_labels)
-                h = plt.hlines(y=arr_c[i], xmin=rs[i] - 0.2,
-                               xmax=rs[i] + hspan,
+                h = plt.hlines(y=arr_a[i] + arr_b[i] + arr_d[i], xmin=rs[i] - 0.2,
+                               # xmax=rs[i] + hspan,
+                               xmax=rs[i] + bar_width + 0.1,
                                colors='k', alpha=0.8,
                                linestyles='dotted', label='baseline')
             # horizontal shift to next trial
