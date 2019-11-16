@@ -780,7 +780,7 @@ class PlotUtils(object):
         bar_width = min(0.2, 0.5 / arr_a.shape[0])
 
         # b & w
-        colors = ['#000000', '#555555', '#dddddd', '#ffffff']
+        colors = ['#000000', '#888888', '#dddddd', '#ffffff']
         if dataset_colors is None:
             dataset_colors = REF_COLORS
         dataset_colors = np.array(dataset_colors)
@@ -836,8 +836,8 @@ class PlotUtils(object):
                 h = plt.hlines(y=arr_a[i] + arr_b[i], xmin=rs[i] - 0.2,
                                # xmax=rs[i] + hspan,
                                xmax=rs[i] + bar_width + 0.1,
-                               colors='r', alpha=1.0,
-                               linestyles='dotted', label='baseline')
+                               colors='r', alpha=1.0, linewidth=2.0,
+                               linestyles='--', label='baseline')
             # horizontal shift to next trial
             rs.append(rs[i] + hoffset)
 
