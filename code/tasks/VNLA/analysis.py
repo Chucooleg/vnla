@@ -758,9 +758,9 @@ class PlotUtils(object):
         :param arr_b: numpy array (num output datasets, num categories).
                       e.g. (incorrect, not confidently in test seen; incorrect, not confidently in test unseen)
         :param arr_c: numpy array (num output datasets, num categories).
-                      e.g. (correct, all in test seen, correct, all in test unseen)
-        :param arr_d: numpy array (num output datasets, num categories). To add a dotted line mark only
                       e.g. (correct, not confidently in test seen, correct, not confidently in test unseen)
+        :param arr_d: numpy array (num output datasets, num categories). To add a dotted line mark only
+                      e.g. (correct, confidently in test seen, correct, confidently in test unseen)
         :param category_name: string to label x-axis. Such as "time" or "room tag"
         :param quality_labels: 3-string iterable. e.g. ('incorrect, confidently', 'incorrect, not-confidently', 'correct')
         :param output_data_labels: multi-string tuple. e.g. ('test_seen', 'test_unseen')
