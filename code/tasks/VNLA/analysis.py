@@ -128,6 +128,10 @@ class OutputData(object):
             self.output_data[i]['agent_nav_argmax_initial'] = agent_nav_argmax_initial
             self.output_data[i]['agent_nav_argmax_final'] = agent_nav_argmax_final
 
+    def add_timestep(self):
+        for datapt in self.output_data:
+            datapt['timesteps'] = [t for t in range(len(datapt['teacher_nav']))]
+
     def __getitem__(self, datapt_idx):
         return self.output_data[datapt_idx]
 
@@ -184,7 +188,8 @@ class PlotUtils(object):
         teacher_targets_flattened = np.array([target for datapt in data for target in datapt[teacher_target_str]])
         # agent_softmaxes_flattened shape (sum_datapt(timesteps in datapt i), num prediction classes)
         agent_softmaxes_flattened = np.array([softmax_arr for datapt in data for softmax_arr in datapt[agent_softmax_str]])
-        timesteps_flattened = np.array([timestep for datapt in data for timestep in range(len(datapt[teacher_target_str]))])
+        timesteps_flattened = np.array([timestep for datapt in data for timestep in datapt['timesteps']])
+        #timesteps_flattened = np.array([timestep for datapt in data for timestep in range(len(datapt[teacher_target_str]))])
         return teacher_targets_flattened, agent_softmaxes_flattened, timesteps_flattened
 
     @classmethod
@@ -200,7 +205,7 @@ class PlotUtils(object):
         teacher_targets_flattened = np.array([target for datapt in data for target in datapt[teacher_target_str]])
         agent_argmaxes_flattened = np.array([argmax for datapt in data for argmax in datapt[agent_argmax_str]])
         agent_entropies_flattened = np.array([entropy for datapt in data for entropy in datapt[agent_ent_str]])
-        timesteps_flattened = np.array([timestep for datapt in data for timestep in range(len(datapt[teacher_target_str]))])
+        timesteps_flattened = np.array([timestep for datapt in data for timestep in datapt['timesteps']])
         return teacher_targets_flattened, agent_argmaxes_flattened, agent_entropies_flattened, timesteps_flattened
 
     @classmethod
@@ -224,6 +229,38 @@ class PlotUtils(object):
         scan_flattened = np.array(scan_flattened)
         assert viewpt_flattened.shape == scan_flattened.shape
         return viewpt_flattened, scan_flattened
+
+    @classmethod
+    def shift_and_flatten_vals_by_time_step_delta(cls, output_data, keyname, timestep_delta):
+        """For each datapoint in output data, for a key array of interest, such as the array stored under key "agent_nav_ent", create an array with values shifted by `timestep_delta` number of timesteps and an array with curr values but trimmed for alignment's sake.
+        
+        Arguments:
+            output_data {list} -- a list of 1+ OutputData objects. Usually one for test seen and one for test unseen.
+            keyname {str} -- name of key with array vals to be time shifted. 
+                             e.g. "agent_nav_ent"
+            timestep_delta {int} -- cam be positive, negative but not zero. Number of time steps to be shifted for the array values.
+        Return:
+            Two 1-D numpy arrays each of shape (sum_datapt(num timesteps at datapt i), )
+        """
+        assert isinstance(timestep_delta, int)
+        assert timestep_delta != 0
+        curr_flattened = []
+        shifted_flattened = []
+
+        # need to time shift within each datapt, not the flattened version
+        for data_pt in output_data:
+            if timestep_delta > 0:
+                # e.g. delta is +1           
+                arr_curr = data_pt[keyname][:-timestep_delta] # A B C D -> A B C
+                arr_shifted = data_pt[keyname][timestep_delta:] # A B C D -> B C D
+            else: 
+                # e.g. delta is -1
+                arr_curr = data_pt[keyname][-timestep_delta:] # A B C D -> B C D
+                arr_shifted = data_pt[keyname][:timestep_delta] # A B C D -> A B C
+            curr_flattened.extend(arr_curr)
+            shifted_flattened.extend(arr_shifted)
+        assert len(curr_flattened) == len(shifted_flattened)
+        return curr_flattened, shifted_flattened
 
     @classmethod
     def get_roomlabels(cls, data):
@@ -559,6 +596,99 @@ class PlotUtils(object):
         return split_data, count_data
 
     @classmethod
+    def plot_time_entropy_corr_by_action_type(cls, output_data_list, output_data_labels, 
+    action_type, action_reference, timestep_delta, cutoff_denom=4):
+
+        print("Action Type : {}".format(action_type))
+        if not action_reference:
+            if "nav" in action_type:
+                action_reference = NAV_ACTIONS
+            elif "ask" in action_type:
+                action_reference = ASK_ACTIONS
+        print("Action Reference : {}".format(action_reference))         
+        print("Time shift = {}".format(timestep_delta))
+
+        # shift time step per traj and flatten vals
+        assert len(output_data_list) == len(output_data_labels)
+        teacher_target_str, agent_argmax_str, agent_ent_str, _ = cls._parse_action_type(action_type)
+        flattened = defaultdict(lambda : defaultdict(list))
+        # flattened['test_seen']['teacher_targets_curr_flattened'] = 1-D array
+        for i in range(len(output_data_labels)):
+            flattened[output_data_labels[i]]["teacher_targets" + '_curr_flattened'], flattened[output_data_labels[i]]["teacher_targets" + '_shifted_flattened'] = \
+                cls.shift_and_flatten_vals_by_time_step_delta(output_data=output_data_list[i], keyname=teacher_target_str, timestep_delta=timestep_delta)
+            flattened[output_data_labels[i]]["agent_argmaxes" + '_curr_flattened'], flattened[output_data_labels[i]]["agent_argmaxes" + '_shifted_flattened'] = \
+                cls.shift_and_flatten_vals_by_time_step_delta(output_data=output_data_list[i], keyname=agent_argmax_str, timestep_delta=timestep_delta)
+            flattened[output_data_labels[i]]["agent_entropies" + '_curr_flattened'], flattened[output_data_labels[i]]["agent_entropies" + '_shifted_flattened'] = \
+                cls.shift_and_flatten_vals_by_time_step_delta(output_data=output_data_list[i], keyname=agent_ent_str, timestep_delta=timestep_delta)
+            flattened[output_data_labels[i]]["timesteps" + '_curr_flattened'], flattened[output_data_labels[i]]["timesteps" + '_shifted_flattened'] = \
+                cls.shift_and_flatten_vals_by_time_step_delta(output_data=output_data_list[i], keyname="timesteps", timestep_delta=timestep_delta)
+        
+        #  compute filters & plot
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(18, 18))
+        # compute the entropy cut-off to qualify for being a bad decision entropy
+        even_dist_entropy = - np.log(1./len(action_reference)) # - log(p(x))
+        # what should count as confidently wrong?
+        bad_entropy_cutoff = even_dist_entropy/cutoff_denom # cutoff at first quantile
+
+        # loop through (correct, correct), (correct, incorrect), (incorrect, correct), (incorrect, incorrect)
+        for typ, ax_id in zip([("correct", "correct"), ("correct", "incorrect"), ("incorrect", "correct"), ("incorrect", "incorrect")],
+        [(0, 0), (0, 1), (1, 1), (1, 0)]):
+
+             # plot vertical lines
+            axes[ax_id].vlines(x=np.arange(0.0, even_dist_entropy + 0.1, 0.1), ymin=0.0,ymax=even_dist_entropy, ls="--", colors="#888888", linewidth=0.1)
+             
+            # plot diagonal
+            axes[ax_id].plot((0, even_dist_entropy), (0, even_dist_entropy), ls="--", c=".3")
+            axes[ax_id].hlines(y=even_dist_entropy / 4., xmin=0.0, xmax=even_dist_entropy, ls="--")          
+            axes[ax_id].vlines(x=even_dist_entropy / 4., ymin=0.0, ymax=even_dist_entropy, ls="--")   
+
+            # loop thtough test seen and test unseen output data
+            for j in range(len(output_data_labels)):
+                # curr
+                if typ[0] == "correct":
+                    filter_curr = np.array(flattened[output_data_labels[j]]['teacher_targets_curr_flattened']) == \
+                        np.array(flattened[output_data_labels[j]]['agent_argmaxes_curr_flattened'])
+                elif typ[0] == 'incorrect':
+                    filter_curr = np.array(flattened[output_data_labels[j]]['teacher_targets_curr_flattened']) != \
+                        np.array(flattened[output_data_labels[j]]['agent_argmaxes_curr_flattened'])      
+                if typ[1] == "correct":                                     
+                    filter_shifted = np.array(flattened[output_data_labels[j]]['teacher_targets_shifted_flattened']) == \
+                        np.array(flattened[output_data_labels[j]]['agent_argmaxes_shifted_flattened'])
+                elif typ[1] == 'incorrect':
+                    filter_shifted = np.array(flattened[output_data_labels[j]]['teacher_targets_shifted_flattened']) != \
+                        np.array(flattened[output_data_labels[j]]['agent_argmaxes_shifted_flattened']) 
+                fil = filter_curr & filter_shifted
+
+                x = np.array(flattened[output_data_labels[j]]['agent_entropies_curr_flattened'])[fil]
+                y = np.array(flattened[output_data_labels[j]]['agent_entropies_shifted_flattened'])[fil]
+                axes[ax_id].scatter(x, y, marker='x', c=REF_COLORS[j], label="{} : {}".format(output_data_labels[j], len(x)), alpha=0.15)
+
+                conf_conf = np.sum((x <= bad_entropy_cutoff) & (y <= bad_entropy_cutoff))
+                conf_notconf = np.sum((x <= bad_entropy_cutoff) & (y > bad_entropy_cutoff))
+                notconf_conf = np.sum((x > bad_entropy_cutoff) & (y <= bad_entropy_cutoff))
+                notconf_notconf = np.sum((x > bad_entropy_cutoff) & (y > bad_entropy_cutoff))               
+
+                # Annotate directly on graph
+                # split the data by confidence first
+                axes[ax_id].annotate("{}:\n{}".format(output_data_labels[j], conf_conf), 
+                xy=(0 + 0.1, bad_entropy_cutoff - 0.2 - 0.15 * j), fontsize="large")
+                axes[ax_id].annotate("{}:\n{}".format(output_data_labels[j], conf_notconf), 
+                xy=(0 + 0.1, bad_entropy_cutoff + 0.5 - 0.15 * j), fontsize="large")
+                axes[ax_id].annotate("{}:\n{}".format(output_data_labels[j], notconf_conf), 
+                xy=(bad_entropy_cutoff + 0.1, bad_entropy_cutoff - 0.2 - 0.15 * j), fontsize="large")
+                axes[ax_id].annotate("{}:\n{}".format(output_data_labels[j], notconf_notconf), 
+                xy=(bad_entropy_cutoff + 0.1, bad_entropy_cutoff + 0.5 - 0.15 * j), fontsize="large")
+
+            axes[ax_id].set_title(str(typ))
+            axes[ax_id].set_xlabel("Time step `t` Entropy -- {}".format(typ[0].upper()))
+            axes[ax_id].set_ylabel("Time step `t {}{}` Entropy -- {}".format("+" if timestep_delta>0 else "", timestep_delta, typ[1].upper()))
+            axes[ax_id].xaxis.set_ticks(np.arange(0.0, even_dist_entropy, 0.1))
+            axes[ax_id].yaxis.set_ticks(np.arange(0.0, even_dist_entropy, 0.1))
+            axes[ax_id].legend(markerscale=1.)
+
+        fig.suptitle(action_type)
+
+    @classmethod
     def plot_entropy_by_action_type(cls, output_data_list, output_data_labels, action_type, cross_ent_bool=False, 
     action_reference=None, action_pair_specific=True, timestep_specific=False, bins=30):
         """
@@ -735,10 +865,10 @@ class PlotUtils(object):
                 x = center
                 dotsize = [bin_arr.shape[0]*0.75 for bin_arr in binned[output_data_labels[k]][a]['teacher_targets_filtered']]
                 dotsize_collect.append(dotsize)
-                ax.scatter(x, y, s=dotsize, label=output_data_labels[k] + " teacher mean", alpha=0.75)
+                ax.scatter(x, y, s=dotsize, label=output_data_labels[k] + " teacher mean", alpha=0.75, c=REF_COLORS[k])
             ax.set_title("{}, Action = {}".format(action_type, action_reference[a]))
-            ax.xaxis.set_ticks(np.arange(0.0, 1.0 + bin_width, bin_width*2))
-            ax.legend(markerscale=0.5)
+            ax.xaxis.set_ticks(np.arange(0.0, 1.0 + bin_width*2, bin_width*4))
+            ax.legend(markerscale=0.1)
 
         return dotsize_collect
 
