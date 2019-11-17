@@ -670,13 +670,13 @@ class PlotUtils(object):
 
                 # Annotate directly on graph
                 # split the data by confidence first
-                axes[ax_id].annotate("{}:\n{}".format(output_data_labels[j], conf_conf), 
+                axes[ax_id].annotate("{}:\n{} ({})".format(output_data_labels[j], conf_conf, round(conf_conf * 1. / len(x), 2)), 
                 xy=(0 + 0.1, bad_entropy_cutoff - 0.2 - 0.15 * j), fontsize="large")
-                axes[ax_id].annotate("{}:\n{}".format(output_data_labels[j], conf_notconf), 
+                axes[ax_id].annotate("{}:\n{} ({})".format(output_data_labels[j], conf_notconf, round(conf_notconf * 1. / len(x), 2)), 
                 xy=(0 + 0.1, bad_entropy_cutoff + 0.5 - 0.15 * j), fontsize="large")
-                axes[ax_id].annotate("{}:\n{}".format(output_data_labels[j], notconf_conf), 
+                axes[ax_id].annotate("{}:\n{} ({})".format(output_data_labels[j], notconf_conf, round(notconf_conf * 1. / len(x), 2)), 
                 xy=(bad_entropy_cutoff + 0.1, bad_entropy_cutoff - 0.2 - 0.15 * j), fontsize="large")
-                axes[ax_id].annotate("{}:\n{}".format(output_data_labels[j], notconf_notconf), 
+                axes[ax_id].annotate("{}:\n{} ({})".format(output_data_labels[j], notconf_notconf, round(notconf_notconf * 1. / len(x), 2)), 
                 xy=(bad_entropy_cutoff + 0.1, bad_entropy_cutoff + 0.5 - 0.15 * j), fontsize="large")
 
             axes[ax_id].set_title(str(typ))
