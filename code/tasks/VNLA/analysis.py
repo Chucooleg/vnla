@@ -132,6 +132,10 @@ class OutputData(object):
         for datapt in self.output_data:
             datapt['timesteps'] = [t for t in range(len(datapt['teacher_nav']))]
 
+    def add_subgraph(self):
+        # TODO
+        pass
+
     def __getitem__(self, datapt_idx):
         return self.output_data[datapt_idx]
 
