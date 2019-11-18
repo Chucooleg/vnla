@@ -231,6 +231,24 @@ class PlotUtils(object):
         return viewpt_flattened, scan_flattened
 
     @classmethod
+    def flatten_masks(cls, data, action_type):
+        """
+        Arguments:
+            data {OutputData} -- data object instantiated from OutputData class
+        
+        Returns:
+            masks_flattened -- 1-D numpy array of shape (sum_datapt(num timesteps at datapt i), )
+        """           
+        if "nav" in action_type:
+            mask_str = "agent_nav_logit_masks"
+        elif "ask" in action_type:
+            mask_str = "agent_ask_logit_masks"
+        # check if mask was applied
+        check_mask = lambda x: 1 if np.sum(x) > 0 else 0
+        masks_flattened = [check_mask(mask) for datapt in data for mask in datapt[mask_str]]
+        return np.array(masks_flattened)
+
+    @classmethod
     def shift_and_flatten_vals_by_time_step_delta(cls, output_data, keyname, timestep_delta):
         """For each datapoint in output data, for a key array of interest, such as the array stored under key "agent_nav_ent", create an array with values shifted by `timestep_delta` number of timesteps and an array with curr values but trimmed for alignment's sake.
         
@@ -412,7 +430,8 @@ class PlotUtils(object):
 
     @classmethod
     def plot_bad_decisions_by_action_type(cls, output_data_list, output_data_labels, 
-    action_type, action_reference, timestep_specific, room_specific, cutoff_denom=4):
+    action_type, action_reference, timestep_specific=True, room_specific=False, 
+    mask_specific=False, cutoff_denom=4):
         """Make one single plot to visualize the fraction of good/bad decision quality such as 
         (wrong, confident) for each category type, such as timestep indices or room labels.
         
@@ -467,6 +486,11 @@ class PlotUtils(object):
             for i in range(len(output_data_labels)):
                 flattened[output_data_labels[i]]['room_labels_flattened'] = cls.get_roomlabels(output_data_list[i])
 
+        # add flattened mask on/off list for each output dataset
+        if mask_specific:
+             for i in range(len(output_data_labels)):
+                flattened[output_data_labels[i]]['masks_flattened'] = cls.flatten_masks(output_data_list[i], action_type) 
+
         # split data by timestep/location
         # split['test_unseen'][3] should give a 1-D numeric array of entropy values for time step 3
         # counts_<filter name>['test_unseen'][3] should give a tuple (qualified counts, unqualified counts) for time step 3
@@ -484,6 +508,8 @@ class PlotUtils(object):
                 categories_flattened = flattened[output_data_labels[i]]['timesteps_flattened']
             elif room_specific:
                 categories_flattened = flattened[output_data_labels[i]]['room_labels_flattened']
+            elif mask_specific:
+                categories_flattened = flattened[output_data_labels[i]]['masks_flattened']
 
             _, count_data_correct_confident = \
                 cls._filter_and_split_ent_by_decision_quality(
@@ -515,12 +541,13 @@ class PlotUtils(object):
 
         # plot grouped bar chart below
         # order the categories first
+        category_ids = sorted(list(categories)) # TODO deal too many room types
         if timestep_specific:
-            category_ids = sorted(list(categories))
             category_name = "timestep"
         elif room_specific:
-            category_ids = sorted(list(categories))  # TODO deal too many room types
             category_name = "room tag"
+        elif mask_specific:
+            category_name = "mask applied"
 
         # wrong, confidently in test seen; wrong, confidently in test unseen
         arr_a = [[counts_wrong_confident[output_data_labels[i]][cat][0] for cat in category_ids] \
