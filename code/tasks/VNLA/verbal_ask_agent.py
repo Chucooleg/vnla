@@ -72,6 +72,8 @@ class VerbalAskAgent(AskAgent):
             'agent_nav_logits_final': [],  #TODO: added
             'agent_nav_softmax_final': [],  #TODO: added
             'subgoals': [],
+            'agent_nav_logit_masks': [],  #TODO: added 
+            'agent_ask_logit_masks': [],  #TODO: added
         } for ob in obs]
 
         # Encode initial command
@@ -139,6 +141,8 @@ class VerbalAskAgent(AskAgent):
             nav_logits_initial_list = nav_logit.data.tolist()
             nav_softmax_initial_list = nav_softmax.data.tolist()
             ask_logits_list = ask_logit.data.tolist()
+            nav_logit_masks_list = nav_logit_mask.data.tolist()
+            ask_logit_masks_list = ask_logit_mask.data.tolist()
 
             self._populate_agent_state_to_obs(obs, nav_softmax, queries_unused,
                 traj, ended, time_step)
@@ -257,6 +261,8 @@ class VerbalAskAgent(AskAgent):
                     traj[i]['agent_ask_logits'].append(ask_logits_list[i])  #TODO: added
                     traj[i]['teacher_ask_reason'].append(ask_reason[i])
                     traj[i]['subgoals'].append(verbal_subgoals[i])
+                    traj[i]['agent_nav_logit_masks'].append(nav_logit_masks_list[i])  #TODO: added
+                    traj[i]['agent_ask_logit_masks'].append(ask_logit_masks_list[i])  #TODO: added
 
                     if a_t_list[i] == self.nav_actions.index('<end>') or \
                        time_step >= ob['traj_len'] - 1:
