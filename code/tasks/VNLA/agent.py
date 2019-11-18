@@ -59,7 +59,8 @@ class BaseAgent(object):
                         for k in ['agent_ask', 'teacher_ask', 'teacher_ask_reason',
                                   'agent_nav_logits_initial', 'agent_nav_softmax_initial',
                                   'agent_nav_logits_final', 'agent_nav_softmax_final',
-                                  'teacher_nav', 'agent_ask_logits']:
+                                  'teacher_nav', 'agent_ask_logits', 'agent_nav_logit_masks', 
+                                  'agent_ask_logit_masks']:
                             if k in t:
                                 self.results[t['instr_id']][k] = t[k]
                         if 'subgoals' in t:
