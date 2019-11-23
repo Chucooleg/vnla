@@ -6,3 +6,5 @@ data/*
 code/build/*
 *.ckpt
 code/data/*
+*/.ipynb_checkpoints/
+*/.vscode/
