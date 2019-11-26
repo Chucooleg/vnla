@@ -265,5 +265,7 @@ class AttentionSeq2SeqModel(nn.Module):
 
     def decode_nav(self, *args, **kwargs):
         return self.decoder.forward_nav(*args, **kwargs)
+        
 
-
+class AttentionSeq2SeqModelMultiHead(nn.Module):
+    pass
