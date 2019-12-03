@@ -24,6 +24,7 @@ from agent import BaseAgent
 from oracle import make_oracle
 from ask_agent import AskAgent
 
+
 class VerbalAskAgent(AskAgent):
 
     def __init__(self, model, hparams, device):
@@ -39,14 +40,18 @@ class VerbalAskAgent(AskAgent):
             sys.exit('unknown advisor: %s' % hparams.advisor)
 
         self.advisor = make_oracle('verbal', hparams.n_subgoal_steps,
-            self.nav_actions, self.ask_actions, mode=mode)
+                                   self.nav_actions, self.ask_actions,
+                                   mode=mode)
         self.hparams = hparams
-        self.teacher_interpret = hasattr(hparams, 'teacher_interpret') and hparams.teacher_interpret
+        self.teacher_interpret = hasattr(hparams, 'teacher_interpret') \
+                                 and hparams.teacher_interpret
 
         self.nav_criterion_bootstrap = nn.CrossEntropyLoss(
-            ignore_index=self.nav_actions.index('<ignore>'), reduction='none')
+            ignore_index=self.nav_actions.index('<ignore>'),
+            reduction='none')
         self.ask_criterion_bootstrap = nn.CrossEntropyLoss(
-            ignore_index=self.ask_actions.index('<ignore>'), reduction='none')
+            ignore_index=self.ask_actions.index('<ignore>'),
+            reduction='none')
 
     def prepend_instruction_to_obs(self, obs_k, idx, instr):
         return instr + ' . ' + obs_k[idx]['instruction']
@@ -164,8 +169,7 @@ class VerbalAskAgent(AskAgent):
             nav_logit_masks_list = nav_logit_mask.data.tolist()
             ask_logit_masks_list = ask_logit_mask.data.tolist()
 
-            self._populate_agent_state_to_obs(obs, nav_softmax, queries_unused,
-                traj, ended, time_step)
+            self._populate_agent_state_to_obs(obs, nav_softmax, queries_unused, traj, ended, time_step)
 
             # Ask teacher for next ask action
             ask_target, ask_reason = self.teacher.next_ask(obs)
@@ -214,8 +218,7 @@ class VerbalAskAgent(AskAgent):
                 # Make new coverage vectors
                 if self.coverage_size is not None:
                     # cov has shape(batch_size, max_length, coverage_size)
-                    cov = torch.zeros(seq_mask.size(0), seq_mask.size(1), self.coverage_size,
-                        dtype=torch.float, device=self.device)
+                    cov = torch.zeros(seq_mask.size(0), seq_mask.size(1), self.coverage_size, dtype=torch.float, device=self.device)
                 else:
                     cov = None
 
@@ -736,4 +739,3 @@ class VerbalAskAgent(AskAgent):
             self._compute_loss()
 
         return traj
-                       
