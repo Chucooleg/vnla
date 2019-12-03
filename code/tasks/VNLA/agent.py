@@ -56,11 +56,17 @@ class BaseAgent(object):
                                 'scan'       : t['scan'],
                                 'agent_nav'  : t['agent_nav'],
                             }
-                        for k in ['agent_ask', 'teacher_ask', 'teacher_ask_reason',
-                                  'agent_nav_logits_initial', 'agent_nav_softmax_initial',
-                                  'agent_nav_logits_final', 'agent_nav_softmax_final',
-                                  'teacher_nav', 'agent_ask_logits', 'agent_nav_logit_masks', 
-                                  'agent_ask_logit_masks']:
+                        for k in [
+                            'agent_ask', 'agent_nav_logit_masks', 'agent_ask_logit_masks', 
+                            'teacher_ask', 'teacher_ask_reason', 
+                            'agent_nav_logits_initial', 'agent_nav_softmax_initial',
+                            'agent_nav_logits_final', 'agent_nav_softmax_final',
+                            'teacher_nav', 'agent_ask_logits', 'agent_ask_softmax', 
+                            'teacher_ask_heads', 'teacher_ask_reason_heads',
+                            'agent_nav_logits_initial_heads', 'agent_nav_softmax_initial_heads',
+                            'agent_nav_logits_final_heads', 'agent_nav_softmax_final_heads',
+                            'teacher_nav_heads', 'agent_ask_logits_heads', 'agent_ask_softmax_heads'
+                            'bootstrap_mask', 'active_head']:
                             if k in t:
                                 self.results[t['instr_id']][k] = t[k]
                         if 'subgoals' in t:

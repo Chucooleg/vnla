@@ -9,6 +9,7 @@ import sys
 import numpy as np
 import random
 import time
+import copy
 
 import torch
 import torch.nn as nn
@@ -67,6 +68,28 @@ class AskAgent(BaseAgent):
         self.n_subgoal_steps  = hparams.n_subgoal_steps
 
         self.coverage_size = hparams.coverage_size if hasattr(hparams, 'coverage_size') else None
+
+        # Bootstrap - set num heads and bernoulli prob
+        self.bootstrap = hasattr(hparams, 'bootstrap') and hparams.bootstrap
+        self.n_ensemble = 10       
+        self.bernoulli_probability = 0.5
+        self.bootstrap_majority_vote = True # False means sampling one head
+        self.random_state = np.random.RandomState(999)
+        
+        if self.bootstrap:
+            if hasattr(hparams, 'n_ensemble'):
+                self.n_ensemble =  int(hparams.n_ensemble)
+            if hasattr(hparams, 'bernoulli_probability'):
+                self.bernoulli_probability =  hparams.bernoulli_probability
+            assert(self.n_ensemble > 1), "ensemble must have more than one head"
+            assert(self.bernoulli_probability > 0.0), "boostrap bernoulli prob must be greater than 0.0"
+            if hasattr(hparams, 'bootstrap_majority_vote'):
+                self.bootstrap_majority_vote =  hparams.bootstrap_majority_vote
+
+        # Optional Gradient Clipping
+        self.gradient_clipping = hasattr(hparams, 'gradient_clipping') and hparams.gradient_clipping
+        if self.gradient_clipping:
+            self.clip_grad = float(hparams.clip_grad)
 
     @staticmethod
     def n_input_nav_actions():
@@ -139,6 +162,7 @@ class AskAgent(BaseAgent):
         sys.exit('Invalid feedback option')
 
     def _populate_agent_state_to_obs(self, obs, *args):
+        """modify obs tentatively for asking policy (but environment is not modified)"""
         nav_softmax, queries_unused, traj, ended, time_step = args
         nav_dist = nav_softmax.data.tolist()
         for i, ob in enumerate(obs):
@@ -147,6 +171,41 @@ class AskAgent(BaseAgent):
             ob['agent_path'] = traj[i]['agent_path']
             ob['ended'] = ended[i]
             ob['time_step'] = time_step
+
+    def _populate_agent_state_to_obs_single_to_multihead(self, obs, *args):
+        """take single obs from last time step, return tentative obs for all heads. called after the first decoding pass
+        """
+        nav_softmax_heads, queries_unused, traj, ended, time_step, n_ensemble = args
+        assert len(nav_softmax_heads) == n_ensemble
+        # nav_softmax_heads is a list of tensors
+        nav_dist_heads = [nav_softmax.data.tolist() for nav_softmax in nav_softmax_heads]
+        obs_multihead = [None] * n_ensemble
+        for k in range(n_ensemble):
+            # these are the fields we want to add for each obs
+            # obs_multihead[k] = [{"nav_dist": None, "queries_unused":None, "agent_path":None, "ended":None, "time_step":None} for i in range(len(obs))]
+            for i, ob in enumerate(obs):
+                obs_multihead[k][i] = copy.deepcopy(ob)
+                obs_multihead[k][i]['nav_dist'] = nav_dist_heads[k][i]
+                obs_multihead[k][i]['queries_unused'] = copy.copy(queries_unused[i]) # maybe modified with asking
+                obs_multihead[k][i]['agent_path'] = traj[i]['agent_path']
+                obs_multihead[k][i]['ended'] = ended[i]
+                obs_multihead[k][i]['time_step'] = time_step
+        return obs_multihead
+
+    def _populate_agent_state_to_obs_multi_to_multihead(self, obs_multihead, *args):
+        """take obs for all heads, return final obs for all heads. called after the second decoding pass
+        """
+        # nav_softmax_heads, queries_unused_heads, traj, ended, time_step, n_ensemble = args
+        nav_softmax_heads, queries_unused_heads, _, _, _, n_ensemble = args
+        # nav_softmax_heads is a list of tensors
+        nav_dist_heads = [nav_softmax.data.tolist() for nav_softmax in nav_softmax_heads]
+        for k in range(n_ensemble):
+            for i, ob in enumerate(obs_multihead[k]):
+                obs_multihead[k][i]['nav_dist'] = nav_dist_heads[k][i]
+                obs_multihead[k][i]['queries_unused'] = queries_unused_heads[k][i]
+                # agent_path, ended and time_step stays the same so we don't update
+        return obs_multihead
+
 
     def _should_ask(self, ended, q):
         return not ended and q == self.ask_actions.index('ask')
@@ -382,6 +441,18 @@ class AskAgent(BaseAgent):
             if n_iters - iter <= 10:
                 last_traj.extend(traj)
             self.loss.backward()
+
+            # divide up gradients in encoder if we are bootstrapping
+            if self.bootstrap:
+                for param in self.model.encoder.parameters():
+                    if param.grad is not None:
+                        param.grad.data *= 1.0/float(self.n_ensemble)
+            
+            # optional gradient clipping
+            if self.gradient_clipping:
+                nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_grad)
+
+            # existing
             optimizer.step()
 
         return last_traj

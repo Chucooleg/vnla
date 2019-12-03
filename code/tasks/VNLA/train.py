@@ -20,7 +20,7 @@ from scipy import stats
 
 from utils import read_vocab,write_vocab,build_vocab,Tokenizer,padding_idx,timeSince
 from env import VNLABatch
-from model import AttentionSeq2SeqModel
+from model import AttentionSeq2SeqModel, AttentionSeq2SeqModelMultiHead
 from ask_agent import AskAgent
 from verbal_ask_agent import VerbalAskAgent
 
@@ -31,8 +31,10 @@ from flags import make_parser
 def set_path():
     OUTPUT_DIR = os.getenv('PT_OUTPUT_DIR', 'output')
 
-    hparams.model_prefix = '%s_nav_%s_ask_%s' % (hparams.exp_name,
-        hparams.nav_feedback, hparams.ask_feedback)
+    bootstrap_bool = "on" if hasattr(hparams, 'bootstrap') and hparams.bootstrap else "off"
+
+    hparams.model_prefix = '%s_nav_%s_ask_%s_bootstrap_%s' % (hparams.exp_name,
+        hparams.nav_feedback, hparams.ask_feedback, bootstrap_bool)
 
     hparams.exp_dir = os.path.join(OUTPUT_DIR, hparams.model_prefix)
     if not os.path.exists(hparams.exp_dir):
@@ -315,7 +317,10 @@ def train_val(seed=None):
         Evaluation(hparams, [split], hparams.data_path)) for split in val_splits}
 
     # Build models
-    model = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
+    if hasattr(hparams, 'bootstrap') and hparams.bootstrap:
+        model = AttentionSeq2SeqModelMultiHead(len(vocab), hparams, device).to(device)
+    else:
+        model = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
         weight_decay=hparams.weight_decay)

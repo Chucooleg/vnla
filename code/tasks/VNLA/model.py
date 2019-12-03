@@ -170,8 +170,7 @@ class AskAttnDecoderLSTM(nn.Module):
         self.backprop_softmax = hparams.backprop_softmax
         self.backprop_ask_features = hparams.backprop_ask_features
 
-    def _lstm_and_attend(self, nav_action, ask_action, feature, h, ctx, ctx_mask,
-        budget=None, cov=None):
+    def _lstm_and_attend(self, nav_action, ask_action, feature, h, ctx, ctx_mask, cov=None):
 
         nav_embeds = self.nav_embedding(nav_action)
         ask_embeds = self.ask_embedding(ask_action)
@@ -196,7 +195,7 @@ class AskAttnDecoderLSTM(nn.Module):
                 budget=None, cov=None):
 
         h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
-            nav_action, ask_action, feature, h, ctx, ctx_mask, budget=budget, cov=cov)
+            nav_action, ask_action, feature, h, ctx, ctx_mask, cov=cov)
 
         # Predict nav action.
         nav_logit = self.nav_predictor(h_tilde)
@@ -217,14 +216,15 @@ class AskAttnDecoderLSTM(nn.Module):
 
         ask_logit = self.ask_predictor(concat_ask_predictor_input)
         ask_logit.data.masked_fill_(ask_logit_mask, -float('inf'))
+        ask_softmax = F.softmax(ask_logit, dim=1)
 
-        return new_h, alpha, nav_logit, nav_softmax, ask_logit, new_cov
+        return new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov
 
     def forward_nav(self, nav_action, ask_action, feature, h, ctx, ctx_mask,
-                    nav_logit_mask, budget=None, cov=None):
+                    nav_logit_mask, cov=None):
 
         h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
-            nav_action, ask_action, feature, h, ctx, ctx_mask, budget=budget, cov=cov)
+            nav_action, ask_action, feature, h, ctx, ctx_mask, cov=cov)
 
         # Predict nav action.
         nav_logit = self.nav_predictor(h_tilde)
@@ -268,4 +268,104 @@ class AttentionSeq2SeqModel(nn.Module):
         
 
 class AttentionSeq2SeqModelMultiHead(nn.Module):
-    pass
+    
+    def __init__(self, vocab_size, hparams, device):
+        super(AttentionSeq2SeqModelMultiHead, self).__init__()
+        enc_hidden_size = hparams.hidden_size // 2 \
+            if hparams.bidirectional else hparams.hidden_size
+        self.encoder = EncoderLSTM(vocab_size,
+                              hparams.word_embed_size,
+                              enc_hidden_size,
+                              padding_idx,
+                              hparams.dropout_ratio,
+                              device,
+                              bidirectional=hparams.bidirectional,
+                              num_layers=hparams.num_lstm_layers)
+        if 'verbal' in hparams.advisor:
+            agent_class = VerbalAskAgent
+        elif hparams.advisor == 'direct':
+            agent_class = AskAgent
+        else:
+            sys.exit('%s advisor not supported' % hparams.advisor)
+        self.decoder_heads_list = nn.ModuleList([AskAttnDecoderLSTM(hparams, agent_class, device) for _ in range(hparams.n_ensemble)])
+
+    def encode(self, *args, **kwargs):
+        return self.encoder(*args, **kwargs)
+
+    def _decode_heads(self, *args, **kwargs):
+         
+        a_t, q_t, f_t, decoder_h_heads, ctx, seq_mask, nav_logit_mask, ask_logit_mask = args
+        b_t = kwargs['budget']
+        cov = kwargs['cov']
+
+        new_h_heads = []
+        alpha_heads = []
+        nav_logit_heads = []
+        nav_softmax_heads = []
+        ask_logit_heads = []
+        ask_softmax_heads = []
+        new_cov_heads = []
+
+        for k in range(len(self.decoder_heads_list)):
+            new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov = self.decoder_heads_list[k](a_t, q_t, f_t, decoder_h_heads[k], ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
+            new_h_heads.append(new_h)
+            alpha_heads.append(alpha)
+            nav_logit_heads.append(nav_logit)
+            nav_softmax_heads.append(nav_softmax)
+            ask_logit_heads.append(ask_logit)
+            ask_softmax_heads.append(ask_softmax)
+            new_cov_heads.append(new_cov)
+
+        return new_h_heads, alpha_heads, nav_logit_heads, nav_softmax_heads, ask_logit_heads, ask_softmax_heads, new_cov_heads
+
+    def _decode_head_k(self, k, *args, **kwargs):
+        # parse the args and kwargs
+        a_t, q_t, f_t, decoder_h_heads, ctx, seq_mask, nav_logit_mask, ask_logit_mask = args
+        b_t = kwargs['budget']
+        cov = kwargs['cov']
+
+        new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov = self.decoder_heads_list[k](a_t, q_t, f_t, decoder_h_heads[k], ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
+
+        return new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov
+
+    def decode(self, k, *args, **kwargs):
+        if k is not None:
+            return self._decode_head_k(k, *args, **kwargs)
+        else:
+            return self._decode_heads(*args, **kwargs)
+
+    def _decode_nav_heads(self, *args, **kwargs):
+        # parse the args and kwargs
+        a_t, q_t_heads, f_t, decoder_h_heads, ctx_heads, seq_mask_heads, nav_logit_mask = args
+        cov_heads = kwargs['cov']
+
+        new_h_heads = []
+        alpha_heads = []
+        nav_logit_heads = []
+        nav_softmax_heads = []
+        new_cov_heads = []  
+
+        for k in range(len(self.decoder_heads_list)):
+            new_h, alpha, nav_logit, nav_softmax, new_cov = self.decoder_heads_list[k].forward_nav(a_t, q_t_heads[k], f_t, decoder_h_heads[k], ctx_heads[k], seq_mask_heads[k], nav_logit_mask, cov=cov_heads[k])
+            new_h_heads.append(new_h)
+            alpha_heads.append(alpha)
+            nav_logit_heads.append(nav_logit)
+            nav_softmax_heads.append(nav_softmax)
+            new_cov_heads.append(new_cov)
+
+        return new_h_heads, alpha_heads, nav_logit_heads, nav_softmax_heads, new_cov_heads 
+
+    def _decode_nav_head_k(self, k, *args, **kwargs):   
+        # parse the args and kwargs
+        a_t, q_t_heads, f_t, decoder_h_heads, ctx_heads, seq_mask_heads, nav_logit_mask = args
+        cov_heads = kwargs['cov']
+
+        new_h, alpha, nav_logit, nav_softmax, new_cov = self.decoder_heads_list[k].forward_nav(a_t, q_t_heads[k], f_t, decoder_h_heads[k], ctx_heads[k], seq_mask_heads[k], nav_logit_mask, cov=cov_heads[k])
+
+        return new_h, alpha, nav_logit, nav_softmax, new_cov
+
+    def decode_nav(self, k, *args, **kwargs):
+        if k is not None:
+            return self._decode_nav_head_k(k, *args, **kwargs)  
+        else:
+            return self._decode_nav_heads(*args, **kwargs)
