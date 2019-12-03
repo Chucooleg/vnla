@@ -621,11 +621,12 @@ class VerbalAskAgent(AskAgent):
                     votes = q_a_pairs[i]
                     votes = [tuple(vote) for vote in votes]
                     majority_vote[i] = Counter(votes).most_common(1)[0][0]
-                    # find a final vote matching head to reference
+                    # sample a final-vote-matching head to reference
+                    matching_heads = []
                     for k in range(self.n_ensemble):
-                        if majority_vote[i] == votes[j]:
-                            heads_ref[i] = k
-                            break
+                        if majority_vote[i] == votes[k]:
+                            matching_heads.append(k)
+                    heads_ref[i] = np.random.choice(matching_heads, 1)
                 assert heads_ref.shape[0] == batch_size
 
                 # for LSTM decoder input
@@ -639,15 +640,17 @@ class VerbalAskAgent(AskAgent):
                 # sample a head for each datapt in the batch
                 # shape(batch_size, )
                 heads_ref = self.random_state.choice(self.n_ensemble, batch_size)
-                a_t_list_heads = np.array(a_t_list_heads).swapaxes(0,1)
+                a_t_list_heads = np.array(a_t_list_heads).swapaxes(0, 1)
                 assert a_t_list_heads.shape[0] == batch_size
                 a_t_list = np.stack([vals[head] for vals, head in zip(a_t_list_heads, heads_ref)]) # needed
                 a_t = torch.tensor(a_t_list, dtype=torch.long, device=self.device)
-                q_t_list_heads = np.array(q_t_list_heads).swapaxes(0,1)
+                q_t_list_heads = np.array(q_t_list_heads).swapaxes(0, 1)
                 assert q_t_list_heads.shape[0] == batch_size
                 q_t_list = np.stack([vals[head] for vals, head in zip(q_t_list_heads, heads_ref)])
                 q_t = torch.tensor(q_t_list, dtype=torch.long, device=self.device)
-            
+
+            # TODO : code up alternative version to better preserve ctx and cov across time steps
+            # TODO : voting/sampling - if same as chosen q_t, a_t pair then keep with existing cov and ctx, else get replaced.
             # prepare for LSTM decoder input in next timestep
             # convert to shape(batch_size, n_ensemble, *feature sizes)
             cov_heads = torch.stack(cov_heads, dim=1)
@@ -662,19 +665,19 @@ class VerbalAskAgent(AskAgent):
 
             # prepare for meta-level algo in next timestep
             # original queries_unused_heads - len=n_ensemble, each len=batch_size.
-            queries_unused_heads = np.array(queries_unused_heads).swapaxes(0,1)
+            queries_unused_heads = np.array(queries_unused_heads).swapaxes(0, 1)
             assert queries_unused_heads.shape[0] == batch_size
             queries_unused = np.stack([vals[head] for vals, head in zip(queries_unused_heads, heads_ref)])
             # original n_subgoal_steps_heads - len=n_ensemble, each len=batch_size
-            n_subgoal_steps_heads = np.array(n_subgoal_steps_heads).swapaxes(0,1)
+            n_subgoal_steps_heads = np.array(n_subgoal_steps_heads).swapaxes(0, 1)
             assert n_subgoal_steps_heads.shape[0] == batch_size
             n_subgoal_steps = np.stack([vals[head] for vals, head in zip(n_subgoal_steps_heads, heads_ref)])
             # original action_subgoals_heads - len=n_ensemble, each len=batch_size, each len=hparams.n_subgoal_steps
-            action_subgoals_heads = np.array(action_subgoals_heads).swapaxes(0,1)
+            action_subgoals_heads = np.array(action_subgoals_heads).swapaxes(0, 1)
             assert action_subgoals_heads.shape[0] == batch_size
             action_subgoals = np.stack([vals[head] for vals, head in zip(action_subgoals_heads, heads_ref)])
             # original verbal_subgoals_heads - len=n_ensemble, each len=batch_size
-            verbal_subgoals_heads = np.array(verbal_subgoals_heads).swapaxes(0,1)
+            verbal_subgoals_heads = np.array(verbal_subgoals_heads).swapaxes(0, 1)
             assert verbal_subgoals_heads.shape[0] == batch_size
             verbal_subgoals = np.stack([vals[head] for vals, head in zip(verbal_subgoals_heads, heads_ref)])
             # obs_heads_final[k][i] = {"nav_dist":..., "queries_unused":..., "agent_path":...., "ended":...., ...}
