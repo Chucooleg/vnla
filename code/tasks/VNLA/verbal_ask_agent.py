@@ -28,7 +28,7 @@ class VerbalAskAgent(AskAgent):
 
     def __init__(self, model, hparams, device):
         super(VerbalAskAgent, self).__init__(model, hparams, device,
-            should_make_advisor=False)
+                                             should_make_advisor=False)
 
         assert 'verbal' in hparams.advisor
         if 'easy' in hparams.advisor:
@@ -44,9 +44,9 @@ class VerbalAskAgent(AskAgent):
         self.teacher_interpret = hasattr(hparams, 'teacher_interpret') and hparams.teacher_interpret
 
         self.nav_criterion_bootstrap = nn.CrossEntropyLoss(
-            ignore_index = self.nav_actions.index('<ignore>'), reduction='none')
+            ignore_index=self.nav_actions.index('<ignore>'), reduction='none')
         self.ask_criterion_bootstrap = nn.CrossEntropyLoss(
-            ignore_index = self.ask_actions.index('<ignore>'), reduction='none')  
+            ignore_index=self.ask_actions.index('<ignore>'), reduction='none')
 
     def prepend_instruction_to_obs(self, obs_k, idx, instr):
         return instr + ' . ' + obs_k[idx]['instruction']
@@ -99,8 +99,9 @@ class VerbalAskAgent(AskAgent):
         decoder_h = None
 
         if self.coverage_size is not None:
-            cov = torch.zeros(seq_mask.size(0), seq_mask.size(1), self.coverage_size,
-                dtype=torch.float, device=self.device)
+            cov = torch.zeros(seq_mask.size(0), seq_mask.size(1),
+                              self.coverage_size,
+                              dtype=torch.float, device=self.device)
         else:
             cov = None
 
@@ -253,7 +254,7 @@ class VerbalAskAgent(AskAgent):
                 # Conditioned on teacher action during intervention
                 # (training only or when teacher_interpret flag is on)
                 if (self.teacher_interpret or not self.is_eval) and \
-                    n_subgoal_steps[i] < len(action_subgoals[i]):
+                        n_subgoal_steps[i] < len(action_subgoals[i]):
                     a_t_list[i] = action_subgoals[i][n_subgoal_steps[i]]
                     n_subgoal_steps[i] += 1
 
@@ -509,7 +510,7 @@ class VerbalAskAgent(AskAgent):
                     # if ask, get subgoal, prepend it
                     if self._should_ask(ended[i], q_t_list_heads[k][i]):
                         # Query advisor for subgoal.
-                        action_subgoals_heads[k][i], verbal_subgoals_heads[k][i] = self.advisor(obs_heads[k][i])
+                        action_subgoals_heads[k][i], verbal_subgoals_heads[k][i] = self.advisor(obs_heads_tentative[k][i])
                         # Prepend subgoal to the current instruction in obs
                         # NOTE bootstrap : modify obs_head instead of env
                         # NOTE bootstrap : modify env after voting below
