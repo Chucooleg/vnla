@@ -341,6 +341,7 @@ class VerbalAskAgent(AskAgent):
             'agent_ask_logit_masks': [],  # added
             'bootstrap_mask': [],  # Boostrap - track mask
             'active_head': [],  # Boostrap - track heads
+            'matching_heads': [], # Boostrap - track heads matching with chosen next actions, list of lists
         } for ob in obs]
 
         # Encode initial command
@@ -428,7 +429,7 @@ class VerbalAskAgent(AskAgent):
             # ask_logit_mask shape(batch_size, n_output_ask_actions), tensor
             # b_t shape(batch_size, ), tensor
             # cov shape(batch_size, max seq length in the batch, coverage dim), tensor
-            _, _, nav_tentative_logit_heads, nav_tentative_softmax_heads, ask_logit_heads, ask_softmax_heads, _ = self.model.decode(a_t, q_t, f_t, decoder_h_heads, ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
+            _, _, nav_tentative_logit_heads, nav_tentative_softmax_heads, ask_logit_heads, ask_softmax_heads, _ = self.model.decode(None, a_t, q_t, f_t, decoder_h_heads, ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
 
             # NOTE logging only
             nav_tentative_logit_heads_list = torch.stack(nav_tentative_logit_heads, dim=1).numpy()
@@ -541,7 +542,6 @@ class VerbalAskAgent(AskAgent):
             # Run second forward pass to compute nav logit
             #  NOTE: q_t and b_t changed since the first forward pass.
             q_t_heads = [torch.tensor(q_t_list, dtype=torch.long, device=self.device) for q_t_list in q_t_list_heads]
-            k = None # decode with all heads
             # inputs:
             # a_t -- stays the same. action from last timestep
             # q_t_heads -- changed. updated from asking and multihead
@@ -551,7 +551,7 @@ class VerbalAskAgent(AskAgent):
             # seq_mask_heads -- changed. depending on whether we have asked. 
             # nav_logit_mask -- stays the same. the same mask for every timestep
             # cov_heads -- changed. depending on whether we have asked.
-            decoder_h_heads, _, nav_final_logit_heads, nav_final_softmax_heads, cov_heads = self.model.decode_nav(k, a_t, q_t_heads, f_t, decoder_h_heads, ctx_heads, seq_mask_heads, nav_logit_mask, cov=cov_heads)
+            decoder_h_heads, _, nav_final_logit_heads, nav_final_softmax_heads, cov_heads = self.model.decode_nav(None, a_t, q_t_heads, f_t, decoder_h_heads, ctx_heads, seq_mask_heads, nav_logit_mask, cov=cov_heads)
 
             # NOTE logging only
             nav_final_logit_heads_list = torch.stack(nav_final_logit_heads, dim=1).numpy()
@@ -605,6 +605,7 @@ class VerbalAskAgent(AskAgent):
             
             #### Vote/Sample for next step ####
             heads_ref = np.zeros(batch_size)
+            matching_heads = [list() for _ in range(batch_size)]
             if self.bootstrap_majority_vote:
                 
                 majority_vote = [tuple() for i in range(batch_size)]
@@ -625,12 +626,10 @@ class VerbalAskAgent(AskAgent):
                     votes = [tuple(vote) for vote in votes]
                     majority_vote[i] = Counter(votes).most_common(1)[0][0]
                     # sample a final-vote-matching head to reference
-                    matching_heads = []
                     for k in range(self.n_ensemble):
                         if majority_vote[i] == votes[k]:
-                            matching_heads.append(k)
+                            matching_heads[i].append(k)
                     heads_ref[i] = np.random.choice(matching_heads, 1)
-                assert heads_ref.shape[0] == batch_size
 
                 # for LSTM decoder input
                 a_t_list = [a for (q, a) in majority_vote]
@@ -652,8 +651,6 @@ class VerbalAskAgent(AskAgent):
                 q_t_list = np.stack([vals[head] for vals, head in zip(q_t_list_heads, heads_ref)])
                 q_t = torch.tensor(q_t_list, dtype=torch.long, device=self.device)
 
-            # TODO : code up alternative version to better preserve ctx and cov across time steps
-            # TODO : voting/sampling - if same as chosen q_t, a_t pair then keep with existing cov and ctx, else get replaced.
             # prepare for LSTM decoder input in next timestep
             # convert to shape(batch_size, n_ensemble, *feature sizes)
             cov_heads = torch.stack(cov_heads, dim=1)
@@ -723,7 +720,7 @@ class VerbalAskAgent(AskAgent):
                     traj[i]['bootstrap_mask'].append(masks[:, i])  # added. masks has shape(n_ensemble, batch size)
                     if not self.bootstrap_majority_vote:
                         traj[i]['active_head'].append(heads_ref[i])  # added
-
+                        traj[i]['matching_heads'].append(matching_heads[i])  # added
                     if a_t_list[i] == self.nav_actions.index('<end>') or \
                        time_step >= ob['traj_len'] - 1:
                         ended[i] = True

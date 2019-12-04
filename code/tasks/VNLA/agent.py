@@ -66,7 +66,7 @@ class BaseAgent(object):
                             'agent_nav_logits_initial_heads', 'agent_nav_softmax_initial_heads',
                             'agent_nav_logits_final_heads', 'agent_nav_softmax_final_heads',
                             'teacher_nav_heads', 'agent_ask_logits_heads', 'agent_ask_softmax_heads'
-                            'bootstrap_mask', 'active_head']:
+                            'bootstrap_mask', 'active_head', 'matching_heads']:
                             if k in t:
                                 self.results[t['instr_id']][k] = t[k]
                         if 'subgoals' in t:
