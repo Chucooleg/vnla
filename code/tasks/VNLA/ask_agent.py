@@ -179,7 +179,8 @@ class AskAgent(BaseAgent):
         assert len(nav_softmax_heads) == n_ensemble
         # nav_softmax_heads is a list of tensors
         nav_dist_heads = [nav_softmax.data.tolist() for nav_softmax in nav_softmax_heads]
-        obs_multihead = [None] * n_ensemble
+        # obs_multihead has len=n_ensemble, each len=batch_size
+        obs_multihead = [[{} for i in range(len(obs))] for k in range(n_ensemble)]
         for k in range(n_ensemble):
             # these are the fields we want to add for each obs
             # obs_multihead[k] = [{"nav_dist": None, "queries_unused":None, "agent_path":None, "ended":None, "time_step":None} for i in range(len(obs))]

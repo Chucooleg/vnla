@@ -432,13 +432,13 @@ class VerbalAskAgent(AskAgent):
             _, _, nav_tentative_logit_heads, nav_tentative_softmax_heads, ask_logit_heads, ask_softmax_heads, _ = self.model.decode(None, a_t, q_t, f_t, decoder_h_heads, ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
 
             # NOTE logging only
-            # cannot call .numpy() unless we detach the tensor first
-            nav_tentative_logit_heads_list = torch.stack(nav_tentative_logit_heads, dim=1).detach().numpy()
+            # cannot call .numpy() unless we put to cpu and detach the tensor first
+            nav_tentative_logit_heads_list = torch.stack(nav_tentative_logit_heads, dim=1).cpu().detach().numpy()
             assert nav_tentative_logit_heads_list.shape[0] == batch_size
             assert nav_tentative_logit_heads_list.shape[1] == self.n_ensemble
-            nav_tentative_softmax_heads_list = torch.stack(nav_tentative_softmax_heads, dim=1).detach().numpy()
-            ask_logit_heads_list = torch.stack(ask_logit_heads, dim=1).detach().numpy()
-            ask_softmax_heads_list = torch.stack(ask_softmax_heads, dim=1).detach().numpy()
+            nav_tentative_softmax_heads_list = torch.stack(nav_tentative_softmax_heads, dim=1).cpu().detach().numpy()
+            ask_logit_heads_list = torch.stack(ask_logit_heads, dim=1).cpu().detach().numpy()
+            ask_softmax_heads_list = torch.stack(ask_softmax_heads, dim=1).cpu().detach().numpy()
             nav_logit_masks_list = nav_logit_mask.data.tolist()
             ask_logit_masks_list = ask_logit_mask.data.tolist()
 
@@ -451,11 +451,13 @@ class VerbalAskAgent(AskAgent):
 
             # Ask teacher for next action
             # NOTE bootstrap : each head has its own ask targets because each head can predict different nav tentative entropies.
-            ask_target_heads, ask_reason_heads = [self.teacher.next_ask(obs_k) for obs_k in obs_heads_tentative]
+            ask_zipped_heads = [self.teacher.next_ask(obs_k) for obs_k in obs_heads_tentative]
+            ask_zipped_heads = list(zip(*ask_zipped_heads)) # unzip
+            ask_target_heads, ask_reason_heads = ask_zipped_heads[0], ask_zipped_heads[1]
             ask_target_heads = [torch.tensor(ask_target_k, dtype=torch.long, device=self.device) for ask_target_k in ask_target_heads]
 
             # NOTE logging only
-            ask_target_heads_list = torch.stack(ask_target_heads, dim=1).detach().numpy()
+            ask_target_heads_list = torch.stack(ask_target_heads, dim=1).cpu().detach().numpy()
             ask_reason_heads_list = np.array(ask_reason_heads).swapaxes(0,1)
 
             # Compute ask loss
@@ -466,7 +468,7 @@ class VerbalAskAgent(AskAgent):
                     ask_loss_k = self.ask_criterion_bootstrap(ask_logit_heads[k], ask_target_heads[k])
                     # masks has shape(self.n_ensemble, batch_size)
                     # mask_k_tensor has shape(batch_size,)
-                    mask_k_tensor = torch.tensor(masks[k], dtype=torch.float)
+                    mask_k_tensor = torch.tensor(masks[k], dtype=torch.float, device=self.device)
                     assert ask_loss_k.shape == mask_k_tensor.shape
                     # shape(batch_size, )
                     ask_loss_masked_k_full = mask_k_tensor * ask_loss_k
@@ -555,10 +557,10 @@ class VerbalAskAgent(AskAgent):
             decoder_h_heads, _, nav_final_logit_heads, nav_final_softmax_heads, cov_heads = self.model.decode_nav(None, a_t, q_t_heads, f_t, decoder_h_heads, ctx_heads, seq_mask_heads, nav_logit_mask, cov=cov_heads)
 
             # NOTE logging only
-            nav_final_logit_heads_list = torch.stack(nav_final_logit_heads, dim=1).detach().numpy()
+            nav_final_logit_heads_list = torch.stack(nav_final_logit_heads, dim=1).cpu().detach().numpy()
             assert nav_final_logit_heads_list.shape[0] == batch_size
             assert nav_final_logit_heads_list.shape[1] == self.n_ensemble
-            nav_final_softmax_heads_list = torch.stack(nav_final_softmax_heads, dim=1).detach().numpy()
+            nav_final_softmax_heads_list = torch.stack(nav_final_softmax_heads, dim=1).cpu().detach().numpy()
 
             # Repopulate agent state
             # NOTE: queries_unused may have changed but it's fine since nav_teacher does not use it!
@@ -568,7 +570,7 @@ class VerbalAskAgent(AskAgent):
             nav_target_heads = [torch.tensor(nav_target_k, dtype=torch.long, device=self.device) for nav_target_k in nav_target_heads]
 
             # NOTE logging only
-            nav_target_heads_list = torch.stack(nav_target_heads, dim=1).detach().numpy()
+            nav_target_heads_list = torch.stack(nav_target_heads, dim=1).cpu().detach().numpy()
 
             # Nav loss
             # NOTE bootstrap : apply masking
@@ -577,7 +579,7 @@ class VerbalAskAgent(AskAgent):
                 for k in range(self.n_ensemble):
                     nav_loss_k = self.nav_criterion_bootstrap(nav_final_logit_heads[k], nav_target_heads[k])
                     # mask_k_tensor has shape(batch_size,)
-                    mask_k_tensor = torch.tensor(masks[k], dtype=torch.float)
+                    mask_k_tensor = torch.tensor(masks[k], dtype=torch.float, device=self.device)
                     assert nav_loss_k.shape == mask_k_tensor.shape
                     # shape(batch_size, )
                     nav_loss_masked_k_full = mask_k_tensor * nav_loss_k
