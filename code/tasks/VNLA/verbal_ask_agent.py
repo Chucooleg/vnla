@@ -328,9 +328,11 @@ class VerbalAskAgent(AskAgent):
             'agent_ask': [],
             'agent_ask_logits_heads': [],  # added
             'agent_ask_softmax_heads': [],  # added
-            'teacher_ask_heads': [],
+            'teacher_ask': [],
+            'teacher_ask_heads': [],  # added
             'teacher_nav_heads': [],  # added
-            'teacher_ask_reason_heads': [],
+            'teacher_ask_reason': [],            
+            'teacher_ask_reason_heads': [], # added
             'agent_nav': [],
             'agent_nav_logits_initial_heads': [],  # added
             'agent_nav_softmax_initial_heads': [],  # added
@@ -433,12 +435,12 @@ class VerbalAskAgent(AskAgent):
 
             # NOTE logging only
             # cannot call .numpy() unless we put to cpu and detach the tensor first
-            nav_tentative_logit_heads_list = torch.stack(nav_tentative_logit_heads, dim=1).cpu().detach().numpy()
-            assert nav_tentative_logit_heads_list.shape[0] == batch_size
-            assert nav_tentative_logit_heads_list.shape[1] == self.n_ensemble
-            nav_tentative_softmax_heads_list = torch.stack(nav_tentative_softmax_heads, dim=1).cpu().detach().numpy()
-            ask_logit_heads_list = torch.stack(ask_logit_heads, dim=1).cpu().detach().numpy()
-            ask_softmax_heads_list = torch.stack(ask_softmax_heads, dim=1).cpu().detach().numpy()
+            nav_tentative_logit_heads_list = torch.stack(nav_tentative_logit_heads, dim=1).cpu().detach().data.tolist()
+            assert len(nav_tentative_logit_heads_list) == batch_size
+            assert len(nav_tentative_logit_heads_list[0]) == self.n_ensemble
+            nav_tentative_softmax_heads_list = torch.stack(nav_tentative_softmax_heads, dim=1).cpu().detach().data.tolist()
+            ask_logit_heads_list = torch.stack(ask_logit_heads, dim=1).cpu().detach().data.tolist()
+            ask_softmax_heads_list = torch.stack(ask_softmax_heads, dim=1).cpu().detach().data.tolist()
             nav_logit_masks_list = nav_logit_mask.data.tolist()
             ask_logit_masks_list = ask_logit_mask.data.tolist()
 
@@ -457,8 +459,8 @@ class VerbalAskAgent(AskAgent):
             ask_target_heads = [torch.tensor(ask_target_k, dtype=torch.long, device=self.device) for ask_target_k in ask_target_heads]
 
             # NOTE logging only
-            ask_target_heads_list = torch.stack(ask_target_heads, dim=1).cpu().detach().numpy()
-            ask_reason_heads_list = np.array(ask_reason_heads).swapaxes(0,1)
+            ask_target_heads_list = torch.stack(ask_target_heads, dim=1).cpu().detach().data.tolist()
+            ask_reason_heads_list = np.array(ask_reason_heads).swapaxes(0,1).tolist()
 
             # Compute ask loss
             # NOTE bootstrap : each head has its own loss before reduced across heads to scalar
@@ -557,10 +559,10 @@ class VerbalAskAgent(AskAgent):
             decoder_h_heads, _, nav_final_logit_heads, nav_final_softmax_heads, cov_heads = self.model.decode_nav(None, a_t, q_t_heads, f_t, decoder_h_heads, ctx_heads, seq_mask_heads, nav_logit_mask, cov=cov_heads)
 
             # NOTE logging only
-            nav_final_logit_heads_list = torch.stack(nav_final_logit_heads, dim=1).cpu().detach().numpy()
-            assert nav_final_logit_heads_list.shape[0] == batch_size
-            assert nav_final_logit_heads_list.shape[1] == self.n_ensemble
-            nav_final_softmax_heads_list = torch.stack(nav_final_softmax_heads, dim=1).cpu().detach().numpy()
+            nav_final_logit_heads_list = torch.stack(nav_final_logit_heads, dim=1).cpu().detach().data.tolist()
+            assert len(nav_final_logit_heads_list) == batch_size
+            assert len(nav_final_logit_heads_list[0]) == self.n_ensemble
+            nav_final_softmax_heads_list = torch.stack(nav_final_softmax_heads, dim=1).cpu().detach().data.tolist()
 
             # Repopulate agent state
             # NOTE: queries_unused may have changed but it's fine since nav_teacher does not use it!
@@ -570,7 +572,7 @@ class VerbalAskAgent(AskAgent):
             nav_target_heads = [torch.tensor(nav_target_k, dtype=torch.long, device=self.device) for nav_target_k in nav_target_heads]
 
             # NOTE logging only
-            nav_target_heads_list = torch.stack(nav_target_heads, dim=1).cpu().detach().numpy()
+            nav_target_heads_list = torch.stack(nav_target_heads, dim=1).cpu().detach().data.tolist()
 
             # Nav loss
             # NOTE bootstrap : apply masking
@@ -607,7 +609,7 @@ class VerbalAskAgent(AskAgent):
                 # a_t_heads[k] = torch.tensor(a_t_list_heads[k], dtype=torch.long, device=self.device)
             
             #### Vote/Sample for next step ####
-            heads_ref = np.zeros(batch_size)
+            heads_ref = np.zeros(batch_size).astype(int)
             matching_heads = [list() for _ in range(batch_size)]
             if self.bootstrap_majority_vote:
                 
@@ -632,11 +634,11 @@ class VerbalAskAgent(AskAgent):
                     for k in range(self.n_ensemble):
                         if majority_vote[i] == votes[k]:
                             matching_heads[i].append(k)
-                    heads_ref[i] = np.random.choice(matching_heads, 1)
+                    heads_ref[i] = np.random.choice(matching_heads[i], 1)
 
                 # for LSTM decoder input
-                a_t_list = [a for (q, a) in majority_vote]
-                q_t_list = [q for (q, a) in majority_vote]
+                a_t_list = [int(a) for (q, a) in majority_vote]
+                q_t_list = [int(q) for (q, a) in majority_vote]
                 a_t = torch.tensor(a_t_list, dtype=torch.long, device=self.device)
                 q_t = torch.tensor(q_t_list, dtype=torch.long, device=self.device)
                 assert a_t.shape[0] == q_t.shape[0] == batch_size
@@ -665,7 +667,6 @@ class VerbalAskAgent(AskAgent):
             seq_mask_heads = torch.stack(seq_mask_heads, dim=1)
             assert seq_mask_heads.shape[0] == batch_size
             seq_mask = torch.stack([vals[head] for vals, head in zip(seq_mask_heads, heads_ref)])
-
             # prepare for meta-level algo in next timestep
             # original queries_unused_heads - len=n_ensemble, each len=batch_size.
             queries_unused_heads = np.array(queries_unused_heads).swapaxes(0, 1)
@@ -676,18 +677,24 @@ class VerbalAskAgent(AskAgent):
             assert n_subgoal_steps_heads.shape[0] == batch_size
             n_subgoal_steps = np.stack([vals[head] for vals, head in zip(n_subgoal_steps_heads, heads_ref)])
             # original action_subgoals_heads - len=n_ensemble, each len=batch_size, each len=hparams.n_subgoal_steps
+            # transform to - len=batch_size, each len=n_ensemble, each len=hparams.n_subgoal_steps
             action_subgoals_heads = np.array(action_subgoals_heads).swapaxes(0, 1)
             assert action_subgoals_heads.shape[0] == batch_size
-            action_subgoals = np.stack([vals[head] for vals, head in zip(action_subgoals_heads, heads_ref)])
+            action_subgoals = [vals[head] for vals, head in zip(action_subgoals_heads, heads_ref)]
             # original verbal_subgoals_heads - len=n_ensemble, each len=batch_size
             verbal_subgoals_heads = np.array(verbal_subgoals_heads).swapaxes(0, 1)
             assert verbal_subgoals_heads.shape[0] == batch_size
-            verbal_subgoals = np.stack([vals[head] for vals, head in zip(verbal_subgoals_heads, heads_ref)])
+            verbal_subgoals = [vals[head] for vals, head in zip(verbal_subgoals_heads, heads_ref)]
             # obs_heads_final[k][i] = {"nav_dist":..., "queries_unused":..., "agent_path":...., "ended":...., ...}
             obs = []
             for i in range(batch_size):
                 obs.append(obs_heads_final[heads_ref[i]][i])
 
+            # for logging only - used in train.py compute_ask_stats()
+            assert len(ask_target_heads_list) == batch_size
+            assert len(ask_reason_heads_list) == batch_size
+            ask_target_list = [vals[head] for vals, head in zip(ask_target_heads_list, heads_ref)]
+            ask_reason = [vals[head] for vals, head in zip(ask_reason_heads_list, heads_ref)]
 
             # write subgoal instructions back to env
             for i in range(batch_size):
@@ -711,16 +718,18 @@ class VerbalAskAgent(AskAgent):
                     traj[i]['agent_nav_softmax_initial_heads'].append(nav_tentative_softmax_heads_list[i])  # added
                     traj[i]['agent_nav_logits_final_heads'].append(nav_final_logit_heads_list[i])  # added
                     traj[i]['agent_nav_softmax_final_heads'].append(nav_final_softmax_heads_list[i])  # added
+                    traj[i]['teacher_ask'].append(ask_target_list[i]) 
                     traj[i]['teacher_nav_heads'].append(nav_target_heads_list[i])  # added
-                    traj[i]['teacher_ask_heads'].append(ask_target_heads_list[i])  # modified
+                    traj[i]['teacher_ask_reason'].append(ask_reason[i])
+                    traj[i]['teacher_ask_reason_heads'].append(ask_reason_heads_list[i]) # added 
+                    traj[i]['teacher_ask_heads'].append(ask_target_heads_list[i])  # added
                     traj[i]['agent_ask'].append(q_t_list[i])
                     traj[i]['agent_ask_logits_heads'].append(ask_logit_heads_list[i])  # added
                     traj[i]['agent_ask_softmax_heads'].append(ask_softmax_heads_list[i])  # added
-                    traj[i]['teacher_ask_reason_heads'].append(ask_reason_heads_list[i]) # added 
                     traj[i]['subgoals'].append(verbal_subgoals[i])
                     traj[i]['agent_nav_logit_masks'].append(nav_logit_masks_list[i])  # added
                     traj[i]['agent_ask_logit_masks'].append(ask_logit_masks_list[i])  # added
-                    traj[i]['bootstrap_mask'].append(masks[:, i])  # added. masks has shape(n_ensemble, batch size)
+                    traj[i]['bootstrap_mask'].append(masks[:, i].tolist())  # added. masks has shape(n_ensemble, batch size)
                     if not self.bootstrap_majority_vote:
                         traj[i]['active_head'].append(heads_ref[i])  # added
                         traj[i]['matching_heads'].append(matching_heads[i])  # added
@@ -737,5 +746,5 @@ class VerbalAskAgent(AskAgent):
         if not self.is_eval:
             # Bootstrap - should remain the same because self.ask_loss and self.nav_loss are reduced to scalars
             self._compute_loss()
-
+        
         return traj

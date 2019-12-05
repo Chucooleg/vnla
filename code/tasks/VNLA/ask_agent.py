@@ -185,7 +185,7 @@ class AskAgent(BaseAgent):
             # these are the fields we want to add for each obs
             # obs_multihead[k] = [{"nav_dist": None, "queries_unused":None, "agent_path":None, "ended":None, "time_step":None} for i in range(len(obs))]
             for i, ob in enumerate(obs):
-                obs_multihead[k][i] = copy.deepcopy(ob)
+                obs_multihead[k][i] = copy.copy(ob)
                 obs_multihead[k][i]['nav_dist'] = nav_dist_heads[k][i]
                 obs_multihead[k][i]['queries_unused'] = copy.copy(queries_unused[i]) # maybe modified with asking
                 obs_multihead[k][i]['agent_path'] = traj[i]['agent_path']
