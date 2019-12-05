@@ -730,9 +730,8 @@ class VerbalAskAgent(AskAgent):
                     traj[i]['agent_nav_logit_masks'].append(nav_logit_masks_list[i])  # added
                     traj[i]['agent_ask_logit_masks'].append(ask_logit_masks_list[i])  # added
                     traj[i]['bootstrap_mask'].append(masks[:, i].tolist())  # added. masks has shape(n_ensemble, batch size)
-                    if not self.bootstrap_majority_vote:
-                        traj[i]['active_head'].append(heads_ref[i])  # added
-                        traj[i]['matching_heads'].append(matching_heads[i])  # added
+                    traj[i]['active_head'].append(heads_ref[i])  # added
+                    traj[i]['matching_heads'].append(matching_heads[i])  # added
                     if a_t_list[i] == self.nav_actions.index('<end>') or \
                        time_step >= ob['traj_len'] - 1:
                         ended[i] = True
