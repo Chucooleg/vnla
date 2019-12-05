@@ -388,13 +388,13 @@ class VerbalAskAgent(AskAgent):
         for time_step in range(episode_len):
 
             # NOTE bootstrap : masks has shape(self.n_ensemble, batch_size)
-            masks = np.zeros((self.n_ensemble, batch_size))
+            masks = np.zeros((self.n_ensemble, batch_size)).astype(int)
             for k in range(self.n_ensemble):
                 tot_used = 0
                 while tot_used == 0:
                     m = np.random.binomial(1, self.bernoulli_probability, batch_size)
                     tot_used = np.sum(m)
-                masks[k] = m
+                masks[k] = int(m)
 
             # Mask out invalid actions
             nav_logit_mask = torch.zeros(batch_size, AskAgent.n_output_nav_actions(), dtype=torch.uint8, device=self.device)
@@ -730,7 +730,7 @@ class VerbalAskAgent(AskAgent):
                     traj[i]['agent_nav_logit_masks'].append(nav_logit_masks_list[i])  # added
                     traj[i]['agent_ask_logit_masks'].append(ask_logit_masks_list[i])  # added
                     traj[i]['bootstrap_mask'].append(masks[:, i].tolist())  # added. masks has shape(n_ensemble, batch size)
-                    traj[i]['active_head'].append(heads_ref[i])  # added
+                    traj[i]['active_head'].append(int(heads_ref[i]))  # added
                     traj[i]['matching_heads'].append(matching_heads[i])  # added
                     if a_t_list[i] == self.nav_actions.index('<end>') or \
                        time_step >= ob['traj_len'] - 1:
