@@ -52,7 +52,7 @@ class BaseAgent(object):
                         looped = True
                     else:
                         self.results[t['instr_id']] = {
-                                'trajectory' : t['agent_path'],
+                                'trajectory' : t['agent_path'], 
                                 'scan'       : t['scan'],
                                 'agent_nav'  : t['agent_nav'],
                             }
