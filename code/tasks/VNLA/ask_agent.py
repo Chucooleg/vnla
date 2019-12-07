@@ -81,7 +81,7 @@ class AskAgent(BaseAgent):
                 self.n_ensemble =  int(hparams.n_ensemble)
             if hasattr(hparams, 'bernoulli_probability'):
                 self.bernoulli_probability =  hparams.bernoulli_probability
-            assert(self.n_ensemble > 1), "ensemble must have more than one head"
+            # assert(self.n_ensemble > 1), "ensemble must have more than one head"
             assert(self.bernoulli_probability > 0.0), "boostrap bernoulli prob must be greater than 0.0"
             if hasattr(hparams, 'bootstrap_majority_vote'):
                 self.bootstrap_majority_vote =  hparams.bootstrap_majority_vote
@@ -118,6 +118,10 @@ class AskAgent(BaseAgent):
 
         seq_tensor = torch.from_numpy(seq_tensor).long().to(self.device)[:, :max_length]
         seq_lengths = torch.from_numpy(seq_lengths).long().to(self.device)
+
+        for len_val in seq_lengths:
+            if len_val <= 0:
+                import pdb; pdb.set_trace()
 
         mask = (seq_tensor == padding_idx)
 

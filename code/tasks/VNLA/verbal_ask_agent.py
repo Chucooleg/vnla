@@ -53,8 +53,26 @@ class VerbalAskAgent(AskAgent):
             ignore_index=self.ask_actions.index('<ignore>'),
             reduction='none')
 
-    def prepend_instruction_to_obs(self, obs_k, idx, instr):
-        return instr + ' . ' + obs_k[idx]['instruction']
+    def prepend_instruction_to_obs(self, initial_instr, idx, instr):
+        return instr + ' . ' + initial_instr[idx]
+
+    def pack_heads_with_diff_seq_lens(self, list_of_heads, tobyte=False):
+        """list of heads : list len=n_ensemble; first dim of each element=batch_size, 
+        second dim of each element is the max seq lengths corresponding to each head. 
+        These second dim varies between heads and we need to equalize them before stacking."""
+        max_seq_len_among_heads = max([h.shape[1] for h in list_of_heads])
+        for k in range(len(list_of_heads)):
+            if list_of_heads[k].shape[1] != max_seq_len_among_heads:
+                short = list_of_heads[k].shape[1]
+                new_shape = list(list_of_heads[k].shape)
+                new_shape[1] = max_seq_len_among_heads
+                if tobyte:
+                    replacement_tensor = torch.zeros(new_shape, dtype=torch.uint8, device=self.device)
+                else:
+                    replacement_tensor = torch.zeros(new_shape, dtype=torch.float, device=self.device)
+                replacement_tensor[:, :short] = list_of_heads[k]
+                list_of_heads[k] = replacement_tensor
+        return list_of_heads
 
     def rollout(self):
         # Boostrap - rollout with multihead option
@@ -385,6 +403,10 @@ class VerbalAskAgent(AskAgent):
 
         episode_len = max(ob['traj_len'] for ob in obs)
 
+        # NOTE bootstrap : preserve original instructions because we want to avoid modifying the env() object with multiple heads
+        initial_instructions = [ob['instruction'] for ob in obs]
+        assert len(initial_instructions) == batch_size
+
         for time_step in range(episode_len):
 
             # NOTE bootstrap : masks has shape(self.n_ensemble, batch_size)
@@ -394,7 +416,7 @@ class VerbalAskAgent(AskAgent):
                 while tot_used == 0:
                     m = np.random.binomial(1, self.bernoulli_probability, batch_size)
                     tot_used = np.sum(m)
-                masks[k] = int(m)
+                masks[k] = m
 
             # Mask out invalid actions
             nav_logit_mask = torch.zeros(batch_size, AskAgent.n_output_nav_actions(), dtype=torch.uint8, device=self.device)
@@ -523,7 +545,7 @@ class VerbalAskAgent(AskAgent):
                         # Prepend subgoal to the current instruction in obs
                         # NOTE bootstrap : modify obs_head instead of env
                         # NOTE bootstrap : modify env after voting below
-                        obs_heads_tentative[k][i]['instruction'] = self.prepend_instruction_to_obs(obs_heads_tentative[k], i, verbal_subgoals_heads[k][i])
+                        obs_heads_tentative[k][i]['instruction'] = self.prepend_instruction_to_obs(initial_instructions, i, verbal_subgoals_heads[k][i])
                         # Reset subgoal step index
                         n_subgoal_steps_heads[k][i] = 0
                         # Decrement queries unused
@@ -536,7 +558,10 @@ class VerbalAskAgent(AskAgent):
                     # Make new batch with new instructions
                     seq, seq_mask_heads[k], seq_lengths = self._make_batch(obs_heads_tentative[k])
                     # Re-encode with new instructions
-                    ctx_heads[k], _ = self.model.encode(seq, seq_lengths)
+                    try:
+                        ctx_heads[k], _ = self.model.encode(seq, seq_lengths)
+                    except:
+                        import pdb; pdb.set_trace()
                     # Make new coverage vectors
                     if self.coverage_size is not None:
                         # cov has shape(batch_size, max_length, coverage_size)
@@ -657,16 +682,31 @@ class VerbalAskAgent(AskAgent):
                 q_t = torch.tensor(q_t_list, dtype=torch.long, device=self.device)
 
             # prepare for LSTM decoder input in next timestep
-            # convert to shape(batch_size, n_ensemble, *feature sizes)
-            cov_heads = torch.stack(cov_heads, dim=1)
+            # convert to shape(batch_size, n_ensemble, max seq len, coverage_size)
+            # TODO
+            try:
+                cov_heads = torch.stack(self.pack_heads_with_diff_seq_lens(cov_heads), dim=1)
+            except:
+                import pdb; pdb.set_trace()
             assert cov_heads.shape[0] == batch_size
+            assert cov_heads.shape[1] == self.n_ensemble
+            # cov has shape(batch_size, max seq len, coverage_size)
             cov = torch.stack([vals[head] for vals, head in zip(cov_heads, heads_ref)])
-            ctx_heads = torch.stack(ctx_heads, dim=1)
+
+            ctx_heads = torch.stack(self.pack_heads_with_diff_seq_lens(ctx_heads), dim=1)
             assert ctx_heads.shape[0] == batch_size
+            assert ctx_heads.shape[1] == self.n_ensemble
             ctx = torch.stack([vals[head] for vals, head in zip(ctx_heads, heads_ref)])
-            seq_mask_heads = torch.stack(seq_mask_heads, dim=1)
+
+            try:
+                seq_mask_heads = torch.stack(self.pack_heads_with_diff_seq_lens(seq_mask_heads, tobyte=True), dim=1)
+            except:
+                import pdb; pdb.set_trace()
             assert seq_mask_heads.shape[0] == batch_size
+            assert seq_mask_heads.shape[1] == self.n_ensemble
             seq_mask = torch.stack([vals[head] for vals, head in zip(seq_mask_heads, heads_ref)])
+
+
             # prepare for meta-level algo in next timestep
             # original queries_unused_heads - len=n_ensemble, each len=batch_size.
             queries_unused_heads = np.array(queries_unused_heads).swapaxes(0, 1)
