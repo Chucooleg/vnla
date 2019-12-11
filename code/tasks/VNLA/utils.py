@@ -30,7 +30,7 @@ def load_nav_graphs(scan, path=None):
     if path is not None:
         DATA_DIR = path
     else:
-        DATA_DIR = os.getenv('PT_DATA_DIR', '../../../data')
+        DATA_DIR = os.getenv('PT_DATA_DIR')
     with open(os.path.join(DATA_DIR, 'connectivity/%s_connectivity.json' % scan)) as f:
         G = nx.Graph()
         positions = {}
@@ -48,8 +48,10 @@ def load_nav_graphs(scan, path=None):
         return G
 
 def load_region_map(scan):
-    DATA_DIR = os.getenv('PT_DATA_DIR', '../../../data')
+    # TODO this funstion is not used anywhere
+    DATA_DIR = os.getenv('PT_DATA_DIR')
     region_map = {}
+    # TODO this path is problematice
     with open(os.path.join(DATA_DIR, 'view_to_region/%s.panorama_to_region.txt' % scan)) as f:
         for line in f:
             fields = line.rstrip().split()
@@ -212,7 +214,10 @@ def load_img_features(path):
 
 def load_region_label_to_name():
     region_label_to_name = {}
-    with open('../../../data/region_label.txt') as f:
+    # with open('../../../data/region_label.txt') as f:
+    label_file_path = os.path.join(os.getenv('PT_DATA_DIR'), 'region_label.txt')
+    # with open('../../../data/region_label.txt') as f:
+    with open(label_file_path) as f:
         for line in f:
             line = line.rstrip()
             code = line[1]
@@ -224,10 +229,9 @@ def load_region_label_to_name():
     return region_label_to_name
 
 def load_panos_to_region(house_id, region_label_to_name):
-    pano_file = '../../data/v1/scans/' + house_id + \
-        '/house_segmentations/' + 'panorama_to_region.txt'
+    pano_file_path = os.path.join(os.getenv('PT_DATA_DIR'), 'matterport3d_dataset/raw_data/v1/scans/{}/house_segmentations/panorama_to_region.txt'.format(house_id))
     panos_to_region = {}
-    with open(pano_file) as f:
+    with open(pano_file_path, "rb") as f:
         for line in f:
             values = line.rstrip().split()
             panos_to_region[values[1]] = values[-1]
