@@ -40,8 +40,8 @@
     "n_subgoal_steps"    : 4,
     "bootstrap"          : true,
     "n_ensemble"         : 10,
-    "bernoulli_probability" : 0.5,
-    "bootstrap_majority_vote" : true,
+    "bernoulli_probability" : 1.0,
+    "bootstrap_majority_vote" : false,
     "gradient_clipping"  : true,
     "clip_grad"          : 5
 }

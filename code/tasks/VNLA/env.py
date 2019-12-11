@@ -11,7 +11,8 @@ import networkx as nx
 from collections import defaultdict
 import scipy.stats
 
-sys.path.append('../../build')
+# sys.path.append('../../build/')
+sys.path.append('/opt/MatterSim/build/')
 import MatterSim
 
 from oracle import make_oracle
@@ -46,7 +47,7 @@ class EnvBatch():
             sim.setCameraResolution(self.image_w, self.image_h)
             sim.setCameraVFOV(math.radians(self.vfov))
             sim.setNavGraphPath(
-                os.path.join(os.getenv('PT_DATA_DIR', '../../../data'), 'connectivity'))
+                os.path.join(os.getenv('PT_DATA_DIR'), 'connectivity'))
             sim.init()
             self.sims.append(sim)
 
