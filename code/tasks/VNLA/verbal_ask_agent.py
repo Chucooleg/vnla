@@ -81,7 +81,6 @@ class VerbalAskAgent(AskAgent):
         else:
             return self._rollout_single()
 
-    @profile
     def _rollout_single(self):
         # Reset environment
         obs = self.env.reset(self.is_eval)
@@ -322,7 +321,6 @@ class VerbalAskAgent(AskAgent):
 
         return traj
 
-    @profile
     def _rollout_multihead(self):
 
         # Reset environment
@@ -750,7 +748,7 @@ class VerbalAskAgent(AskAgent):
                     traj[i]['teacher_ask_reason'].append(ask_reason[i])
                     traj[i]['teacher_ask_reason_heads'].append(ask_reason_heads_list[i]) # added 
                     traj[i]['teacher_ask_heads'].append(ask_target_heads_list[i])  # added
-                    traj[i]['agent_ask'].append(q_t_list[i])
+                    traj[i]['agent_ask'].append(int(q_t_list[i]))
                     traj[i]['agent_ask_logits_heads'].append(ask_logit_heads_list[i])  # added
                     traj[i]['agent_ask_softmax_heads'].append(ask_softmax_heads_list[i])  # added
                     traj[i]['subgoals'].append(verbal_subgoals[i])
