@@ -30,7 +30,10 @@ class BaseAgent(object):
             output.append(item)
 
         with open(self.results_path, 'w') as f:
-            json.dump(output, f)
+            try:
+                json.dump(output, f)
+            except:
+                import ipdb; ipdb.set_trace()
 
     def rollout(self):
         raise NotImplementedError
