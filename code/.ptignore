@@ -1,0 +1,7 @@
+tasks/VNLA/output/
+tasks/VNLA/output/*
+**/.ipynb_checkpoints
+verbal_hard_original.json
+**/data
+*.ipynb
+build/
