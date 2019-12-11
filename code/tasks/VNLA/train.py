@@ -44,7 +44,7 @@ def set_path():
         hparams.load_path is not None else \
         os.path.join(hparams.exp_dir, '%s_last.ckpt' % hparams.model_prefix)
 
-    DATA_DIR = os.getenv('PT_DATA_DIR', '../../../data')
+    DATA_DIR = os.getenv('PT_DATA_DIR')
     hparams.data_path = os.path.join(DATA_DIR, hparams.data_dir)
     hparams.img_features = os.path.join(DATA_DIR, 'img_features/ResNet-152-imagenet.tsv')
 
