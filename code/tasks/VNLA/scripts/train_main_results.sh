@@ -36,7 +36,7 @@ else
   exit
 fi
 
-command="python -u -m memory_profiler train.py -config $config_file -exp $output_dir $extra -device $device"
+command="python -u train.py -config $config_file -exp $output_dir $extra -device $device"
 echo $command
 $command
 
