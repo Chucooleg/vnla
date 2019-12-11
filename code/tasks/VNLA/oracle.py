@@ -302,7 +302,7 @@ class MultistepShortestPathOracle(ShortestPathOracle):
         self.sim.setCameraResolution(640, 480)
         self.sim.setCameraVFOV(math.radians(60))
         self.sim.setNavGraphPath(
-            os.path.join(os.getenv('PT_DATA_DIR', '../../../data'), 'connectivity'))
+            os.path.join(os.getenv('PT_DATA_DIR'), 'connectivity'))
         self.sim.init()
         self.n_steps = n_steps
         self.env_nav_actions = env_nav_actions
