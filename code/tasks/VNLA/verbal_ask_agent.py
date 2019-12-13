@@ -56,7 +56,7 @@ class VerbalAskAgent(AskAgent):
     def prepend_instruction_to_obs(self, initial_instr, idx, instr):
         return instr + ' . ' + initial_instr[idx]
 
-    def pack_heads_with_diff_seq_lens(self, list_of_heads, tobyte=False):
+    def pack_heads_with_diff_seq_lens(self, list_of_heads, dattype=torch.float):
         """list of heads : list len=n_ensemble; first dim of each element=batch_size, 
         second dim of each element is the max seq lengths corresponding to each head. 
         These second dim varies between heads and we need to equalize them before stacking."""
@@ -66,13 +66,10 @@ class VerbalAskAgent(AskAgent):
                 short = list_of_heads[k].shape[1]
                 new_shape = list(list_of_heads[k].shape)
                 new_shape[1] = max_seq_len_among_heads
-                if tobyte:
-                    replacement_tensor = torch.zeros(new_shape, dtype=torch.uint8, device=self.device)
-                else:
-                    replacement_tensor = torch.zeros(new_shape, dtype=torch.float, device=self.device)
+                replacement_tensor = torch.zeros(new_shape, dtype=dattype, device=self.device)
                 replacement_tensor[:, :short] = list_of_heads[k]
                 list_of_heads[k] = replacement_tensor
-        return list_of_heads
+        return [h.type(dattype) for h in list_of_heads]
 
     def rollout(self):
         # Boostrap - rollout with multihead option
@@ -408,7 +405,6 @@ class VerbalAskAgent(AskAgent):
         assert len(initial_instructions) == batch_size
 
         for time_step in range(episode_len):
-
             # NOTE bootstrap : masks has shape(self.n_ensemble, batch_size)
             mul_heads_per_data_pt_and_mul_datapts_per_head = False
             while not mul_heads_per_data_pt_and_mul_datapts_per_head:
@@ -687,7 +683,11 @@ class VerbalAskAgent(AskAgent):
             assert ctx_heads.shape[1] == self.n_ensemble
             ctx = torch.stack([vals[head] for vals, head in zip(ctx_heads, heads_ref)])
 
-            seq_mask_heads = torch.stack(self.pack_heads_with_diff_seq_lens(seq_mask_heads, tobyte=True), dim=1)
+            # seq_mask_heads = torch.stack(self.pack_heads_with_diff_seq_lens(seq_mask_heads, tointTrue), dim=1)
+            try:
+                seq_mask_heads = torch.stack(self.pack_heads_with_diff_seq_lens(seq_mask_heads, dattype=torch.uint8), dim=1)
+            except:
+                import pdb; pdb.set_trace()
             assert seq_mask_heads.shape[0] == batch_size
             assert seq_mask_heads.shape[1] == self.n_ensemble
             seq_mask = torch.stack([vals[head] for vals, head in zip(seq_mask_heads, heads_ref)])
