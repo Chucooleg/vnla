@@ -149,7 +149,6 @@ def build_vocab(path, splits, min_count, max_length, start_vocab=base_vocab,
             break
     return vocab
 
-
 def write_vocab(vocab, path):
     print('Writing vocab of size %d to %s' % (len(vocab),path))
     with open(path, 'w') as f:
@@ -231,7 +230,7 @@ def load_region_label_to_name():
 def load_panos_to_region(house_id, region_label_to_name):
     pano_file_path = os.path.join(os.getenv('PT_DATA_DIR'), 'matterport3d_dataset/raw_data/v1/scans/{}/house_segmentations/panorama_to_region.txt'.format(house_id))
     panos_to_region = {}
-    with open(pano_file_path, "rb") as f:
+    with open(pano_file_path) as f:
         for line in f:
             values = line.rstrip().split()
             panos_to_region[values[1]] = values[-1]
