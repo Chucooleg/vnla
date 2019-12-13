@@ -117,5 +117,18 @@ def make_parser():
    parser.add_argument('-rule_b_d', type=int,
         help='Use rules (b) to (d) only for help-requesting teacher')
 
+   # Bootstrapping settings
+   parser.add_argument('-bootstrap', type=int, default=1,
+        help='bootstrap on (1) or off (0)')
+   parser.add_argument('-n_ensemble', type=int, default=10,
+        help='number of bootstrap heads')
+   parser.add_argument('-bernoulli_probability', type=float, default=1.0,
+        help='bernoulli probability that a datapt is exposed to backprop a head')
+   parser.add_argument('-bootstrap_majority_vote', type=int, default=1,
+        help='majority vote among heads (1) or sampling heads (0)')
+   parser.add_argument('-gradient_clipping', type=int, default=1,
+        help='gradient clipping on (1) or off (0)')
+   parser.add_argument('-clip_grad', type=float, default=5,
+        help='clip grad for gradient clipping')
 
    return parser
