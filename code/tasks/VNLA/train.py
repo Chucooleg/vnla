@@ -23,10 +23,14 @@ from env import VNLABatch
 from model import AttentionSeq2SeqModel, AttentionSeq2SeqModelMultiHead
 from ask_agent import AskAgent
 from verbal_ask_agent import VerbalAskAgent
+from tensorboardX import SummaryWriter
 
 from eval import Evaluation
 from oracle import *
 from flags import make_parser
+
+SW = SummaryWriter(os.environ.get('PT_OUTPUT_DIR', '.'), flush_secs=30)
+# SW = SummaryWriter(os.environ.get('PHILLY_LOG_DIRECTORY', '.'), flush_secs=30) # pull from browser
 
 def set_path():
     OUTPUT_DIR = os.getenv('PT_OUTPUT_DIR', 'output')
@@ -47,6 +51,7 @@ def set_path():
     DATA_DIR = os.getenv('PT_DATA_DIR')
     hparams.data_path = os.path.join(DATA_DIR, hparams.data_dir)
     hparams.img_features = os.path.join(DATA_DIR, 'img_features/ResNet-152-imagenet.tsv')
+
 
 def save(path, model, optimizer, iter, best_metrics, train_env):
     ckpt = {
@@ -140,14 +145,19 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
 
 
     for idx in range(start_iter, end_iter, hparams.log_every):
-        interval = min(hparams.log_every, end_iter - idx)
-        iter = idx + interval
+        # An iter is a batch
+
+        # progress per training job on philly
+        print("PROGRESS: {}%".format(((idx-start_iter) / (end_iter-start_iter)) * 100)) 
+
+        interval = min(hparams.log_every, end_iter - idx) # An interval is a number of batches
+        iter = idx + interval # iter index at the end of this interval
 
         # Train for log_every iterations
         if eval_mode:
             loss_str = '\n * eval mode'
         else:
-            traj = agent.train(train_env, optimizer, interval, train_feedback)
+            traj = agent.train(train_env, optimizer, interval, train_feedback, idx)
 
             train_losses = np.array(agent.losses)
             assert len(train_losses) == interval
@@ -159,6 +169,10 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str += ', nav loss: %.4f' % train_nav_loss_avg
             loss_str += ', ask loss: %.4f' % train_ask_loss_avg
             loss_str += compute_ask_stats(traj)
+
+            SW.add_scalar('train loss per {} iters'.format(hparams.log_every), train_loss_avg, iter)
+            SW.add_scalar('train nav loss per {} iters'.format(hparams.log_every), train_nav_loss_avg, iter)
+            SW.add_scalar('train ask loss per {} iters'.format(hparams.log_every), train_ask_loss_avg, iter)
 
         metrics = defaultdict(dict)
         should_save_ckpt = []
@@ -173,7 +187,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str += ', nav loss: %.4f' % val_nav_loss_avg
             val_ask_loss_avg = np.average(agent.ask_losses)
             loss_str += ', ask loss: %.4f' % val_ask_loss_avg
-
+            
             # Get validation distance from goal under test evaluation conditions
             traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False)
 
@@ -267,11 +281,8 @@ def setup(seed=None):
                            hparams.no_room else 'asknav'),
             train_vocab_path)
 
-def train_val(seed=None):
+def train_val(device, seed=None):
     ''' Train on the training set, and validate on seen and unseen splits. '''
-
-    # which GPU to use
-    device = torch.device('cuda', hparams.device_id)
 
     # Resume from lastest checkpoint (if any)
     if os.path.exists(hparams.load_path):
@@ -318,12 +329,14 @@ def train_val(seed=None):
 
     # Build models
     if hasattr(hparams, 'bootstrap') and hparams.bootstrap:
-        model = AttentionSeq2SeqModelMultiHead(len(vocab), hparams, device).to(device)
+        model = AttentionSeq2SeqModelMultiHead(len(vocab), hparams, device)#.to(device)
     else:
-        model = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
+        model = AttentionSeq2SeqModel(len(vocab), hparams, device)#.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
         weight_decay=hparams.weight_decay)
+
+    print ("device count :".format(torch.cuda.device_count()))
 
     best_metrics = { 'val_seen'  : -1,
                      'val_unseen': -1,
@@ -370,23 +383,26 @@ if __name__ == "__main__":
 
     set_path()
 
-    with torch.cuda.device(hparams.device_id):
-        # Multi-seed evaluation
-        if hasattr(hparams, 'multi_seed_eval') and hparams.multi_seed_eval:
-            args.eval_only = 1
-            seeds = [123, 435, 6757, 867, 983]
-            metrics = defaultdict(lambda: defaultdict(list))
-            for seed in seeds:
-                this_metrics = train_val(seed=seed)
-                for metric in this_metrics:
-                    for k, v in this_metrics[metric].items():
-                        if 'rate' in metric:
-                            v *= 100
-                        metrics[metric][k].append(v)
-            for metric in metrics:
-                for k, v in metrics[metric].items():
-                   print('%s %s: %.2f %.2f' % (metric, k, np.average(v), stats.sem(v) * 1.95))
-        else:
-            # Train
-            train_val()
+    device = torch.device('cuda')
+    
+    # with torch.cuda.device(hparams.device_id):
+    # with torch.cuda.device(device):
+    # Multi-seed evaluation
+    if hasattr(hparams, 'multi_seed_eval') and hparams.multi_seed_eval:
+        args.eval_only = 1
+        seeds = [123, 435, 6757, 867, 983]
+        metrics = defaultdict(lambda: defaultdict(list))
+        for seed in seeds:
+            this_metrics = train_val(seed=seed)
+            for metric in this_metrics:
+                for k, v in this_metrics[metric].items():
+                    if 'rate' in metric:
+                        v *= 100
+                    metrics[metric][k].append(v)
+        for metric in metrics:
+            for k, v in metrics[metric].items():
+                print('%s %s: %.2f %.2f' % (metric, k, np.average(v), stats.sem(v) * 1.95))
+    else:
+        # Train
+        train_val(device)
 
