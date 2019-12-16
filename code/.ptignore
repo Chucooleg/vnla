@@ -5,3 +5,5 @@ verbal_hard_original.json
 **/data
 *.ipynb
 build/
+**/build_py35
+**/build_py36
