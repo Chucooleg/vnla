@@ -71,14 +71,14 @@ class VerbalAskAgent(AskAgent):
                 list_of_heads[k] = replacement_tensor
         return [h.type(dattype) for h in list_of_heads]
 
-    def rollout(self):
+    def rollout(self, iter_idx=None):
         # Boostrap - rollout with multihead option
         if self.bootstrap:
-            return self._rollout_multihead()
+            return self._rollout_multihead(iter_idx)
         else:
-            return self._rollout_single()
+            return self._rollout_single(iter_idx)
 
-    def _rollout_single(self):
+    def _rollout_single(self, iter_idx=None):
         # Reset environment
         obs = self.env.reset(self.is_eval)
         batch_size = len(obs)
@@ -283,6 +283,8 @@ class VerbalAskAgent(AskAgent):
             # Take nav action
             obs = self.env.step(env_action)
 
+            # import pdb; pdb.set_trace()
+
             # Save trajectory output
             ask_target_list = ask_target.data.tolist()
             for i, ob in enumerate(obs):
@@ -313,12 +315,17 @@ class VerbalAskAgent(AskAgent):
             if ended.all():
                 break
 
+        # # check GPU usage
+        # import pdb; pdb.set_trace()
+
         if not self.is_eval:
-            self._compute_loss()
+            self._compute_loss(iter_idx)
 
         return traj
 
-    def _rollout_multihead(self):
+    def _rollout_multihead(self, iter_idx=None):
+
+        print ("using multi-head")
 
         # Reset environment
         # obs length=batch_size, each ob is a dictionary
@@ -364,6 +371,7 @@ class VerbalAskAgent(AskAgent):
         # Encode initial command
         # NOTE bootstrap : the encoder is shared
         ctx, _ = self.model.encode(seq, seq_lengths)
+
         # NOTE bootstrap : same initial decoder hidden state, None, for all heads
         # decoder_h_heads has len(n_ensemble), each tensor element has shape(batch_size, hidden_size)
         # NOTE bootstrap : each head will preserve its own decoder_h til the end
@@ -434,6 +442,9 @@ class VerbalAskAgent(AskAgent):
             # Budget features
             # shape(batch_size, )
             b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)
+
+            # # check GPU usage
+            # import pdb; pdb.set_trace()
 
             # Run first forward pass to compute ask logit 
             # NOTE bootstrap : run multiple decoder heads on same input
@@ -684,10 +695,7 @@ class VerbalAskAgent(AskAgent):
             ctx = torch.stack([vals[head] for vals, head in zip(ctx_heads, heads_ref)])
 
             # seq_mask_heads = torch.stack(self.pack_heads_with_diff_seq_lens(seq_mask_heads, tointTrue), dim=1)
-            try:
-                seq_mask_heads = torch.stack(self.pack_heads_with_diff_seq_lens(seq_mask_heads, dattype=torch.uint8), dim=1)
-            except:
-                import pdb; pdb.set_trace()
+            seq_mask_heads = torch.stack(self.pack_heads_with_diff_seq_lens(seq_mask_heads, dattype=torch.uint8), dim=1)
             assert seq_mask_heads.shape[0] == batch_size
             assert seq_mask_heads.shape[1] == self.n_ensemble
             seq_mask = torch.stack([vals[head] for vals, head in zip(seq_mask_heads, heads_ref)])
@@ -767,8 +775,11 @@ class VerbalAskAgent(AskAgent):
             if ended.all():
                 break
 
+        # # check GPU usage
+        # import pdb; pdb.set_trace()
+
         if not self.is_eval:
             # Bootstrap - should remain the same because self.ask_loss and self.nav_loss are reduced to scalars
-            self._compute_loss()
+            self._compute_loss(iter_idx)
         
         return traj
