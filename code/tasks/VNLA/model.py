@@ -55,17 +55,42 @@ class EncoderLSTM(nn.Module):
         embeds = self.drop(embeds)
         state = self.init_state(inputs)
 
+        
+        total_length = embeds.size(1)
         packed_embeds = pack_padded_sequence(embeds, sorted_lengths, batch_first=True)
         enc_h, state = self.lstm(packed_embeds, state)
 
-        state = (self.encoder2decoder(state[0]), self.encoder2decoder(state[1]))
+        try:
+            print ("embeds size", embeds.size())
+            print ("total_length", total_length)
+        except Exception:
+            pass
 
-        ctx, lengths = pad_packed_sequence(enc_h, batch_first=True)
+        try:
+            print ("packed_embeds size", packed_embeds.batch_sizes)
+        except Exception:
+            pass       
+
+        try:
+            print ("enc_h size", enc_h.size())
+        except Exception:
+            pass  
+
+        try:
+            print ("state size", state.size())
+        except Exception:
+            pass  
+
+        state = (self.encoder2decoder(state[0]), self.encoder2decoder(state[1]))
+        # https://pytorch.org/docs/stable/notes/faq.html
+        ctx, lengths = pad_packed_sequence(enc_h, batch_first=True, total_length=total_length)
         ctx = self.drop(ctx)
 
         # Unsort outputs
         _, backward_index_map = forward_index_map.sort(0, False)
         ctx = ctx[backward_index_map]
+
+        print ("ctx size", ctx.size())
 
         return ctx, state
 
@@ -190,9 +215,8 @@ class AskAttnDecoderLSTM(nn.Module):
 
         return h_tilde, alpha, output_drop, new_h, new_cov
 
-    def forward(self, nav_action, ask_action, feature, h, ctx, ctx_mask,
-                nav_logit_mask, ask_logit_mask,
-                budget=None, cov=None):
+    def forward_tentative(self, nav_action, ask_action, feature, h, ctx, ctx_mask, 
+    nav_logit_mask, ask_logit_mask, budget=None, cov=None):
 
         h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
             nav_action, ask_action, feature, h, ctx, ctx_mask, cov=cov)
@@ -233,6 +257,15 @@ class AskAttnDecoderLSTM(nn.Module):
 
         return new_h, alpha, nav_logit, nav_softmax, new_cov
 
+    def forward(self, tentative_bool, nav_action, ask_action, feature, h, ctx, ctx_mask,
+                nav_logit_mask, ask_logit_mask=None, budget=None, cov=None):
+
+        if tentative_bool:
+            assert ask_logit_mask is not None, "tentative nav prediction must have non-None ask_logit_mask"
+            return self.forward_tentative(nav_action, ask_action, feature, h, ctx, ctx_mask, nav_logit_mask, ask_logit_mask, budget, cov)
+        else:
+            return self.forward_nav(nav_action, ask_action, feature, h, ctx, ctx_mask, nav_logit_mask, cov)
+
 
 class AttentionSeq2SeqModel(nn.Module):
 
@@ -247,25 +280,30 @@ class AttentionSeq2SeqModel(nn.Module):
                               hparams.dropout_ratio,
                               device,
                               bidirectional=hparams.bidirectional,
-                              num_layers=hparams.num_lstm_layers)
-
+                              num_layers=hparams.num_lstm_layers).to(device)
+    
         if 'verbal' in hparams.advisor:
             agent_class = VerbalAskAgent
         elif hparams.advisor == 'direct':
             agent_class = AskAgent
         else:
             sys.exit('%s advisor not supported' % hparams.advisor)
-        self.decoder = AskAttnDecoderLSTM(hparams, agent_class, device)
+        self.decoder = AskAttnDecoderLSTM(hparams, agent_class, device).to(device)
+
+        if torch.cuda.device_count() > 1:
+            self.encoder = nn.DataParallel(self.encoder, device_ids=[0,1,2,3])
+            self.decoder = nn.DataParallel(self.decoder, device_ids=[0,1,2,3])
+    
 
     def encode(self, *args, **kwargs):
         return self.encoder(*args, **kwargs)
 
     def decode(self, *args, **kwargs):
-        return self.decoder(*args, **kwargs)
+        return self.decoder(tentative=True, *args, **kwargs)
 
     def decode_nav(self, *args, **kwargs):
-        return self.decoder.forward_nav(*args, **kwargs)
-        
+            return self.decoder(tentative=False, *args, **kwargs)
+
 
 class AttentionSeq2SeqModelMultiHead(nn.Module):
     
@@ -280,14 +318,23 @@ class AttentionSeq2SeqModelMultiHead(nn.Module):
                               hparams.dropout_ratio,
                               device,
                               bidirectional=hparams.bidirectional,
-                              num_layers=hparams.num_lstm_layers)
+                              num_layers=hparams.num_lstm_layers).to(device)
+
+        if torch.cuda.device_count() > 1:
+            self.encoder = nn.DataParallel(self.encoder, device_ids=[0,1,2,3])
+    
         if 'verbal' in hparams.advisor:
             agent_class = VerbalAskAgent
         elif hparams.advisor == 'direct':
             agent_class = AskAgent
         else:
             sys.exit('%s advisor not supported' % hparams.advisor)
-        self.decoder_heads_list = nn.ModuleList([AskAttnDecoderLSTM(hparams, agent_class, device) for _ in range(hparams.n_ensemble)])
+
+        if torch.cuda.device_count() > 1:
+            self.decoder_heads_list = nn.ModuleList([nn.DataParallel(AskAttnDecoderLSTM(hparams, agent_class, device).to(device), device_ids=[0,1,2,3]) for _ in range(hparams.n_ensemble)])
+
+        else:
+            self.decoder_heads_list = nn.ModuleList([AskAttnDecoderLSTM(hparams, agent_class, device).to(device) for _ in range(hparams.n_ensemble)])
 
     def encode(self, *args, **kwargs):
         return self.encoder(*args, **kwargs)
@@ -307,7 +354,9 @@ class AttentionSeq2SeqModelMultiHead(nn.Module):
         new_cov_heads = []
 
         for k in range(len(self.decoder_heads_list)):
-            new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov = self.decoder_heads_list[k](a_t, q_t, f_t, decoder_h_heads[k], ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
+
+            new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov = self.decoder_heads_list[k](True, a_t, q_t, f_t, decoder_h_heads[k], ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
+
             new_h_heads.append(new_h)
             alpha_heads.append(alpha)
             nav_logit_heads.append(nav_logit)
@@ -324,7 +373,7 @@ class AttentionSeq2SeqModelMultiHead(nn.Module):
         b_t = kwargs['budget']
         cov = kwargs['cov']
 
-        new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov = self.decoder_heads_list[k](a_t, q_t, f_t, decoder_h_heads[k], ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
+        new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov = self.decoder_heads_list[k](True, a_t, q_t, f_t, decoder_h_heads[k], ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
 
         return new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov
 
@@ -346,7 +395,9 @@ class AttentionSeq2SeqModelMultiHead(nn.Module):
         new_cov_heads = []  
 
         for k in range(len(self.decoder_heads_list)):
-            new_h, alpha, nav_logit, nav_softmax, new_cov = self.decoder_heads_list[k].forward_nav(a_t, q_t_heads[k], f_t, decoder_h_heads[k], ctx_heads[k], seq_mask_heads[k], nav_logit_mask, cov=cov_heads[k])
+
+            new_h, alpha, nav_logit, nav_softmax, new_cov = self.decoder_heads_list[k](False, a_t, q_t_heads[k], f_t, decoder_h_heads[k], ctx_heads[k], seq_mask_heads[k], nav_logit_mask, cov=cov_heads[k])
+            
             new_h_heads.append(new_h)
             alpha_heads.append(alpha)
             nav_logit_heads.append(nav_logit)
@@ -360,7 +411,7 @@ class AttentionSeq2SeqModelMultiHead(nn.Module):
         a_t, q_t_heads, f_t, decoder_h_heads, ctx_heads, seq_mask_heads, nav_logit_mask = args
         cov_heads = kwargs['cov']
 
-        new_h, alpha, nav_logit, nav_softmax, new_cov = self.decoder_heads_list[k].forward_nav(a_t, q_t_heads[k], f_t, decoder_h_heads[k], ctx_heads[k], seq_mask_heads[k], nav_logit_mask, cov=cov_heads[k])
+        new_h, alpha, nav_logit, nav_softmax, new_cov = self.decoder_heads_list[k](False, a_t, q_t_heads[k], f_t, decoder_h_heads[k], ctx_heads[k], seq_mask_heads[k], nav_logit_mask, cov=cov_heads[k])
 
         return new_h, alpha, nav_logit, nav_softmax, new_cov
 
