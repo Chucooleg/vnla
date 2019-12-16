@@ -93,6 +93,7 @@ class Evaluation(object):
         if not self.no_room:
             goal_room = None
             for shortest_path in gt['paths']:
+
                 assert goal_room is None or goal_room == \
                     self.panos_to_region[scan][shortest_path[-1]]
                 goal_room = self.panos_to_region[scan][shortest_path[-1]]
@@ -114,9 +115,12 @@ class Evaluation(object):
                 if item['instr_id'] in instr_ids:
                     instr_ids.remove(item['instr_id'])
                     self._score_item(item['instr_id'], item['trajectory'])
+
+        # TODO: uncomment/comment this block on with large/small data!
         assert len(instr_ids) == 0, 'Missing %d of %d instruction ids from %s - not in %s'\
                        % (len(instr_ids), len(self.instr_ids), ",".join(self.splits), output_file)
         assert len(self.scores['nav_errors']) == len(self.instr_ids)
+
         score_summary = {
             'nav_error': np.average(self.scores['nav_errors']),
             'oracle_error': np.average(self.scores['oracle_errors']),
