@@ -35,7 +35,7 @@ class BaseAgent(object):
             except:
                 import ipdb; ipdb.set_trace()
 
-    def rollout(self):
+    def rollout(self, iter_idx):
         raise NotImplementedError
 
     @staticmethod

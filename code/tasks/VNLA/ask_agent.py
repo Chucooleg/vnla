@@ -21,6 +21,11 @@ from utils import padding_idx
 from agent import BaseAgent
 from oracle import make_oracle
 
+from tensorboardX import SummaryWriter
+
+SW = SummaryWriter(os.environ.get('PT_OUTPUT_DIR', '.'), flush_secs=30)
+# SW = SummaryWriter(os.environ.get('PHILLY_LOG_DIRECTORY', '.'), flush_secs=30) # pull from browser
+
 
 class AskAgent(BaseAgent):
 
@@ -211,11 +216,11 @@ class AskAgent(BaseAgent):
                 # agent_path, ended and time_step stays the same so we don't update
         return obs_multihead
 
-
     def _should_ask(self, ended, q):
         return not ended and q == self.ask_actions.index('ask')
 
-    def rollout(self):
+    def rollout(self, iter_idx=None):
+        # iter_idx indicates which batch we are at over the whole training process
         # Reset environment
         obs = self.env.reset(self.is_eval)
         batch_size = len(obs)
@@ -390,21 +395,27 @@ class AskAgent(BaseAgent):
                 break
 
         if not self.is_eval:
-            self._compute_loss()
+            self._compute_loss(iter_idx)
 
         return traj
 
-    def _compute_loss(self):
+    def _compute_loss(self, iter_idx=None):
 
         self.loss = self.nav_loss + self.ask_loss
-        self.losses.append(self.loss.item() / self.episode_len)
+        iter_loss_avg = self.loss.item() / self.episode_len
+        self.losses.append(iter_loss_avg)
+        if iter_idx: SW.add_scalar('train loss per iter', iter_loss_avg, iter_idx)
 
-        self.nav_losses.append(self.nav_loss.item() / self.episode_len)
+        iter_nav_loss_avg = self.nav_loss.item() / self.episode_len
+        self.nav_losses.append(iter_nav_loss_avg)
+        if iter_idx: SW.add_scalar('train nav loss per iter', iter_nav_loss_avg, iter_idx)
 
         if self.random_ask or self.ask_first or self.teacher_ask or self.no_ask:
-            self.ask_losses.append(0)
+            iter_ask_loss_avg = 0
         else:
-            self.ask_losses.append(self.ask_loss.item() / self.episode_len)
+            iter_ask_loss_avg = self.ask_loss.item() / self.episode_len
+        self.ask_losses.append(iter_ask_loss_avg)
+        if iter_idx: SW.add_scalar('train nav loss per iter', iter_ask_loss_avg, iter_idx)
 
     def _setup(self, env, feedback):
         self.nav_feedback = feedback['nav']
@@ -432,7 +443,7 @@ class AskAgent(BaseAgent):
             self.model.eval()
         return BaseAgent.test(self, env)
 
-    def train(self, env, optimizer, n_iters, feedback):
+    def train(self, env, optimizer, n_iters, feedback, idx):
         ''' Train for a given number of iterations '''
 
         self.is_eval = False
@@ -442,7 +453,7 @@ class AskAgent(BaseAgent):
         last_traj = []
         for iter in range(1, n_iters + 1):
             optimizer.zero_grad()
-            traj = self.rollout()
+            traj = self.rollout(idx + iter)
             if n_iters - iter <= 10:
                 last_traj.extend(traj)
             self.loss.backward()
