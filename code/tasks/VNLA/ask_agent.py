@@ -23,9 +23,6 @@ from oracle import make_oracle
 
 from tensorboardX import SummaryWriter
 
-SW = SummaryWriter(os.environ.get('PT_OUTPUT_DIR', '.'), flush_secs=30)
-# SW = SummaryWriter(os.environ.get('PHILLY_LOG_DIRECTORY', '.'), flush_secs=30) # pull from browser
-
 
 class AskAgent(BaseAgent):
 
@@ -96,6 +93,9 @@ class AskAgent(BaseAgent):
         if self.gradient_clipping:
             self.clip_grad = float(hparams.clip_grad)
 
+        self.SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
+        # self.SW = SummaryWriter(os.environ.get('PHILLY_LOG_DIRECTORY', '.'), flush_secs=30) # view from browser
+
     @staticmethod
     def n_input_nav_actions():
         return len(AskAgent.nav_actions)
@@ -124,9 +124,9 @@ class AskAgent(BaseAgent):
         seq_tensor = torch.from_numpy(seq_tensor).long().to(self.device)[:, :max_length]
         seq_lengths = torch.from_numpy(seq_lengths).long().to(self.device)
 
-        for len_val in seq_lengths:
-            if len_val <= 0:
-                import pdb; pdb.set_trace()
+        # for len_val in seq_lengths:
+        #     if len_val <= 0:
+        #         import pdb; pdb.set_trace()
 
         mask = (seq_tensor == padding_idx)
 
@@ -281,9 +281,9 @@ class AskAgent(BaseAgent):
         for time_step in range(episode_len):
 
             nav_logit_mask = torch.zeros(batch_size,
-                AskAgent.n_output_nav_actions(), dtype=torch.uint8, device=self.device)
+                AskAgent.n_output_nav_actions(), dtype=torch.bool, device=self.device)
             ask_logit_mask = torch.zeros(batch_size,
-                AskAgent.n_output_ask_actions(), dtype=torch.uint8, device=self.device)
+                AskAgent.n_output_ask_actions(), dtype=torch.bool, device=self.device)
 
             # Mask invalid actions
             nav_mask_indices = []
@@ -404,18 +404,18 @@ class AskAgent(BaseAgent):
         self.loss = self.nav_loss + self.ask_loss
         iter_loss_avg = self.loss.item() / self.episode_len
         self.losses.append(iter_loss_avg)
-        if iter_idx: SW.add_scalar('train loss per iter', iter_loss_avg, iter_idx)
+        if iter_idx: self.SW.add_scalar('train loss per iter', iter_loss_avg, iter_idx)
 
         iter_nav_loss_avg = self.nav_loss.item() / self.episode_len
         self.nav_losses.append(iter_nav_loss_avg)
-        if iter_idx: SW.add_scalar('train nav loss per iter', iter_nav_loss_avg, iter_idx)
+        if iter_idx: self.SW.add_scalar('train nav loss per iter', iter_nav_loss_avg, iter_idx)
 
         if self.random_ask or self.ask_first or self.teacher_ask or self.no_ask:
             iter_ask_loss_avg = 0
         else:
             iter_ask_loss_avg = self.ask_loss.item() / self.episode_len
         self.ask_losses.append(iter_ask_loss_avg)
-        if iter_idx: SW.add_scalar('train nav loss per iter', iter_ask_loss_avg, iter_idx)
+        if iter_idx: self.SW.add_scalar('train nav loss per iter', iter_ask_loss_avg, iter_idx)
 
     def _setup(self, env, feedback):
         self.nav_feedback = feedback['nav']
@@ -450,13 +450,50 @@ class AskAgent(BaseAgent):
         self._setup(env, feedback)
         self.model.train()
 
+         # timming bookkeeping
+        time_keep = {
+            'total_traj_time': 0.0,
+            'initial_setup': 0.0,
+            'mask_sampling': 0.0,
+            'initial_setup_pertimestep': 0.0,
+            'decode_tentative': 0.0,
+            'logging_1': 0.0,
+            'logging_2': 0.0,
+            'logging_3': 0.0,
+            'pop_state_to_obs_1': 0.0,
+            'ask_teacher_for_next_action': 0.0,
+            'ask_loss': 0.0,
+            'compute_q_t': 0.0,
+            'determine_final_ask': 0.0,
+            'decode_final': 0.0,
+            'pop_state_to_obs_2': 0.0,
+            'ask_for_next_nav_action': 0.0,
+            'nav_loss': 0.0,
+            'adjust_a_t_and_write_env_action': 0.0,
+            'adjust_a_t': 0.0,
+            'voting_sampling': 0.0,
+            'synchronization_before_stack': 0.0,
+            'prepare_for_LSTM_decoder_next_timestep': 0.0,
+            'prepare_for_meta_algo_next_timestep': 0.0,
+            'get_ask_target_and_reason_for_logging': 0.0,
+            'prepend_instruction_back_to_env': 0.0,
+            'loop_through_batch_to_write_env_action': 0.0,
+            'env_step': 0.0,
+            'save_traj_output': 0.0,
+            'compute_loss_per_batch': 0.0,
+            'loss_backward_time': 0.0,
+        }       
+
         last_traj = []
         for iter in range(1, n_iters + 1):
             optimizer.zero_grad()
-            traj = self.rollout(idx + iter)
+            traj, iter_time_keep = self.rollout(idx + iter)
             if n_iters - iter <= 10:
                 last_traj.extend(traj)
+
+            start_time = time.time() 
             self.loss.backward()
+            backward_time = time.time() - start_time
 
             # divide up gradients in encoder if we are bootstrapping
             if self.bootstrap:
@@ -470,8 +507,14 @@ class AskAgent(BaseAgent):
 
             # existing
             optimizer.step()
+            time_keep['loss_backward_time'] += time.time() - start_time
 
-        return last_traj
+            # time keep for different processes in rollout
+            for key in time_keep.keys():
+                if key in iter_time_keep:
+                    time_keep[key] += iter_time_keep[key]
+
+        return last_traj, time_keep
 
 
 
