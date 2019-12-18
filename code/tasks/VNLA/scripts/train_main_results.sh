@@ -39,9 +39,10 @@ else
   exit
 fi
 
-# command="python -u train.py -config $config_file -exp $output_dir $extra -device $device"
+# command="python -u -m pdb -c continue train.py -config $config_file -exp $output_dir $ask $extras"
 # command="python -u train.py -config $config_file -exp $output_dir $ask $extras"
-command="python -u -m pdb -c continue train.py -config $config_file -exp $output_dir $ask $extras"
+command="python -u -m torch.utils.bottleneck train.py -config $config_file -exp $output_dir $ask $extras"
+
 echo $command
 $command
 
