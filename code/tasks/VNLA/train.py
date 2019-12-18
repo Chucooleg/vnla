@@ -29,11 +29,13 @@ from eval import Evaluation
 from oracle import *
 from flags import make_parser
 
-SW = SummaryWriter(os.environ.get('PT_OUTPUT_DIR', '.'), flush_secs=30)
-# SW = SummaryWriter(os.environ.get('PHILLY_LOG_DIRECTORY', '.'), flush_secs=30) # pull from browser
 
 def set_path():
-    OUTPUT_DIR = os.getenv('PT_OUTPUT_DIR', 'output')
+
+    JOB_NAME = os.getenv('JOB_NAME')
+    OUTPUT_DIR = os.path.join(os.getenv('PT_OUTPUT_DIR'),  JOB_NAME) if JOB_NAME else os.getenv('PT_OUTPUT_DIR')
+    if JOB_NAME and not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
 
     bootstrap_bool = "on" if hasattr(hparams, 'bootstrap') and hparams.bootstrap else "off"
 
@@ -43,6 +45,10 @@ def set_path():
     hparams.exp_dir = os.path.join(OUTPUT_DIR, hparams.model_prefix)
     if not os.path.exists(hparams.exp_dir):
         os.makedirs(hparams.exp_dir)
+
+    hparams.tensorboard_dir = os.path.join(hparams.exp_dir, "tensorboard")
+    if not os.path.exists(hparams.tensorboard_dir):
+        os.makedirs(hparams.tensorboard_dir)   
 
     hparams.load_path = hparams.load_path if hasattr(hparams, 'load_path') and \
         hparams.load_path is not None else \
@@ -143,12 +149,11 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     start = time.time()
     sr = 'success_rate'
 
+    SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
+    # SW = SummaryWriter(os.environ.get('PHILLY_LOG_DIRECTORY', '.'), flush_secs=30) # pull from browser
 
     for idx in range(start_iter, end_iter, hparams.log_every):
         # An iter is a batch
-
-        # progress per training job on philly
-        print("PROGRESS: {}%".format(((idx-start_iter) / (end_iter-start_iter)) * 100)) 
 
         interval = min(hparams.log_every, end_iter - idx) # An interval is a number of batches
         iter = idx + interval # iter index at the end of this interval
@@ -157,7 +162,11 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
         if eval_mode:
             loss_str = '\n * eval mode'
         else:
-            traj = agent.train(train_env, optimizer, interval, train_feedback, idx)
+            traj, time_keep = agent.train(train_env, optimizer, interval, train_feedback, idx)
+            
+            # timing for different processes in rollout and loss backward
+            for key in sorted(time_keep.keys()):
+                print ("{} time = {}".format(key, time_keep[key]))
 
             train_losses = np.array(agent.losses)
             assert len(train_losses) == interval
@@ -258,6 +267,9 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                     '%s_%s.ckpt' % (hparams.model_prefix, env_name))
                 save(save_path, model, optimizer, iter, best_metrics, train_env)
                 print("Saved %s model to %s" % (env_name, save_path))
+        
+        # progress per training job on philly
+        print("PROGRESS: {}%".format(float(iter)/end_iter*100))
 
     return None
 
@@ -380,7 +392,7 @@ if __name__ == "__main__":
         value = getattr(args, flag)
         if value is not None:
             setattr(hparams, flag, value)
-
+    
     set_path()
 
     device = torch.device('cuda')
