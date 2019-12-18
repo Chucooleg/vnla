@@ -50,7 +50,7 @@ class BaseAgent(object):
         traj = []
         with torch.no_grad():
             while True:
-                for t in self.rollout():
+                for t in self.rollout()[0]:
                     if t['instr_id'] in self.results:
                         looped = True
                     else:
