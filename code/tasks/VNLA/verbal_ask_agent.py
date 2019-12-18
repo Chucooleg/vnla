@@ -66,6 +66,7 @@ class VerbalAskAgent(AskAgent):
                 short = list_of_heads[k].shape[1]
                 new_shape = list(list_of_heads[k].shape)
                 new_shape[1] = max_seq_len_among_heads
+                # TODO constant
                 replacement_tensor = torch.zeros(new_shape, dtype=dattype, device=self.device)
                 replacement_tensor[:, :short] = list_of_heads[k]
                 list_of_heads[k] = replacement_tensor
@@ -79,6 +80,43 @@ class VerbalAskAgent(AskAgent):
             return self._rollout_single(iter_idx)
 
     def _rollout_single(self, iter_idx=None):
+
+        # timming bookkeeping
+        time_keep = {
+            'total_traj_time': 0.0,
+            'initial_setup': 0.0,
+            'mask_sampling': 0.0,
+            'initial_setup_pertimestep': 0.0,
+            'decode_tentative': 0.0,
+            'logging_1': 0.0,
+            'logging_2': 0.0,
+            'logging_3': 0.0,
+            'pop_state_to_obs_1': 0.0,
+            'ask_teacher_for_next_action': 0.0,
+            'ask_loss': 0.0,
+            'compute_q_t': 0.0,
+            'determine_final_ask': 0.0,
+            'decode_final': 0.0,
+            'pop_state_to_obs_2': 0.0,
+            'ask_for_next_nav_action': 0.0,
+            'nav_loss': 0.0,
+            'adjust_a_t_and_write_env_action': 0.0,
+            'adjust_a_t': 0.0,
+            'voting_sampling': 0.0,
+            'synchronization_before_stack': 0.0,
+            'prepare_for_LSTM_decoder_next_timestep': 0.0,
+            'prepare_for_meta_algo_next_timestep': 0.0,
+            'get_ask_target_and_reason_for_logging': 0.0,
+            'prepend_instruction_back_to_env': 0.0,
+            'loop_through_batch_to_write_env_action': 0.0,
+            'env_step': 0.0,
+            'save_traj_output': 0.0,
+            'compute_loss_per_batch': 0.0,
+        }
+
+        traj_start_time = time.time()
+        start_time = time.time() 
+
         # Reset environment
         obs = self.env.reset(self.is_eval)
         batch_size = len(obs)
@@ -116,6 +154,7 @@ class VerbalAskAgent(AskAgent):
 
         # Encode initial command
         ctx, _ = self.model.encode(seq, seq_lengths)
+
         decoder_h = None
 
         if self.coverage_size is not None:
@@ -145,13 +184,17 @@ class VerbalAskAgent(AskAgent):
 
         episode_len = max(ob['traj_len'] for ob in obs)
 
+        time_keep['initial_setup'] += time.time() - start_time 
+
         for time_step in range(episode_len):
+
+            start_time = time.time() 
 
             # Mask out invalid actions
             nav_logit_mask = torch.zeros(batch_size,
-                AskAgent.n_output_nav_actions(), dtype=torch.uint8, device=self.device)
+                AskAgent.n_output_nav_actions(), dtype=torch.bool, device=self.device)
             ask_logit_mask = torch.zeros(batch_size,
-                AskAgent.n_output_ask_actions(), dtype=torch.uint8, device=self.device)
+                AskAgent.n_output_ask_actions(), dtype=torch.bool, device=self.device)
 
             nav_mask_indices = []
             ask_mask_indices = []
@@ -171,30 +214,46 @@ class VerbalAskAgent(AskAgent):
             # Budget features
             b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)
 
+            time_keep['initial_setup_pertimestep'] += time.time() - start_time
+
             # Run first forward pass to compute ask logit
+            start_time = time.time() 
             _, _, nav_logit, nav_softmax, ask_logit, ask_softmax, _ = self.model.decode(
                 a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask,
                 ask_logit_mask, budget=b_t, cov=cov)
+            time_keep['decode_tentative'] += time.time() - start_time
 
             # logging only
+            start_time = time.time() 
             nav_logits_initial_list = nav_logit.data.tolist()
             nav_softmax_initial_list = nav_softmax.data.tolist()
             ask_logits_list = ask_logit.data.tolist()
             ask_softmax_list = ask_softmax.data.tolist()
             nav_logit_masks_list = nav_logit_mask.data.tolist()
             ask_logit_masks_list = ask_logit_mask.data.tolist()
+            time_keep['logging_1'] += time.time() - start_time
 
+            start_time = time.time()
             self._populate_agent_state_to_obs(obs, nav_softmax, queries_unused, traj, ended, time_step)
+            time_keep['pop_state_to_obs_1'] += time.time() - start_time
 
             # Ask teacher for next ask action
+            start_time = time.time()
             ask_target, ask_reason = self.teacher.next_ask(obs)
             ask_target = torch.tensor(ask_target, dtype=torch.long, device=self.device)
+            time_keep['ask_teacher_for_next_action'] += time.time() - start_time
+
+            start_time = time.time()
             if not self.is_eval and not (self.random_ask or self.ask_first or self.teacher_ask or self.no_ask):
                 self.ask_loss += self.ask_criterion(ask_logit, ask_target)
-
+            time_keep['ask_loss'] += time.time() - start_time
+                
             # Determine next ask action
+            start_time = time.time()
             q_t = self._next_action('ask', ask_logit, ask_target, self.ask_feedback)
+            time_keep['compute_q_t'] += time.time() - start_time
 
+            start_time = time.time()
             # Find which agents have asked and prepend subgoals to their current instructions.
             ask_target_list = ask_target.data.tolist()
             q_t_list = q_t.data.tolist()
@@ -236,34 +295,49 @@ class VerbalAskAgent(AskAgent):
                     cov = torch.zeros(seq_mask.size(0), seq_mask.size(1), self.coverage_size, dtype=torch.float, device=self.device)
                 else:
                     cov = None
+            time_keep['determine_final_ask'] += time.time() - start_time
 
+            start_time = time.time()
             # Run second forward pass to compute nav logit
             # NOTE: q_t and b_t changed since the first forward pass.
             q_t = torch.tensor(q_t_list, dtype=torch.long, device=self.device)
             # b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)
             decoder_h, _, nav_logit, nav_softmax, cov = self.model.decode_nav(
                 a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask, cov=cov)
+            time_keep['decode_final'] += time.time() - start_time
 
             # logging only
+            start_time = time.time()
             nav_logits_final_list = nav_logit.data.tolist()
             nav_softmax_final_list = nav_softmax.data.tolist()
+            time_keep['logging_2'] += time.time() - start_time
 
             # Repopulate agent state
             # NOTE: queries_unused may have changed but it's fine since nav_teacher does not use it!
+            start_time = time.time()
             self._populate_agent_state_to_obs(obs, nav_softmax, queries_unused,
                 traj, ended, time_step)
+            time_keep['pop_state_to_obs_2'] += time.time() - start_time
 
             # Ask teacher for next nav action
+            start_time = time.time()
             nav_target = self.teacher.next_nav(obs)
             nav_target = torch.tensor(nav_target, dtype=torch.long, device=self.device)
+            time_keep['ask_for_next_nav_action'] += time.time() - start_time
 
             # logging only
+            start_time = time.time()
             nav_target_list = nav_target.data.tolist()
+            time_keep['logging_3'] += time.time() - start_time
 
             # Nav loss
+            start_time = time.time()
             if not self.is_eval:
                 self.nav_loss += self.nav_criterion(nav_logit, nav_target)
+            time_keep['nav_loss'] += time.time() - start_time
+
             # Determine next nav action
+            start_time = time.time()
             a_t = self._next_action('nav', nav_logit, nav_target, self.nav_feedback)
 
             # Translate agent action to environment action
@@ -277,16 +351,23 @@ class VerbalAskAgent(AskAgent):
                     n_subgoal_steps[i] += 1
 
                 env_action[i] = self.teacher.interpret_agent_action(a_t_list[i], obs[i])
-
+            
             a_t = torch.tensor(a_t_list, dtype=torch.long, device=self.device)
+            time_keep['adjust_a_t_and_write_env_action'] += time.time() - start_time
 
             # Take nav action
+            start_time = time.time()
             obs = self.env.step(env_action)
+            time_keep['env_step'] += time.time() - start_time
 
             # import pdb; pdb.set_trace()
 
             # Save trajectory output
+            start_time = time.time()
             ask_target_list = ask_target.data.tolist()
+            time_keep['get_ask_target_and_reason_for_logging'] += time.time() - start_time
+
+            start_time = time.time()
             for i, ob in enumerate(obs):
                 if not ended[i]:
                     traj[i]['agent_path'].append((ob['viewpoint'], ob['heading'], ob['elevation']))
@@ -314,18 +395,57 @@ class VerbalAskAgent(AskAgent):
             # Early exit if all ended
             if ended.all():
                 break
+            time_keep['save_traj_output'] += time.time() - start_time
 
         # # check GPU usage
         # import pdb; pdb.set_trace()
 
         if not self.is_eval:
+            start_time = time.time()
             self._compute_loss(iter_idx)
+            time_keep['compute_loss_per_batch'] += time.time() - start_time
 
-        return traj
+        time_keep['total_traj_time'] += time.time() - traj_start_time
+        return traj, time_keep
 
     def _rollout_multihead(self, iter_idx=None):
 
-        print ("using multi-head")
+        # timming bookkeeping
+        time_keep = {
+            'total_traj_time': 0.0,
+            'initial_setup': 0.0,
+            'mask_sampling': 0.0,
+            'initial_setup_pertimestep': 0.0,
+            'decode_tentative': 0.0,
+            'logging_1': 0.0,
+            'logging_2': 0.0,
+            'logging_3': 0.0,
+            'pop_state_to_obs_1': 0.0,
+            'ask_teacher_for_next_action': 0.0,
+            'ask_loss': 0.0,
+            'compute_q_t': 0.0,
+            'determine_final_ask': 0.0,
+            'decode_final': 0.0,
+            'pop_state_to_obs_2': 0.0,
+            'ask_for_next_nav_action': 0.0,
+            'nav_loss': 0.0,
+            'adjust_a_t_and_write_env_action': 0.0,
+            'adjust_a_t': 0.0,
+            'voting_sampling': 0.0,
+            'synchronization_before_stack': 0.0,
+            'prepare_for_LSTM_decoder_next_timestep': 0.0,
+            'prepare_for_meta_algo_next_timestep': 0.0,
+            'get_ask_target_and_reason_for_logging': 0.0,
+            'prepend_instruction_back_to_env': 0.0,
+            'loop_through_batch_to_write_env_action': 0.0,
+            'env_step': 0.0,
+            'save_traj_output': 0.0,
+            'compute_loss_per_batch': 0.0,
+        }
+
+        traj_start_time = time.time()
+
+        start_time = time.time() 
 
         # Reset environment
         # obs length=batch_size, each ob is a dictionary
@@ -412,7 +532,12 @@ class VerbalAskAgent(AskAgent):
         initial_instructions = [ob['instruction'] for ob in obs]
         assert len(initial_instructions) == batch_size
 
+        time_keep['initial_setup'] += time.time() - start_time 
+
         for time_step in range(episode_len):
+
+            start_time = time.time() 
+            
             # NOTE bootstrap : masks has shape(self.n_ensemble, batch_size)
             mul_heads_per_data_pt_and_mul_datapts_per_head = False
             while not mul_heads_per_data_pt_and_mul_datapts_per_head:
@@ -421,15 +546,20 @@ class VerbalAskAgent(AskAgent):
                 # make sure that each datapt gets exposure to some heads
                 mul_heads_per_data_pt_and_mul_datapts_per_head = (not 0 in np.sum(masks, axis=0)) and (not 0 in np.sum(masks, axis=1))
 
+            time_keep['mask_sampling'] += time.time() - start_time
+
+            start_time = time.time()
+
             # Mask out invalid actions
-            nav_logit_mask = torch.zeros(batch_size, AskAgent.n_output_nav_actions(), dtype=torch.uint8, device=self.device)
-            ask_logit_mask = torch.zeros(batch_size, AskAgent.n_output_ask_actions(), dtype=torch.uint8, device=self.device)
+            nav_logit_mask = torch.zeros(batch_size, AskAgent.n_output_nav_actions(), dtype=torch.bool, device=self.device)
+            ask_logit_mask = torch.zeros(batch_size, AskAgent.n_output_ask_actions(), dtype=torch.bool, device=self.device)
 
             nav_mask_indices = []
             ask_mask_indices = []
             for i, ob in enumerate(obs):
                 if len(ob['navigableLocations']) <= 1:
                     nav_mask_indices.append((i, self.nav_actions.index('forward')))
+
                 if queries_unused[i] <= 0:
                     ask_mask_indices.append((i, self.ask_actions.index('ask')))
 
@@ -442,6 +572,8 @@ class VerbalAskAgent(AskAgent):
             # Budget features
             # shape(batch_size, )
             b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)
+
+            time_keep['initial_setup_pertimestep'] += time.time() - start_time
 
             # # check GPU usage
             # import pdb; pdb.set_trace()
@@ -459,10 +591,13 @@ class VerbalAskAgent(AskAgent):
             # ask_logit_mask shape(batch_size, n_output_ask_actions), tensor
             # b_t shape(batch_size, ), tensor
             # cov shape(batch_size, max seq length in the batch, coverage dim), tensor
+            start_time = time.time() 
             _, _, nav_tentative_logit_heads, nav_tentative_softmax_heads, ask_logit_heads, ask_softmax_heads, _ = self.model.decode(None, a_t, q_t, f_t, decoder_h_heads, ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
+            time_keep['decode_tentative'] += time.time() - start_time
 
             # NOTE logging only
             # cannot call .numpy() unless we put to cpu and detach the tensor first
+            start_time = time.time() 
             nav_tentative_logit_heads_list = torch.stack(nav_tentative_logit_heads, dim=1).cpu().detach().data.tolist()
             assert len(nav_tentative_logit_heads_list) == batch_size
             assert len(nav_tentative_logit_heads_list[0]) == self.n_ensemble
@@ -471,27 +606,33 @@ class VerbalAskAgent(AskAgent):
             ask_softmax_heads_list = torch.stack(ask_softmax_heads, dim=1).cpu().detach().data.tolist()
             nav_logit_masks_list = nav_logit_mask.data.tolist()
             ask_logit_masks_list = ask_logit_mask.data.tolist()
+            time_keep['logging_1'] += time.time() - start_time
 
             # Repopulate agent state
             # NOTE bootstrap : get tentative obs for multihead
             # obs length=batch_size, each ob is a dictionary
             # obs_heads_tentative, length=n_ensemble, each element is a list of length=batch_size, each element is a dictionary
             # queries_unused length=batch_size
+            start_time = time.time()
             obs_heads_tentative = self._populate_agent_state_to_obs_single_to_multihead(obs, nav_tentative_softmax_heads, queries_unused, traj, ended, time_step, self.n_ensemble)
+            time_keep['pop_state_to_obs_1'] += time.time() - start_time
 
             # Ask teacher for next action
             # NOTE bootstrap : each head has its own ask targets because each head can predict different nav tentative entropies.
+            start_time = time.time()
             ask_zipped_heads = [self.teacher.next_ask(obs_k) for obs_k in obs_heads_tentative]
             ask_zipped_heads = list(zip(*ask_zipped_heads)) # unzip
             ask_target_heads, ask_reason_heads = ask_zipped_heads[0], ask_zipped_heads[1]
             ask_target_heads = [torch.tensor(ask_target_k, dtype=torch.long, device=self.device) for ask_target_k in ask_target_heads]
+            time_keep['ask_teacher_for_next_action'] += time.time() - start_time
 
             # NOTE logging only
             ask_target_heads_list = torch.stack(ask_target_heads, dim=1).cpu().detach().data.tolist()
             ask_reason_heads_list = np.array(ask_reason_heads).swapaxes(0,1).tolist()
-
+             
             # Compute ask loss
             # NOTE bootstrap : each head has its own loss before reduced across heads to scalar
+            start_time = time.time()
             if not self.is_eval and not (self.random_ask or self.ask_first or self.teacher_ask or self.no_ask):
                 cnt_ask_loss_heads = [0.0] * self.n_ensemble
                 for k in range(self.n_ensemble):
@@ -506,11 +647,16 @@ class VerbalAskAgent(AskAgent):
                     ask_loss_masked_k_full_reduced = torch.sum(ask_loss_masked_k_full/torch.sum(mask_k_tensor))
                     cnt_ask_loss_heads[k] = ask_loss_masked_k_full_reduced
                 self.ask_loss += sum(cnt_ask_loss_heads) / self.n_ensemble
+            time_keep['ask_loss'] += time.time() - start_time
 
             #### Determine next ask action #### 
             # NOTE bootstrap : self._next_action returns pytorch tensors
+            start_time = time.time()
             q_t_heads = [self._next_action('ask', ask_logit_k, ask_target_k, self.ask_feedback) for ask_logit_k, ask_target_k in zip(ask_logit_heads, ask_target_heads)]
+            time_keep['compute_q_t'] += time.time() - start_time
 
+
+            start_time = time.time()
             # Find which agents have asked and prepended subgoals to their current instructions
             # NOTE bootstrap : multihead version
             ask_target_list_heads = [ask_target_k.data.tolist() for ask_target_k in ask_target_heads]
@@ -570,7 +716,9 @@ class VerbalAskAgent(AskAgent):
                         cov_heads[k] = torch.zeros(seq_mask_heads[k].size(0), seq_mask_heads[k].size(1), self.coverage_size, dtype=torch.float, device=self.device)
                     else:
                         cov_heads[k] = None
+            time_keep['determine_final_ask'] += time.time() - start_time
 
+            start_time = time.time()
             # Run second forward pass to compute nav logit
             #  NOTE: q_t and b_t changed since the first forward pass.
             q_t_heads = [torch.tensor(q_t_list, dtype=torch.long, device=self.device) for q_t_list in q_t_list_heads]
@@ -584,25 +732,36 @@ class VerbalAskAgent(AskAgent):
             # nav_logit_mask -- stays the same. the same mask for every timestep
             # cov_heads -- changed. depending on whether we have asked.
             decoder_h_heads, _, nav_final_logit_heads, nav_final_softmax_heads, cov_heads = self.model.decode_nav(None, a_t, q_t_heads, f_t, decoder_h_heads, ctx_heads, seq_mask_heads, nav_logit_mask, cov=cov_heads)
+            time_keep['decode_final'] += time.time() - start_time
 
             # NOTE logging only
+            start_time = time.time()
             nav_final_logit_heads_list = torch.stack(nav_final_logit_heads, dim=1).cpu().detach().data.tolist()
             assert len(nav_final_logit_heads_list) == batch_size
             assert len(nav_final_logit_heads_list[0]) == self.n_ensemble
             nav_final_softmax_heads_list = torch.stack(nav_final_softmax_heads, dim=1).cpu().detach().data.tolist()
+            time_keep['logging_2'] += time.time() - start_time
 
             # Repopulate agent state
             # NOTE: queries_unused may have changed but it's fine since nav_teacher does not use it!
-            obs_heads_final = self._populate_agent_state_to_obs_multi_to_multihead(obs_heads_tentative, nav_final_softmax_heads, queries_unused_heads, traj, ended, time_step, self.n_ensemble)            
+            start_time = time.time()
+            obs_heads_final = self._populate_agent_state_to_obs_multi_to_multihead(obs_heads_tentative, nav_final_softmax_heads, queries_unused_heads, traj, ended, time_step, self.n_ensemble)  
+            time_keep['pop_state_to_obs_2'] += time.time() - start_time
+
             # Ask teacher for next nav action
+            start_time = time.time()
             nav_target_heads = [self.teacher.next_nav(obs_k) for obs_k in obs_heads_final]
             nav_target_heads = [torch.tensor(nav_target_k, dtype=torch.long, device=self.device) for nav_target_k in nav_target_heads]
+            time_keep['ask_for_next_nav_action'] += time.time() - start_time
 
             # NOTE logging only
+            start_time = time.time()
             nav_target_heads_list = torch.stack(nav_target_heads, dim=1).cpu().detach().data.tolist()
+            time_keep['logging_3'] += time.time() - start_time
 
             # Nav loss
             # NOTE bootstrap : apply masking
+            start_time = time.time()
             if not self.is_eval:
                 cnt_nav_loss_heads = [0.0] * self.n_ensemble
                 for k in range(self.n_ensemble):
@@ -617,8 +776,11 @@ class VerbalAskAgent(AskAgent):
                     # accumulate across heads
                     cnt_nav_loss_heads[k] = nav_loss_masked_k_reduced
                 self.nav_loss += sum(cnt_nav_loss_heads)/self.n_ensemble
+            time_keep['nav_loss'] += time.time() - start_time
+
 
             #### Determine next nav action #### 
+            start_time = time.time()
             a_t_heads = [self._next_action('nav', nav_final_logit_heads[k], nav_target_heads[k], self.nav_feedback) for k in range(self.n_ensemble)] 
 
             # meta algo adjustments to a_t
@@ -631,19 +793,27 @@ class VerbalAskAgent(AskAgent):
                         n_subgoal_steps_heads[k][i] < len(action_subgoals_heads[k][i]):  
                         a_t_list_heads[k][i] = action_subgoals_heads[k][i][n_subgoal_steps_heads[k][i]]
                         n_subgoal_steps_heads[k][i] += 1
+            time_keep['adjust_a_t'] += time.time() - start_time
             
             #### Vote/Sample for next step ####
+            # NOTE bad implementation 1
+            start_time = time.time()
             heads_ref = np.zeros(batch_size).astype(int)
             matching_heads = [list() for _ in range(batch_size)]
+
             if self.bootstrap_majority_vote:
                 
+                # each tupe (asking action idx, navigation action index)
                 majority_vote = [tuple() for i in range(batch_size)]
+
                 # shape(n_ensemble, batch_size, 2)
                 q_a_pairs = [None] * self.n_ensemble
+
                 for k in range(self.n_ensemble):
                     # q_t_list_heads[k] np array shape(batch_size,)
                     # a_t_list_heads[k] np array shape(batch_size,)
                     q_a_pairs[k] = np.stack([q_t_list_heads[k], a_t_list_heads[k]], axis=1)
+
                 # stack to shape(batch_size, n_ensemble, 2)
                 q_a_pairs = np.stack(q_a_pairs, axis=1)
                 assert q_a_pairs.shape[0] == batch_size
@@ -663,9 +833,12 @@ class VerbalAskAgent(AskAgent):
                 # for LSTM decoder input
                 a_t_list = [int(a) for (q, a) in majority_vote]
                 q_t_list = [int(q) for (q, a) in majority_vote]
+                # Navigation a_t shape (batch_size,)
                 a_t = torch.tensor(a_t_list, dtype=torch.long, device=self.device)
+                # Asking q_t shape (batch_size,)
                 q_t = torch.tensor(q_t_list, dtype=torch.long, device=self.device)
                 assert a_t.shape[0] == q_t.shape[0] == batch_size
+                time_keep['voting_sampling'] += time.time() - start_time
                 
             else:
                 # sample a head for each datapt in the batch
@@ -680,13 +853,23 @@ class VerbalAskAgent(AskAgent):
                 q_t_list = np.stack([vals[head] for vals, head in zip(q_t_list_heads, heads_ref)])
                 q_t = torch.tensor(q_t_list, dtype=torch.long, device=self.device)
                 assert a_t.shape[0] == q_t.shape[0] == batch_size
+                time_keep['voting_sampling'] += time.time() - start_time
 
+
+            start_time = time.time()
+            torch.cuda.synchronize()
+            time_keep['synchronization_before_stack'] += time.time() - start_time
+
+            # NOTE bad implementation 2
+            start_time = time.time()
             # prepare for LSTM decoder input in next timestep
+
             # convert to shape(batch_size, n_ensemble, max seq len, coverage_size)
             cov_heads = torch.stack(self.pack_heads_with_diff_seq_lens(cov_heads), dim=1)
             assert cov_heads.shape[0] == batch_size
             assert cov_heads.shape[1] == self.n_ensemble
             # cov has shape(batch_size, max seq len, coverage_size)
+            # head ref has len = batch_size
             cov = torch.stack([vals[head] for vals, head in zip(cov_heads, heads_ref)])
 
             ctx_heads = torch.stack(self.pack_heads_with_diff_seq_lens(ctx_heads), dim=1)
@@ -694,12 +877,17 @@ class VerbalAskAgent(AskAgent):
             assert ctx_heads.shape[1] == self.n_ensemble
             ctx = torch.stack([vals[head] for vals, head in zip(ctx_heads, heads_ref)])
 
-            # seq_mask_heads = torch.stack(self.pack_heads_with_diff_seq_lens(seq_mask_heads, tointTrue), dim=1)
-            seq_mask_heads = torch.stack(self.pack_heads_with_diff_seq_lens(seq_mask_heads, dattype=torch.uint8), dim=1)
+            seq_mask_heads = torch.stack(self.pack_heads_with_diff_seq_lens(seq_mask_heads, dattype=torch.bool), dim=1)
             assert seq_mask_heads.shape[0] == batch_size
             assert seq_mask_heads.shape[1] == self.n_ensemble
             seq_mask = torch.stack([vals[head] for vals, head in zip(seq_mask_heads, heads_ref)])
 
+            time_keep['prepare_for_LSTM_decoder_next_timestep'] += time.time() - start_time
+
+
+
+            # NOTE bad implementation 3
+            start_time = time.time()
             # prepare for meta-level algo in next timestep
             # original queries_unused_heads - len=n_ensemble, each len=batch_size.
             queries_unused_heads = np.array(queries_unused_heads).swapaxes(0, 1)
@@ -722,26 +910,38 @@ class VerbalAskAgent(AskAgent):
             obs = []
             for i in range(batch_size):
                 obs.append(obs_heads_final[heads_ref[i]][i])
+            time_keep['prepare_for_meta_algo_next_timestep'] += time.time() - start_time
 
+
+
+            start_time = time.time()
             # for logging only - used in train.py compute_ask_stats()
             assert len(ask_target_heads_list) == batch_size
             assert len(ask_reason_heads_list) == batch_size
             ask_target_list = [vals[head] for vals, head in zip(ask_target_heads_list, heads_ref)]
             ask_reason = [vals[head] for vals, head in zip(ask_reason_heads_list, heads_ref)]
+            time_keep['get_ask_target_and_reason_for_logging'] += time.time() - start_time
 
+            start_time = time.time()
             # write subgoal instructions back to env
             for i in range(batch_size):
                 if self._should_ask(ended[i], q_t_list[i]):
                     # Prepend subgoal to the current instruction in env
                     self.env.prepend_instruction(i, verbal_subgoals[i])
+            time_keep['prepend_instruction_back_to_env'] += time.time() - start_time
 
+            start_time = time.time()
             # Loop through batch and write env_action[i]
             for i in range(batch_size):
                 env_action[i] = self.teacher.interpret_agent_action(a_t_list[i], obs[i])
+            time_keep['loop_through_batch_to_write_env_action'] += time.time() - start_time
 
             # Take nav action
+            start_time = time.time()
             obs = self.env.step(env_action)
+            time_keep['env_step'] += time.time() - start_time
 
+            start_time = time.time()
             # Save trajectory output
             for i, ob in enumerate(obs):
                 if not ended[i]:
@@ -774,12 +974,16 @@ class VerbalAskAgent(AskAgent):
             # Early exit if all ended
             if ended.all():
                 break
+            time_keep['save_traj_output'] += time.time() - start_time
 
         # # check GPU usage
         # import pdb; pdb.set_trace()
 
         if not self.is_eval:
             # Bootstrap - should remain the same because self.ask_loss and self.nav_loss are reduced to scalars
+            start_time = time.time()
             self._compute_loss(iter_idx)
-        
-        return traj
+            time_keep['compute_loss_per_batch'] += time.time() - start_time
+
+        time_keep['total_traj_time'] += time.time() - traj_start_time
+        return traj, time_keep
