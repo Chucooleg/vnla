@@ -58,28 +58,30 @@ class EncoderLSTM(nn.Module):
         
         total_length = embeds.size(1)
         packed_embeds = pack_padded_sequence(embeds, sorted_lengths, batch_first=True)
+        # TODO : see if this raise an error
+        self.lstm.flatten_parameters() # see if this raise an error
         enc_h, state = self.lstm(packed_embeds, state)
 
-        try:
-            print ("embeds size", embeds.size())
-            print ("total_length", total_length)
-        except Exception:
-            pass
+        # try:
+        #     print ("embeds size", embeds.size())
+        #     print ("total_length", total_length)
+        # except Exception:
+        #     pass
 
-        try:
-            print ("packed_embeds size", packed_embeds.batch_sizes)
-        except Exception:
-            pass       
+        # try:
+        #     print ("packed_embeds size", packed_embeds.batch_sizes)
+        # except Exception:
+        #     pass       
 
-        try:
-            print ("enc_h size", enc_h.size())
-        except Exception:
-            pass  
+        # try:
+        #     print ("enc_h size", enc_h.size())
+        # except Exception:
+        #     pass  
 
-        try:
-            print ("state size", state.size())
-        except Exception:
-            pass  
+        # try:
+        #     print ("state size", state.size())
+        # except Exception:
+        #     pass  
 
         state = (self.encoder2decoder(state[0]), self.encoder2decoder(state[1]))
         # https://pytorch.org/docs/stable/notes/faq.html
@@ -89,8 +91,6 @@ class EncoderLSTM(nn.Module):
         # Unsort outputs
         _, backward_index_map = forward_index_map.sort(0, False)
         ctx = ctx[backward_index_map]
-
-        print ("ctx size", ctx.size())
 
         return ctx, state
 
@@ -133,6 +133,8 @@ class Attention(nn.Module):
             h_expand = h.unsqueeze(1).expand(-1, cov.size(1), -1).contiguous().view(-1, h.size(1))
             attn_expand = attn.unsqueeze(2).view(-1, 1)
             concat_input = torch.cat((context_expand, h_expand, attn_expand), 1)
+            # TODO : see if this raise an error
+            self.cov_rnn.flatten_parameters() # see if this raise an error
             new_cov, _ = self.cov_rnn(concat_input.unsqueeze(0), cov_expand.unsqueeze(0))
             new_cov = new_cov.squeeze(0).view_as(cov)
         else:
@@ -204,6 +206,8 @@ class AskAttnDecoderLSTM(nn.Module):
 
         concat_lstm_input = torch.cat(lstm_inputs, dim=1)
         drop = self.drop(concat_lstm_input)
+        # TODO : see if this raise an error
+        self.lstm.flatten_parameters() # see if this raise an error
         output, new_h = self.lstm(drop.unsqueeze(0), h)
 
         output = output.squeeze(0)
@@ -291,18 +295,19 @@ class AttentionSeq2SeqModel(nn.Module):
         self.decoder = AskAttnDecoderLSTM(hparams, agent_class, device).to(device)
 
         if torch.cuda.device_count() > 1:
-            self.encoder = nn.DataParallel(self.encoder, device_ids=[0,1,2,3])
-            self.decoder = nn.DataParallel(self.decoder, device_ids=[0,1,2,3])
-    
+            # self.encoder = nn.DataParallel(self.encoder, device_ids=[0,1,2,3])
+            # self.decoder = nn.DataParallel(self.decoder, device_ids=[0,1,2,3])
+            self.encoder = nn.DataParallel(self.encoder)
+            self.decoder = nn.DataParallel(self.decoder)   
 
     def encode(self, *args, **kwargs):
         return self.encoder(*args, **kwargs)
 
     def decode(self, *args, **kwargs):
-        return self.decoder(tentative=True, *args, **kwargs)
+        return self.decoder(True, *args, **kwargs)
 
     def decode_nav(self, *args, **kwargs):
-            return self.decoder(tentative=False, *args, **kwargs)
+            return self.decoder(False, *args, **kwargs)
 
 
 class AttentionSeq2SeqModelMultiHead(nn.Module):
@@ -321,7 +326,8 @@ class AttentionSeq2SeqModelMultiHead(nn.Module):
                               num_layers=hparams.num_lstm_layers).to(device)
 
         if torch.cuda.device_count() > 1:
-            self.encoder = nn.DataParallel(self.encoder, device_ids=[0,1,2,3])
+            # self.encoder = nn.DataParallel(self.encoder, device_ids=[0,1,2,3])
+            self.encoder = nn.DataParallel(self.encoder)
     
         if 'verbal' in hparams.advisor:
             agent_class = VerbalAskAgent
@@ -331,7 +337,8 @@ class AttentionSeq2SeqModelMultiHead(nn.Module):
             sys.exit('%s advisor not supported' % hparams.advisor)
 
         if torch.cuda.device_count() > 1:
-            self.decoder_heads_list = nn.ModuleList([nn.DataParallel(AskAttnDecoderLSTM(hparams, agent_class, device).to(device), device_ids=[0,1,2,3]) for _ in range(hparams.n_ensemble)])
+            # self.decoder_heads_list = nn.ModuleList([nn.DataParallel(AskAttnDecoderLSTM(hparams, agent_class, device).to(device), device_ids=[0,1,2,3]) for _ in range(hparams.n_ensemble)])
+            self.decoder_heads_list = nn.ModuleList([nn.DataParallel(AskAttnDecoderLSTM(hparams, agent_class, device).to(device)) for _ in range(hparams.n_ensemble)])
 
         else:
             self.decoder_heads_list = nn.ModuleList([AskAttnDecoderLSTM(hparams, agent_class, device).to(device) for _ in range(hparams.n_ensemble)])
