@@ -1,0 +1,77 @@
+description: VNLA bootstrapping jobs with mattersim docker image
+
+target:
+  # which virtual cluster you belong to (msrlabs, etc.). Everyone has access to "msrlabs".
+  vc: msrlabs
+  # physical cluster to use (cam, gcr, rr1, rr2) or Azure clusters (eu1, eu2, etc.)
+  cluster: eu2
+
+environment:
+  image: philly/jobs/test/pytorch:pytorch1.2.0-py36-mattersim
+  registry: phillyregistry.azurecr.io
+
+  setup:
+    - pip install scikit-learn --user
+    - python -m pip install networkx==2.3 --user
+    - CUDA_VISIBILE_DEVICES=0,1,2,3
+    # - pip install ipdb --user
+
+storage:
+  input1:
+    storage_account_name: msrairesidentssa4
+    container_name: matterport3d
+    mount_dir: /mnt/matterport3d
+    local_dir: /home/hoyeung/blob_matterport3d/
+  output:
+    storage_account_name: msrairesidentssa4
+    container_name: experiment-results
+    mount_dir: /mnt/experiment-results-philly
+    local_dir: /home/hoyeung/Documents/vnla/code/tasks/VNLA/output
+
+code:
+  # local directory of the code. this will be uploaded to the server.
+  # $CONFIG_DIR is expanded to the directory of this config file
+  local_dir: $CONFIG_DIR/
+
+# data:
+#   data upload is not required for this example
+
+# list of jobs to run, we run 2 jobs in this example
+jobs:
+  # name must be unique across the jobs
+# - name: low_p_voting_noclip_debug_3
+#   sku: G4
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -bootstrap_majority_vote 1 -gradient_clipping 0
+- name: low_p_voting_noclip
+  sku: G4
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -bootstrap_majority_vote 1 -gradient_clipping 0
+- name: low_p_voting_clip
+  sku: G4
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -bootstrap_majority_vote 1 -gradient_clipping 1
+- name: low_p_sampling_noclip
+  sku: G4
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -bootstrap_majority_vote 0 -gradient_clipping 0
+- name: low_p_sampling_clip
+  sku: G4
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -bootstrap_majority_vote 0 -gradient_clipping 1 
+- name: high_p_voting_noclip 
+  sku: G4
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 1.0 -bootstrap_majority_vote 1 -gradient_clipping 0
+- name: high_p_voting_clip
+  sku: G4
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 1.0 -bootstrap_majority_vote 1 -gradient_clipping 1
+- name: high_p_sampling_noclip
+  sku: G4
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 1.0 -bootstrap_majority_vote 0 -gradient_clipping 0
+- name: high_p_sampling_clip
+  sku: G4
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 1.0 -bootstrap_majority_vote 0 -gradient_clipping 1

@@ -23,12 +23,12 @@ storage:
     storage_account_name: msrairesidentssa4
     container_name: matterport3d
     mount_dir: /mnt/matterport3d
-    # local_dir: /home/hoyeung/blob_matterport3d/
+    local_dir: /home/hoyeung/blob_matterport3d/
   output:
     storage_account_name: msrairesidentssa4
     container_name: experiment-results
     mount_dir: /mnt/experiment-results-philly
-    # local_dir: /home/hoyeung/Documents/vnla/code/tasks/VNLA/output
+    local_dir: /home/hoyeung/Documents/vnla/code/tasks/VNLA/output
 
 code:
   # local directory of the code. this will be uploaded to the server.
@@ -41,22 +41,14 @@ code:
 # list of jobs to run, we run 2 jobs in this example
 jobs:
   # name must be unique across the jobs
-- name: time_khanh_peek
+- name: time_khanh
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && export JOB_NAME=time_khanh_peek && bash train_main_results.sh learned -bootstrap 0 -n_ensemble 0 -n_iters 50000
-- name: time_1head_bootstrap_peek
+  - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 0 -n_ensemble 0 -n_iters 50000
+- name: time_1head_bootstrap
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && export JOB_NAME=time_1head_bootstrap_peek && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 1 -n_iters 50000
-# - name: time_khanh
-#   sku: G1
-#   command:
-#   - cd tasks/VNLA/scripts/ && export JOB_NAME=time_khanh && bash train_main_results.sh learned -bootstrap 0 -n_ensemble 0 -n_iters 50000
-# - name: time_1head_bootstrap
-#   sku: G1
-#   command:
-#   - cd tasks/VNLA/scripts/ && export JOB_NAME=time_1head_bootstrap && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 1 -n_iters 50000
+  - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 1 -n_iters 50000
 
 
 # - name: low_p_voting_noclip_debug_3

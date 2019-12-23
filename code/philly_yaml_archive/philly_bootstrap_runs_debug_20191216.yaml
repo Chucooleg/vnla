@@ -1,5 +1,4 @@
-description: VNLA bootstrapping compare 1head vs single with less iters
-# experiment named vnla_time_comparisons
+description: VNLA bootstrapping jobs with mattersim docker image
 
 target:
   # which virtual cluster you belong to (msrlabs, etc.). Everyone has access to "msrlabs".
@@ -14,8 +13,7 @@ environment:
   setup:
     - pip install scikit-learn --user
     - python -m pip install networkx==2.3 --user
-    - CUDA_VISIBILE_DEVICES=0
-    # - CUDA_VISIBILE_DEVICES=0,1,2,3
+    - CUDA_VISIBILE_DEVICES=0,1,2,3
     # - pip install ipdb --user
 
 storage:
@@ -23,12 +21,12 @@ storage:
     storage_account_name: msrairesidentssa4
     container_name: matterport3d
     mount_dir: /mnt/matterport3d
-    # local_dir: /home/hoyeung/blob_matterport3d/
+    local_dir: /home/hoyeung/blob_matterport3d/
   output:
     storage_account_name: msrairesidentssa4
     container_name: experiment-results
     mount_dir: /mnt/experiment-results-philly
-    # local_dir: /home/hoyeung/Documents/vnla/code/tasks/VNLA/output
+    local_dir: /home/hoyeung/Documents/vnla/code/tasks/VNLA/output
 
 code:
   # local directory of the code. this will be uploaded to the server.
@@ -41,34 +39,15 @@ code:
 # list of jobs to run, we run 2 jobs in this example
 jobs:
   # name must be unique across the jobs
-- name: time_khanh_peek
-  sku: G1
+- name: low_p_voting_noclip_debug_3
+  sku: G4
   command:
-  - cd tasks/VNLA/scripts/ && export JOB_NAME=time_khanh_peek && bash train_main_results.sh learned -bootstrap 0 -n_ensemble 0 -n_iters 50000
-- name: time_1head_bootstrap_peek
-  sku: G1
-  command:
-  - cd tasks/VNLA/scripts/ && export JOB_NAME=time_1head_bootstrap_peek && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 1 -n_iters 50000
-# - name: time_khanh
-#   sku: G1
-#   command:
-#   - cd tasks/VNLA/scripts/ && export JOB_NAME=time_khanh && bash train_main_results.sh learned -bootstrap 0 -n_ensemble 0 -n_iters 50000
-# - name: time_1head_bootstrap
-#   sku: G1
-#   command:
-#   - cd tasks/VNLA/scripts/ && export JOB_NAME=time_1head_bootstrap && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 1 -n_iters 50000
-
-
-# - name: low_p_voting_noclip_debug_3
-#   sku: G4
-#   command:
-#   - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -bootstrap_majority_vote 1 -gradient_clipping 0
-
+  - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -bootstrap_majority_vote 1 -gradient_clipping 0
 
 # - name: low_p_voting_noclip
-#   sku: G4
-#   command:
-#   - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -bootstrap_majority_vote 1 -gradient_clipping 0
+# sku: G4
+# command:
+# - cd tasks/VNLA/scripts/ && bash train_main_results.sh learned -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -bootstrap_majority_vote 1 -gradient_clipping 0
 # - name: low_p_voting_clip
 #   sku: G4
 #   command:
