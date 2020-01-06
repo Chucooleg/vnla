@@ -84,7 +84,7 @@ class ShortestPathOracle(object):
             if loc.viewpointId == next_point:
                 # Look directly at the viewpoint before moving
                 if loc.rel_heading > math.pi/6.0:
-                      return (0, 1, 0) # Turn right
+                      return (0, 1, 0) # Turn right 
                 elif loc.rel_heading < -math.pi/6.0:
                       return (0,-1, 0) # Turn left
                 elif loc.rel_elevation > math.pi/6.0 and ob['viewIndex'] // 12 < 2:
@@ -100,8 +100,9 @@ class ShortestPathOracle(object):
         elif ob['viewIndex'] // 12 == 2:
             return (0, 0,-1) # Look down
 
-        # Otherwise decide which way to turn
-        target_rel = self.graph[ob['scan']].node[next_point]['position'] - ob['point']
+        # If camera is already neutralized, decide which way to turn
+        target_rel = self.graph[ob['scan']].node[next_point]['position'] - ob['point']  # state.location.point
+        # 180deg - 
         target_heading = math.pi / 2.0 - math.atan2(target_rel[1], target_rel[0])
         if target_heading < 0:
             target_heading += 2.0 * math.pi
@@ -129,12 +130,14 @@ class ShortestPathOracle(object):
         return self.agent_nav_actions.index('<end>')
 
     def interpret_agent_action(self, action_idx, ob):
+        '''Translate action index back to env action for simulator to take'''
 
         # If the action is not `forward`, simply map it to the simulator's
         # action space
         if action_idx != self.agent_nav_actions.index('forward'):
             return self.env_nav_actions[action_idx]
 
+        # If the action is forward, more complicated
         scan = ob['scan']
         start_point = ob['viewpoint']
 
@@ -143,15 +146,15 @@ class ShortestPathOracle(object):
 
         optimal_path = self.paths[scan][start_point][goal_point]
 
-        # If it is at the goal, take action 1.
+        # If the goal is right in front of us, go to it.
         # The dataset guarantees that the goal is always reachable.
         if len(optimal_path) < 2:
             return (1, 0, 0)
 
         next_optimal_point = optimal_path[1]
 
-        # If the next optimal viewpoint is within 30 degrees of the center of
-        # the view, go to it.
+        # If the next optimal viewpoint is within 30 degrees of 
+        # the center of the view, go to it.
         for i, loc in enumerate(ob['navigableLocations']):
             if loc.viewpointId == next_optimal_point:
                 if loc.rel_heading > math.pi/6.0 or loc.rel_heading < -math.pi/6.0 or \
@@ -161,13 +164,104 @@ class ShortestPathOracle(object):
                 else:
                     return (i, 0, 0)
 
-        # Otherwise, take action 1.
+        # Otherwise, go the navigable (seeable) viewpt that has the least angular distance from the center of the current image (viewpt).
         return (1, 0, 0)
 
     def __call__(self, obs):
         self.actions = list(map(self._shortest_path_action, obs))
         return list(map(self._map_env_action_to_agent_action, self.actions, obs))
 
+
+class FrontierShortestPathsOracle(ShortestPathOracle):
+
+    def __init__(self, agent_nav_actions, env_nav_actions=None):
+        super(FrontierShortestPathsOracle, self).__init__(agent_nav_actions, env_nav_actions)
+
+        # self.env_nav_actions = env_nav_actions
+        self.valid_rotation_action_indices = [self.agent_nav_actions[r] for r in ('left', 'right', 'up', 'down', '<end>', '<ignore>')]
+
+    def interpret_agent_rotations(self, rotation_action_indices, ob):
+        '''
+        rotation_action_indices : a list of int action indices
+        Returns:
+            list of length agent.max_macro_action_seq_len
+            e.g. [(0, 1, 0), (0, 1, -1), ..... (0,0,0)]
+            e.g. [(0,0,0), ... (0,0,0)] if ob has ended.
+        '''
+        max_macro_action_seq_len = len(rotation_action_indices)
+        macro_rotations = [(0,0,0)] * max_macro_action_seq_len
+        if not ob['ended']:
+            for action_idx in rotation_action_indices:
+                assert action_idx in self.valid_rotation_action_indices
+                macro_rotations[i] = self.env_nav_actions[action_idx]
+        return macro_rotations
+
+    def interpret_agent_forward(self, ob):
+        '''
+        Returns:
+            (0, 0, 0) to ignore if trajectory has already ended
+            or
+            (1, 0, 0) to step forward to the direct facing vertex
+        '''
+        if ob['ended']:
+            return self.env_nav_actions[self.agent_nav_actions.index('<ignore>')]
+        else:
+            return self.env_nav_actions[self.agent_nav_actions.index('forward')]
+
+    def make_explore_instructions(self, obs):
+        '''
+        Make env level instructions of each ob to explore its own panoramic sphere.
+
+        Returns:
+        heading_adjusts:     list len=batch_size, each an env action tuple.
+        elevation_adjusts_1: same.
+        elevation_adjusts_2: list len=batch_size, each either a single action tuple, or double action tuple.
+        '''
+        batch_size = len(obs)
+
+        # How agent explore the entire pano sphere
+        # Right*11, Up/Down, Right*11, Up/Down (*2), Right*11
+        heading_adjusts = [()] * batch_size
+        elevation_adjusts_1 = [()] * batch_size 
+        elevation_adjusts_2 = [()] * batch_size 
+
+        # (0,0,1)
+        up_tup = self.env_nav_actions[self.agent_nav_actions.index('up')]
+        # (0,0,-1)
+        down_tup = self.env_nav_actions[self.agent_nav_actions.index('down')]
+        # (0,1,0)
+        right_tup = self.env_nav_actions[self.agent_nav_actions.index('right')]
+        # (0,0,0)
+        ignore_tup = self.env_nav_actions[self.agent_nav_actions.index('<ignore>')]
+
+        # Loop through each ob in the batch
+        for i, ob in enumerate(obs):
+            if ob['ended']:
+                # ignore all. 
+                heading_adjusts[i] = ignore_tup
+            else:
+                # turn right for 12 times. 
+                heading_adjusts[i] = right_tup
+                # check agent elevation
+                if ob['viewIndex'] // 12 == 0:
+                    # facing down, so need to look up twice. 
+                    elevation_adjusts_1[i] = elevation_adjusts_2[i] = up_tup
+                elif ob['viewIndex'] // 12 == 2: 
+                    # facing up, so need to look down twice. 
+                    elevation_adjusts_1[i] = elevation_adjusts_2[i] = down_tup
+                else:  
+                    # neutral, so need to look up once, and then look down twice
+                    elevation_adjusts_1[i] = up_tup
+                    elevation_adjusts_2[i] = (down_tup, down_tup)
+
+        return heading_adjusts, elevation_adjusts_1, elevation_adjusts_2 
+
+    def _map_env_action_to_agent_action(self):
+        # TODO becareful or overriding parent
+        pass
+
+    def _compute_frontier_cost(self, ob):
+        # TODO
 
 
 class AskOracle(object):
@@ -293,6 +387,7 @@ class AskOracle(object):
 
 
 class MultistepShortestPathOracle(ShortestPathOracle):
+    '''For Ask Agents with direct advisors'''
 
     def __init__(self, n_steps, agent_nav_actions, env_nav_actions):
         super(MultistepShortestPathOracle, self).__init__(agent_nav_actions)
@@ -455,6 +550,12 @@ def make_oracle(oracle_type, *args, **kwargs):
         return MultistepShortestPathOracle(*args, **kwargs)
     if oracle_type == 'verbal':
         return StepByStepSubgoalOracle(*args, **kwargs)
+
+    if oracle_type == 'frontier_shortest':
+        return FrontierShortestPathsOracle(*args, **kwargs)
+    # TODO implement next
+    # if oracle_type == 'diverse_shortest':
+    #     return DiverseShortestPathsOracle(*args, **kwargs)
 
     return None
 

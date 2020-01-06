@@ -10,8 +10,12 @@ import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from utils import padding_idx
-from ask_agent import AskAgent
-from verbal_ask_agent import VerbalAskAgent
+from action_imitation_verbal_ask_agent import ActionImitationVerbalAskAgent
+from action_imitation_no_ask_agent import ActionImitationNoAskAgent
+# TODO Implement more agents later
+# from value_estimation_verbal_ask_no_recovery_agent import ValueEstimationVerbalAskNoRecoveryAgent
+from value_estimation_no_ask_no_recovery_agent import ValueEstimationNoAskNoRecoveryAgent
+
 
 class EncoderLSTM(nn.Module):
 
@@ -55,38 +59,21 @@ class EncoderLSTM(nn.Module):
         embeds = self.drop(embeds)
         state = self.init_state(inputs)
 
-        
-        total_length = embeds.size(1)
-        packed_embeds = pack_padded_sequence(embeds, sorted_lengths, batch_first=True)
-        # TODO : see if this raise an error
-        self.lstm.flatten_parameters() # see if this raise an error
-        enc_h, state = self.lstm(packed_embeds, state)
-
-        # try:
-        #     print ("embeds size", embeds.size())
-        #     print ("total_length", total_length)
-        # except Exception:
-        #     pass
-
-        # try:
-        #     print ("packed_embeds size", packed_embeds.batch_sizes)
-        # except Exception:
-        #     pass       
-
-        # try:
-        #     print ("enc_h size", enc_h.size())
-        # except Exception:
-        #     pass  
-
-        # try:
-        #     print ("state size", state.size())
-        # except Exception:
-        #     pass  
-
-        state = (self.encoder2decoder(state[0]), self.encoder2decoder(state[1]))
-        # https://pytorch.org/docs/stable/notes/faq.html
-        ctx, lengths = pad_packed_sequence(enc_h, batch_first=True, total_length=total_length)
-        ctx = self.drop(ctx)
+        if torch.cuda.device_count() > 1:
+            # https://pytorch.org/docs/stable/notes/faq.html
+            total_length = embeds.size(1)
+            packed_embeds = pack_padded_sequence(embeds, sorted_lengths, batch_first=True)
+            self.lstm.flatten_parameters()
+            enc_h, state = self.lstm(packed_embeds, state)
+            state = (self.encoder2decoder(state[0]), self.encoder2decoder(state[1]))
+            ctx, lengths = pad_packed_sequence(enc_h, batch_first=True, total_length=total_length)
+            ctx = self.drop(ctx)
+        else:
+            packed_embeds = pack_padded_sequence(embeds, sorted_lengths, batch_first=True)
+            enc_h, state = self.lstm(packed_embeds, state)
+            state = (self.encoder2decoder(state[0]), self.encoder2decoder(state[1]))
+            ctx, lengths = pad_packed_sequence(enc_h, batch_first=True)
+            ctx = self.drop(ctx)
 
         # Unsort outputs
         _, backward_index_map = forward_index_map.sort(0, False)
@@ -133,8 +120,8 @@ class Attention(nn.Module):
             h_expand = h.unsqueeze(1).expand(-1, cov.size(1), -1).contiguous().view(-1, h.size(1))
             attn_expand = attn.unsqueeze(2).view(-1, 1)
             concat_input = torch.cat((context_expand, h_expand, attn_expand), 1)
-            # TODO : see if this raise an error
-            self.cov_rnn.flatten_parameters() # see if this raise an error
+            if torch.cuda.device_count() > 1:
+                self.cov_rnn.flatten_parameters()
             new_cov, _ = self.cov_rnn(concat_input.unsqueeze(0), cov_expand.unsqueeze(0))
             new_cov = new_cov.squeeze(0).view_as(cov)
         else:
@@ -171,7 +158,8 @@ class AskAttnDecoderLSTM(nn.Module):
             coverage_dim=hparams.coverage_size
             if hasattr(hparams, 'coverage_size') else None)
 
-        self.nav_predictor = nn.Linear(hparams.hidden_size, agent_class.n_output_nav_actions())
+        self.nav_predictor = None # subclass specify
+        # self.nav_predictor = nn.Linear(hparams.hidden_size, agent_class.n_output_nav_actions())
 
         ask_predictor_input_size = hparams.hidden_size * 2 + \
             agent_class.n_output_nav_actions() + hparams.img_feature_size + \
@@ -197,7 +185,17 @@ class AskAttnDecoderLSTM(nn.Module):
         self.backprop_softmax = hparams.backprop_softmax
         self.backprop_ask_features = hparams.backprop_ask_features
 
+
+class AskAttnDecoderClassifierLSTM(nn.Module):
+
+    def __init__(self, hparams, agent_class, device):
+
+        super(AskAttnDecoderClassifierLSTM, self).__init__(hparams, agent_class, device)
+
+        self.nav_predictor = nn.Linear(hparams.hidden_size, agent_class.n_output_nav_actions())
+
     def _lstm_and_attend(self, nav_action, ask_action, feature, h, ctx, ctx_mask, cov=None):
+        '''run LSTM cell, run attention layer on coverage vector'''
 
         nav_embeds = self.nav_embedding(nav_action)
         ask_embeds = self.ask_embedding(ask_action)
@@ -206,8 +204,8 @@ class AskAttnDecoderLSTM(nn.Module):
 
         concat_lstm_input = torch.cat(lstm_inputs, dim=1)
         drop = self.drop(concat_lstm_input)
-        # TODO : see if this raise an error
-        self.lstm.flatten_parameters() # see if this raise an error
+        if torch.cuda.device_count() > 1:
+                self.lstm.flatten_parameters()
         output, new_h = self.lstm(drop.unsqueeze(0), h)
 
         output = output.squeeze(0)
@@ -217,10 +215,11 @@ class AskAttnDecoderLSTM(nn.Module):
         # Attention
         h_tilde, alpha, new_cov = self.attention_layer(output_drop, ctx, ctx_mask, cov=cov)
 
-        return h_tilde, alpha, output_drop, new_h, new_cov
+        return h_tilde, alpha, output_drop, new_h, new_cov        
 
     def forward_tentative(self, nav_action, ask_action, feature, h, ctx, ctx_mask, 
     nav_logit_mask, ask_logit_mask, budget=None, cov=None):
+        '''run LSTM to decode next nav action and predict ask action'''
 
         h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
             nav_action, ask_action, feature, h, ctx, ctx_mask, cov=cov)
@@ -232,7 +231,6 @@ class AskAttnDecoderLSTM(nn.Module):
         if not self.backprop_softmax:
             nav_softmax = nav_softmax.detach()
 
-        assert budget is not None
         budget_embeds = self.budget_embedding(budget)
         ask_predictor_inputs = [h_tilde, output_drop, feature, nav_softmax, budget_embeds]
 
@@ -250,6 +248,7 @@ class AskAttnDecoderLSTM(nn.Module):
 
     def forward_nav(self, nav_action, ask_action, feature, h, ctx, ctx_mask,
                     nav_logit_mask, cov=None):
+        '''run LSTM to decode next nav action only (no ask prediction)'''
 
         h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
             nav_action, ask_action, feature, h, ctx, ctx_mask, cov=cov)
@@ -266,39 +265,106 @@ class AskAttnDecoderLSTM(nn.Module):
 
         if tentative_bool:
             assert ask_logit_mask is not None, "tentative nav prediction must have non-None ask_logit_mask"
+            assert budget is not None, "tentative nav prediction must have non-None budget"
             return self.forward_tentative(nav_action, ask_action, feature, h, ctx, ctx_mask, nav_logit_mask, ask_logit_mask, budget, cov)
         else:
             return self.forward_nav(nav_action, ask_action, feature, h, ctx, ctx_mask, nav_logit_mask, cov)
 
 
-class AttentionSeq2SeqModel(nn.Module):
+class AskAttnDecoderRegressorLSTM(nn.Module):
+
+    def __init__(self, hparams, agent_class, device):
+
+        super(AskAttnDecoderRegressorLSTM, self).__init__(hparams, agent_class, device)
+
+        # Q-value regressor output dim is 1
+        self.nav_predictor = nn.Linear(hparams.hidden_size, 1)
+        # 'end' trajectory classifier
+        self.end_predictor = nn.Linear(hparams.hidden_size, 1)
+
+    def _lstm_and_attend(self, nav_action, ask_action, feature, h, ctx, ctx_mask, cov=None):
+        '''run LSTM cell, run attention layer on coverage vector'''
+
+        # Sum up macro action embeddings
+        # TODO how "end" works may affect nn.embedding dim 1
+        nav_embeds = self.nav_embedding(nav_action)
+        nav_embeds_sum = torch.sum(nav_embeds, dim=1)
+
+        ask_embeds = self.ask_embedding(ask_action)
+
+        lstm_inputs = [nav_embeds_sum, ask_embeds, feature]
+
+        concat_lstm_input = torch.cat(lstm_inputs, dim=1)
+        drop = self.drop(concat_lstm_input)
+        if torch.cuda.device_count() > 1:
+                self.lstm.flatten_parameters()
+        output, new_h = self.lstm(drop.unsqueeze(0), h)
+
+        output = output.squeeze(0)
+
+        output_drop = self.drop(output)
+
+        # Attention
+        h_tilde, alpha, new_cov = self.attention_layer(output_drop, ctx, ctx_mask, cov=cov)
+
+        return h_tilde, alpha, output_drop, new_h, new_cov        
+
+    def forward(self, tentative_bool, nav_action, ask_action, feature, h, ctx, ctx_mask, view_index_mask, cov=None):
+        '''run LSTM to decode q-value for a particular view'''
+
+        h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
+            nav_action, ask_action, feature, h, ctx, ctx_mask, cov=cov)        
+
+        # Predict q-value -- cost
+        # tensor shape (batch_size, 1) -> (batch_size,)
+        q_value = self.nav_predictor(h_tilde).squeeze(-1)
+        # tensor shape (batch_size,)
+        q_value.data.masked_fill_(view_index_mask, float('inf'))
+
+        # Predict if the candidate viewpt is the end point
+        # tensor shape (batch_size, 1) -> (batch_size,)
+        end_logit = self.end_predictor(h_tilde).squeeze(-1)
+        end_sigmoid = torch.sigmoid(end_logit)
+        # tensor shape (batch_size,)
+        end_sigmoid.data.masked_fill_(view_index_mask, float('inf'))
+
+        return new_h, alpha, q_value, end_logit, end_sigmoid, new_cov
+
+
+class AttentionSeq2SeqFramesModel(nn.Module):
 
     def __init__(self, vocab_size, hparams, device):
-        super(AttentionSeq2SeqModel, self).__init__()
+        super(AttentionSeq2SeqFramesModel, self).__init__()
         enc_hidden_size = hparams.hidden_size // 2 \
             if hparams.bidirectional else hparams.hidden_size
         self.encoder = EncoderLSTM(vocab_size,
-                              hparams.word_embed_size,
-                              enc_hidden_size,
-                              padding_idx,
-                              hparams.dropout_ratio,
-                              device,
-                              bidirectional=hparams.bidirectional,
-                              num_layers=hparams.num_lstm_layers).to(device)
-    
-        if 'verbal' in hparams.advisor:
-            agent_class = VerbalAskAgent
-        elif hparams.advisor == 'direct':
-            agent_class = AskAgent
+                                hparams.word_embed_size,
+                                enc_hidden_size,
+                                padding_idx,  # imported from utils
+                                hparams.dropout_ratio,
+                                device,
+                                bidirectional=hparams.bidirectional,
+                                num_layers=hparams.num_lstm_layers).to(device)
+
+        
+        assert hparams.navigation_objective == 'value_estimation', \
+            ('Only value estimation agents are supported at the moment')
+
+        # Specify agent_class so to determine some model layer sizes 
+        # i.e. using agent_class.n_nav_outputs, agent_class.n_ask_outputs
+        if hparams.uncertainty_handling == 'no_ask' and hparams.recovery_strategy == 'no_recovery':
+            agent_class = ValueEstimationNoAskNoRecoveryAgent
+        # NOTE placeholder for Verbal Ask No Recovery agent
+        # elif hparams.uncertainty_handling == 'learned_ask_flag' and hparams.recovery_strategy == 'no_recovery':
+        #     agent_class = ValueEstimationVerbalAskNoRecoveryAgent
         else:
-            sys.exit('%s advisor not supported' % hparams.advisor)
-        self.decoder = AskAttnDecoderLSTM(hparams, agent_class, device).to(device)
+            sys.exit('%s uncertainty handling and %s recovery strategy not supported, no matching agent classes.' % hparams.uncertainty_handling, hparams.recovery_strategy)
+
+        self.decoder = AskAttnDecoderRegressorLSTM(hparams, agent_class, device).to(device)
 
         if torch.cuda.device_count() > 1:
-            # self.encoder = nn.DataParallel(self.encoder, device_ids=[0,1,2,3])
-            # self.decoder = nn.DataParallel(self.decoder, device_ids=[0,1,2,3])
             self.encoder = nn.DataParallel(self.encoder)
-            self.decoder = nn.DataParallel(self.decoder)   
+            self.decoder = nn.DataParallel(self.decoder)
 
     def encode(self, *args, **kwargs):
         return self.encoder(*args, **kwargs)
@@ -307,123 +373,49 @@ class AttentionSeq2SeqModel(nn.Module):
         return self.decoder(True, *args, **kwargs)
 
     def decode_nav(self, *args, **kwargs):
-            return self.decoder(False, *args, **kwargs)
+        return self.decoder(False, *args, **kwargs)
 
 
-class AttentionSeq2SeqModelMultiHead(nn.Module):
-    
+class AttentionSeq2SeqContinuousModel(nn.Module):
+    '''
+    This class only applies to action imitation agents
+    '''
+
     def __init__(self, vocab_size, hparams, device):
-        super(AttentionSeq2SeqModelMultiHead, self).__init__()
+        super(AttentionSeq2SeqContinuousModel, self).__init__()
         enc_hidden_size = hparams.hidden_size // 2 \
             if hparams.bidirectional else hparams.hidden_size
         self.encoder = EncoderLSTM(vocab_size,
-                              hparams.word_embed_size,
-                              enc_hidden_size,
-                              padding_idx,
-                              hparams.dropout_ratio,
-                              device,
-                              bidirectional=hparams.bidirectional,
-                              num_layers=hparams.num_lstm_layers).to(device)
+                                hparams.word_embed_size,
+                                enc_hidden_size,
+                                padding_idx,
+                                hparams.dropout_ratio,
+                                device,
+                                bidirectional=hparams.bidirectional,
+                                num_layers=hparams.num_lstm_layers).to(device)
+
+        # Specify agent_class so to determine some model layer sizes 
+        # i.e. using agent_class.n_nav_outputs, agent_class.n_ask_outputs
+        assert hparams.recovery_strategy == 'no_recovery', ('Action Imitation agents do not support recovery strategies.')
+        if hparams.uncertainty_handling == 'no_ask':
+            agent_class = ActionImitationNoAskAgent
+        elif hparams.uncertainty_handling == 'learned_ask_flag':
+            assert hparams.advisor == 'verbal', ('only verbal advisor is supported')
+            agent_class = ActionImitationVerbalAskAgent
+        else:
+            sys.exit('%s uncertainty handling not supported, no matching agent classes.' % hparams.uncertainty_handling)
+
+        self.decoder = AskAttnDecoderClassifierLSTM(hparams, agent_class, device).to(device)
 
         if torch.cuda.device_count() > 1:
-            # self.encoder = nn.DataParallel(self.encoder, device_ids=[0,1,2,3])
             self.encoder = nn.DataParallel(self.encoder)
-    
-        if 'verbal' in hparams.advisor:
-            agent_class = VerbalAskAgent
-        elif hparams.advisor == 'direct':
-            agent_class = AskAgent
-        else:
-            sys.exit('%s advisor not supported' % hparams.advisor)
-
-        if torch.cuda.device_count() > 1:
-            # self.decoder_heads_list = nn.ModuleList([nn.DataParallel(AskAttnDecoderLSTM(hparams, agent_class, device).to(device), device_ids=[0,1,2,3]) for _ in range(hparams.n_ensemble)])
-            self.decoder_heads_list = nn.ModuleList([nn.DataParallel(AskAttnDecoderLSTM(hparams, agent_class, device).to(device)) for _ in range(hparams.n_ensemble)])
-
-        else:
-            self.decoder_heads_list = nn.ModuleList([AskAttnDecoderLSTM(hparams, agent_class, device).to(device) for _ in range(hparams.n_ensemble)])
+            self.decoder = nn.DataParallel(self.decoder)
 
     def encode(self, *args, **kwargs):
         return self.encoder(*args, **kwargs)
 
-    def _decode_heads(self, *args, **kwargs):
-         
-        a_t, q_t, f_t, decoder_h_heads, ctx, seq_mask, nav_logit_mask, ask_logit_mask = args
-        b_t = kwargs['budget']
-        cov = kwargs['cov']
+    def decode(self, *args, **kwargs):
+        return self.decoder(True, *args, **kwargs)
 
-        new_h_heads = []
-        alpha_heads = []
-        nav_logit_heads = []
-        nav_softmax_heads = []
-        ask_logit_heads = []
-        ask_softmax_heads = []
-        new_cov_heads = []
-
-        for k in range(len(self.decoder_heads_list)):
-
-            new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov = self.decoder_heads_list[k](True, a_t, q_t, f_t, decoder_h_heads[k], ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
-
-            new_h_heads.append(new_h)
-            alpha_heads.append(alpha)
-            nav_logit_heads.append(nav_logit)
-            nav_softmax_heads.append(nav_softmax)
-            ask_logit_heads.append(ask_logit)
-            ask_softmax_heads.append(ask_softmax)
-            new_cov_heads.append(new_cov)
-
-        return new_h_heads, alpha_heads, nav_logit_heads, nav_softmax_heads, ask_logit_heads, ask_softmax_heads, new_cov_heads
-
-    def _decode_head_k(self, k, *args, **kwargs):
-        # parse the args and kwargs
-        a_t, q_t, f_t, decoder_h_heads, ctx, seq_mask, nav_logit_mask, ask_logit_mask = args
-        b_t = kwargs['budget']
-        cov = kwargs['cov']
-
-        new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov = self.decoder_heads_list[k](True, a_t, q_t, f_t, decoder_h_heads[k], ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
-
-        return new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov
-
-    def decode(self, k, *args, **kwargs):
-        if k is not None:
-            return self._decode_head_k(k, *args, **kwargs)
-        else:
-            return self._decode_heads(*args, **kwargs)
-
-    def _decode_nav_heads(self, *args, **kwargs):
-        # parse the args and kwargs
-        a_t, q_t_heads, f_t, decoder_h_heads, ctx_heads, seq_mask_heads, nav_logit_mask = args
-        cov_heads = kwargs['cov']
-
-        new_h_heads = []
-        alpha_heads = []
-        nav_logit_heads = []
-        nav_softmax_heads = []
-        new_cov_heads = []  
-
-        for k in range(len(self.decoder_heads_list)):
-
-            new_h, alpha, nav_logit, nav_softmax, new_cov = self.decoder_heads_list[k](False, a_t, q_t_heads[k], f_t, decoder_h_heads[k], ctx_heads[k], seq_mask_heads[k], nav_logit_mask, cov=cov_heads[k])
-            
-            new_h_heads.append(new_h)
-            alpha_heads.append(alpha)
-            nav_logit_heads.append(nav_logit)
-            nav_softmax_heads.append(nav_softmax)
-            new_cov_heads.append(new_cov)
-
-        return new_h_heads, alpha_heads, nav_logit_heads, nav_softmax_heads, new_cov_heads 
-
-    def _decode_nav_head_k(self, k, *args, **kwargs):   
-        # parse the args and kwargs
-        a_t, q_t_heads, f_t, decoder_h_heads, ctx_heads, seq_mask_heads, nav_logit_mask = args
-        cov_heads = kwargs['cov']
-
-        new_h, alpha, nav_logit, nav_softmax, new_cov = self.decoder_heads_list[k](False, a_t, q_t_heads[k], f_t, decoder_h_heads[k], ctx_heads[k], seq_mask_heads[k], nav_logit_mask, cov=cov_heads[k])
-
-        return new_h, alpha, nav_logit, nav_softmax, new_cov
-
-    def decode_nav(self, k, *args, **kwargs):
-        if k is not None:
-            return self._decode_nav_head_k(k, *args, **kwargs)  
-        else:
-            return self._decode_nav_heads(*args, **kwargs)
+    def decode_nav(self, *args, **kwargs):
+        return self.decoder(False, *args, **kwargs)

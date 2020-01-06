@@ -12,17 +12,22 @@ from torch import optim
 from torch.autograd import Variable
 import torch.nn.functional as F
 
+from tensorboardX import SummaryWriter
 from utils import padding_idx
 
+
 class BaseAgent(object):
+    """
+    Handles test results writing
+    """
 
     def __init__(self):
         random.seed(1)
         self.results = {}
-        self.losses = []
         self.results_path = None
+        self.SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
 
-    def write_results(self, traj):
+    def write_results(self):
         output = []
         for k, v in self.results.items():
             item = { 'instr_id' : k }
@@ -36,45 +41,52 @@ class BaseAgent(object):
                 import ipdb; ipdb.set_trace()
 
     def rollout(self, iter_idx):
-        raise NotImplementedError
+        raise NotImplementedError('Subclasses are expected to implement rollout')
 
     @staticmethod
     def get_agent(name):
         return globals()[name+"Agent"]
 
-    def test(self, env):
+    def base_test(self, env):
         self.env.reset_epoch()
+
+        # self.is_eval is set to True in subclass
 
         self.results = {}
         looped = False
         traj = []
         with torch.no_grad():
+            # rollout many times until all the datapts are processed
             while True:
-                for t in self.rollout()[0]:
-                    if t['instr_id'] in self.results:
+                for tr in self.rollout()[0]:
+                    if tr['instr_id'] in self.results:
                         looped = True
                     else:
-                        self.results[t['instr_id']] = {
-                                'trajectory' : t['agent_path'], 
-                                'scan'       : t['scan'],
-                                'agent_nav'  : t['agent_nav'],
+                        self.results[tr['instr_id']] = {
+                                # common to all agents
+                                'trajectory' : tr['agent_path'], 
+                                'scan'       : tr['scan'],
+                                'agent_nav'  : tr['agent_nav'],
                             }
                         for k in [
-                            'agent_ask', 'agent_nav_logit_masks', 'agent_ask_logit_masks', 
-                            'teacher_ask', 'teacher_ask_reason', 
-                            'agent_nav_logits_initial', 'agent_nav_softmax_initial',
+                            # imitation no ask agent
+                            # single head
+                            'agent_nav_logits', 'agent_nav_softmax', 
+                            'agent_nav_logit_masks', 'teacher_nav',
+                            # imitation verbal ask agent
+                            # single head
+                            'agent_nav_logits_tentative', 'agent_nav_softmax_tentative',
                             'agent_nav_logits_final', 'agent_nav_softmax_final',
-                            'teacher_nav', 'agent_ask_logits', 'agent_ask_softmax', 
-                            'teacher_ask_heads', 'teacher_ask_reason_heads',
-                            'agent_nav_logits_initial_heads', 'agent_nav_softmax_initial_heads',
-                            'agent_nav_logits_final_heads', 'agent_nav_softmax_final_heads',
-                            'teacher_nav_heads', 'agent_ask_logits_heads', 'agent_ask_softmax_heads',
-                            'bootstrap_mask', 'active_head', 'matching_heads']:
-                            if k in t:
-                                self.results[t['instr_id']][k] = t[k]
-                        if 'subgoals' in t:
-                            self.results[t['instr_id']]['subgoals'] = t['subgoals']
-                        traj.append(t)
+                            'agent_ask',
+                            'agent_ask_logits', 'agent_ask_softmax',
+                            'agent_ask_logit_masks', 'teacher_ask', 'teacher_ask_reason',
+                            ]:
+
+                            if k in tr:
+                                self.results[tr['instr_id']][k] = tr[k]
+                        if 'subgoals' in tr:
+                            self.results[tr['instr_id']]['subgoals'] = tr['subgoals']
+                        traj.append(tr)
                 if looped:
                     break
         return traj
