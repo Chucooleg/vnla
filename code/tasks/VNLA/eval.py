@@ -72,6 +72,8 @@ class Evaluation(object):
         self.scores['trajectory_steps'].append(len(path) - 1)
 
         nav_errors = oracle_errors = 1e9
+        # there can be more than one ground truth path for the same datapt
+        # e.g. two bathrooms with mirrors
         for shortest_path in gt['paths']:
             start = shortest_path[0]
             assert start == path[0][0], 'Result trajectories should include the start position'
