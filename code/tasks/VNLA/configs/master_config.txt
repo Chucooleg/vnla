@@ -35,6 +35,7 @@
     "decay_beta_every"      : 1000,
     "min_history_to_learn"  : 5000,
     "num_recent_frames"     : 4,
+    "success_radius"        : 2,
 
     # History buffer parameters
     'max_buffer_size'       : 10000,
