@@ -97,8 +97,9 @@ class HistoryBuffer(object):
             self._indexed_data[key]['view_index_mask_indices'].append(experience['view_index_mask_indices'])
             # tensor
             self._indexed_data[key]['viewix_actions_map'].append(experience['viewix_actions_map'])
-             # np array
-            self._indexed_data[key]['end_target_indices'].append(experience['end_target_indices'])
+            
+            #  # np array
+            # self._indexed_data[key]['end_target_indices'].append(experience['end_target_indices'])
 
             # Append target
             self._indexed_data[key]['q_values_target'].append(experience['q_values_target'])
