@@ -85,9 +85,9 @@ class EnvBatch():
 
 class VNLAExplorationBatch():
 
-    def __init__(self, batch_size=100):
-        # assign a new simulator for each data point in the batch
-        self.batch_size = batch_size
+    def __init__(self, obs):
+        # assign a new simulator for each ob in the batch
+        self.batch_size = len(obs)
         for i in range(batch_size):
             sim = MatterSim.Simulator()
             sim.setRenderingEnabled(False)
@@ -98,112 +98,263 @@ class VNLAExplorationBatch():
                 os.path.join(os.getenv('PT_DATA_DIR'), 'connectivity'))
             sim.init()
             self.sims.append(sim)
+        self._reset(obs)
 
-    def reset(self, obs):
+        # list length=batch_size, each element is a list of 35 rotation tuples.
+        # e.g. [[(0,1,0), (0,-1,1), ...], [(0,1,0), (0,-1,1), ...], ....]
+        self._rotation_history = [[]] * self.batch_size
+
+    def _reset(self, obs):
         '''set x_curr and psi_curr for each simulator in beginning of episodes'''
         for i, ob in enumerate(obs):
             self.sims[i].newEpisode(ob['scan'], ob['viewpoint'], ob['heading'], ob['elevation'])
 
-    def _take_explore_step(self, instruction):
-        '''
-        1. Take 1 step/macro-step and collect the viewIndex
-        2. Check if there's a reachable vertex within 30 deg, return the closest one if so.
+#-------------------
 
-        instruction : list len = batch_size, each element is a tuple of single or macro-action.
+    def _getStates(self):
+        '''
+        Get the most current viewIndex and closest navigableLocation at index [1] of each sim.
+
+        Returns:
+            viewix_batch: list length = batch_size, each int.
+            closest_vertex_batch: list length = batch_size, each a dictionary (see state.navigableLocations)
+        '''
+        viewix_batch = closest_vertex_batch = [None] * self.batch_size
+        for (i, sim) in enumerate(self.sims):
+            state = sim.getState()
+            viewix_batch[i] = state.viewIndex
+            if len(state.navigableLocations) >= 1:
+                closest_vertex_batch[i] = state.navigableLocations[1]
+            else:
+                closest_vertex_batch[i] = {}
+        return viewix_batch, closest_vertex_batch
+
+    def _map_to_efficient_rotation(self, rotation_history):
+        '''
+        Figure out shortest rotation sequence from rotation_history. 
+        Returns:
+            list. length = batch_size, 
+            each element is a single list of tuples. [(0,1,0), (0,-1,1), ...]
+        '''
+        # env should have taken 1 or more rotations already
+        assert all.([len(hist) > 0 for hist in self.rotation_history])
+
+        def compress_single(l):
+            '''
+            Return more compact and efficient list of env action tuples.
+            Do not combine [(0,1,0), (0,0,1)] to [(0,1,1)] because they need to be translated into single action action indices for LSTM later.
+            
+            Example : [(0,1,0), (0,0,-1), (0,1,0), (0,0,1)] 
+                    returns [(0,1,0), (0,1,0)]
+                    
+            Example : [(0,1,0), (0,0,-1), (0,1,0), (0,0,1), (0,0,1), (0,0,1), (0,0,1)] 
+                    returns [(0, 1, 0), (0, 1, 0), (0, 0, 1), (0, 0, 1), (0, 0, 1)]
+
+            Example : [(0,0,0), (0,0,0), (0,1,0), (0,0,-1)]
+                    returns [(0, 1, 0), (0, 0, -1)]
+            '''
+            seq = np.array(l)
+            head, ele = np.sum(seq, axis=0)[1:]
+            # 1 or -1
+            h = 0 if head == 0 else int(head/abs(head))
+            e = 0 if ele == 0 else int(ele/abs(ele))
+            
+            res_seq = [(0, h, 0)] * abs(head) + [(0, 0, e)] * abs(ele)
+
+            try:
+                assert len(res_seq) <= 8
+            except:
+                print ("check compact rotation sequence length.")
+                import pdb; pdb.set_trace()
+
+            return res_seq
+
+        return list(map(compress_single, self._rotation_history))
+
+    def _rotates(self, rotation_instruction_batch):
+        '''
+        Sims take action using env level instructions. Modify rotation history as well.
+
+        rotation_instruction_batch: list length=batch_size. 
+                     each can be a single env action tuple such as (0,1,0) or a double action tuple such as ((0,0,-1), (0,0,-1))
+        '''
+        assert len(self.sims) == len(rotation_instruction_batch)
+        for i, sim in enumerate(self.sims):
+            rotations = rotation_instruction_batch[i]
+            # there can be more than 1 sim-level rotation in a rotation instruction
+            for index, heading, elevation in rotations:
+                # sim.makeAction(index, heading, elevation)
+                sim.makeAction(index, heading, elevation)
+                self._rotation_history[i].append((index, heading, elevation))
+
+    def _retrieve_curr_viewix_and_next_vertex(self):
+        '''
+        Returns:
+            viewix_batch: list of integers, length = batch_size.
+            closest_vertex_batch: list of viewpointId strings, length = batch_size.
+        '''
+        next_vertex_batch = [''] * self.batch_size 
+        # list len=batch_size, each int
+        # list len=batch_size, each a dictionary
+        viewix_batch, closest_navigable_locations_batch = self._getStates()
+
+        # check if whether we are looking at the closest navigable vertex directly.
+        for i, closest_vertex in enumerate(closest_navigable_locations_batch):
+            # only a few rotation angles are connected to another vertex
+            if closest_vertex:
+                
+                # if: 1) directly facing -- within 30deg of center of view
+                if  (closest_vertex.rel_heading < math.pi/6.0 and closest_vertex.rel_heading > -math.pi/6.0) or \
+                    # 2,3) already looked up/down, but vertex is further up/down
+                    (viewix_batch[i] // 12 == 2 and loc.rel_elevation > math.pi/6.0) or \
+                    (viewix_batch[i] // 12 == 0 and loc.rel_elevation < -math.pi/6.0):
+                    next_vertex_batch[i] = closest_vertex.viewpointId
+            # otherwise, remain ''
+
+        # list length batch_size, list length batch_size
+        return viewix_batch, next_vertex_batch
+
+    def _take_explore_step(self, rotation_instruction=None):
+        '''
+        1. Execute a single or no rotation instruction and collect the viewIndex
+        2. Check if there's a reachable vertex within center of view, return the closest one if so. See definition of a reachable vertex in self._retrieve_curr_viewix_and_next_vertex.
+
+        rotation_instruction : list len = batch_size, each element is either a single action tuple e.g.(0,1,0), or double action tuple e.g.((0,0,-1), (0,0,-1)).
 
         Returns: 
             A list of tuples. list len = batch_size.
-            Each element in list is a tuple (view_ix, list of env action tuples, vertex string)
+            Each element in the returned list is a tuple with signature:
+            (view_ix integer, list of env action tuples, vertex string)
         '''
-        # TODO solve how oracle provides instructions first
-        [(view_ix, efficient_action_list, vertex_str), ...]
-        # assert this thing is batch size first
+        if rotation_instruction is None:
+            # env skip rotation
+
+            # list length batch_size (int), list length batch_size (str)
+            viewix_batch, next_vertex_batch = self._retrieve_curr_viewix_and_next_vertex()
+            efficient_rotations_batch = [(0,0,0)] * self.batch_size
+        else:
+            # rotate and update rotation history
+            self._rotates(rotation_instruction)  
+            viewix_batch, next_vertex_batch = self._retrieve_curr_viewix_and_next_vertex()
+            efficient_rotations_batch = self._map_to_efficient_rotation(self._rotation_history)
+            
+        assert len(efficient_rotations_batch) == len(viewix_batch) == len(next_vertex_batch) == self.batch_size
+
+        # length = batch_size, [(view_ix, efficient actions, vertex), ...]
+        return zip(viewix_batch, efficient_rotations_batch, next_vertex_batch)
+
+#---------------------------------
+    def _update_action_and_vertex_maps(self, viewix_env_actions_map, viewix_next_vertex_map, 
+    viewix_actions_vertex_tuples):
+        '''
+        viewix_actions_vertex_tuples:   zipped object. length = batch_size. 
+                                        e.g. [(view_ix, efficient actions, vertex), ...]
+        viewix_env_actions_map: list (batch_size, 36, varies). Each [(0,1,0), (0,-1,1), ...]
+        viewix_next_vertex_map: list (batch_size, 36). Each string.
+        '''
+        # loop through batch
+        for i, (viewix, env_actions_list, vertex_str) in enumerate(viewix_actions_vertex_tuples):
+            viewix_env_actions_map[i][viewix] = env_actions_list
+            viewix_next_vertex_map[i][viewix] = vertex_str
+        return viewix_env_actions_map, viewix_next_vertex_map       
 
     def _explore_horizontally(self, viewix_env_actions_map, viewix_next_vertex_map, heading_adjusts):
-        '''turn around horizontally - 11 times'''
+        '''
+        Turn around horizontally and look- 11 times
+
+        viewix_env_actions_map: list (batch_size, 36, varies). Each [(0,1,0), (0,-1,1), ...]
+        viewix_next_vertex_map: list (batch_size, 36, varies). Each string.
+        '''
         for _ in range(11):
             # list, length = batch_size, [(view_ix, efficient actions, vertex), ...]
             viewix_actions_vertex_tuples = self._take_explore_step(heading_adjusts)
-            # loop through batch
-            for i, (viewix, env_actions_list, vertex_str) in enumerate(viewix_actions_vertex_tuples):
-                viewix_env_actions_map[i][viewix] = env_actions_list
-                viewix_next_vertex_map[i][viewix] = vertex_str
+            viewix_env_actions_map, viewix_next_vertex_map = self._update_action_and_vertex_maps( 
+                viewix_env_actions_map, 
+                viewix_next_vertex_map, 
+                viewix_actions_vertex_tuples)
         return viewix_env_actions_map, viewix_next_vertex_map
 
-
-    def explore(self, instructions):
+    def _explore_elevation(self, viewix_env_actions_map, viewix_next_vertex_map, elevation_adjusts):
         '''
-        instructions: 3 lists, each of len batch_size.
+        Look up or down to get observe.
+
+        viewix_env_actions_map: list (batch_size, 36, varies). Each [(0,1,0), (0,-1,1), ...]
+        viewix_next_vertex_map: list (batch_size, 36, varies). Each string.
+        '''
+        # list, length = batch_size, [(view_ix, efficient actions, vertex), ...]
+        viewix_actions_vertex_tuples = self._take_explore_step(elevation_adjusts) 
+        return self._update_action_and_vertex_maps(viewix_env_actions_map, viewix_next_vertex_map, \
+            viewix_actions_vertex_tuples)
+
+    def _explore_current(self, viewix_env_actions_map, viewix_next_vertex_map):
+        '''
+        Observe from current observation angle, without further rotation.
+
+        viewix_env_actions_map: list (batch_size, 36, varies). Each [(0,1,0), (0,-1,1), ...]
+        viewix_next_vertex_map: list (batch_size, 36, varies). Each string.
+        '''
+        # list, length = batch_size, 
+        # i.e. [(view_ix int, efficient actions, vertex str), ...]
+        viewix_actions_vertex_tuples = self._take_explore_step(None)
+        return self._update_action_and_vertex_maps(viewix_env_actions_map, viewix_next_vertex_map, \
+            viewix_actions_vertex_tuples)
+
+    def explore_sphere(self, explore_instructions, sphere_size):
+        '''
+        Batch of simulators look around their panoramic spheres and collect 3 mappings:
+        - viewIndex to env level rotation action
+        - viewIndex to next vertex viewpoint Id
+        - viewIndex to 1/0 indicating if the rotation angle directly faces a reachable next vertex.
+
+        explore_instructions : a tuple of 3 lists. each length = batch_size. each element in respective list is either a single action tuple e.g.(0,1,0), or double action tuple e.g.((0,0,-1), (0,0,-1)). 
+
+        sphere_size : int = 36 -- from hparams. There are 36 discretized images in an agent's panoramic sphere.
 
         Returns:
             viewix_env_actions_map: list (batch_size, 36, varies). Each [(0,1,0), (0,-1,1), ...]
-            viewix_next_vertex_map: list (batch_size, 36, varies). Each string.
-        ''' 
-        viewix_env_actions_map = [[None] * 36] * self.batch_size
-        viewix_next_vertex_map = [[''] * 36] * self.batch_size
 
-        # elaborate condensed instructions into 35 steps that cover the sphere
-        heading_adjusts, elevation_adjusts_1, elevation_adjusts_2 = instructions
+            viewix_next_vertex_map: list (batch_size, 36). Each string.
+
+            view_index_mask: array shape (36, batch_size). True if a particular view angle doesn't have any directly reachable next vertex on the floor plan graph.
+        ''' 
+        viewix_env_actions_map = [[None] * sphere_size] * self.batch_size
+        viewix_next_vertex_map = [[None] * sphere_size] * self.batch_size
+
+        # elaborate condensed exploration instructions into 35 steps that cover the sphere
+        heading_adjusts, elevation_adjusts_1, elevation_adjusts_2 = explore_instructions
 
         # capture current - 1 time
-        # TODO
+        viewix_env_actions_map, viewix_next_vertex_map = \
+            self._explore_current(viewix_env_actions_map, viewix_next_vertex_map)
 
         # turn around horizontally - 11 times
         viewix_env_actions_map, viewix_next_vertex_map = \
             self._explore_horizontally(viewix_env_actions_map, viewix_next_vertex_map, heading_adjusts)
 
         # adjust elevation - 1 time
-        # TODO
+        viewix_env_actions_map, viewix_next_vertex_map = \
+            self._explore_elevation(viewix_env_actions_map, viewix_next_vertex_map, elevation_adjusts_1)
 
         # turn around horizontally - 11 times
         viewix_env_actions_map, viewix_next_vertex_map = \
             self._explore_horizontally(viewix_env_actions_map, viewix_next_vertex_map, heading_adjusts)
 
         # adjust elevation - 1 time
-        # TODO
+        viewix_env_actions_map, viewix_next_vertex_map = \
+            self._explore_elevation(viewix_env_actions_map, viewix_next_vertex_map, elevation_adjusts_2)
 
         # turn around horizontally - 11 times
         viewix_env_actions_map, viewix_next_vertex_map = \
             self._explore_horizontally(viewix_env_actions_map, viewix_next_vertex_map, heading_adjusts)
 
-        # assert all 36 views are covered
+        # assert all 36 views are covered for each ob in the batch (no Nones at all)
+        assert all.([v_str is not None for task_sphere in viewix_next_vertex_map for v_str in task_sphere])
 
-        return viewix_env_actions_map, viewix_next_vertex_map
+        # arr shape(36, batch_size), each boolean
+        view_index_mask = (np.char.array(viewix_next_vertex_map) == '').t()
+        assert view_index_mask.shape == (self.batch_size, sphere_size)
 
-    def _getStates(self):
-        pass
-
-    def _get_obs(self):
-        # '''get obs for current batch from self.data and simulators'''
-        # obs = []
-        # # feature, state are from the current batch of simulators
-        # for i, (feature, state) in enumerate(self.env.getStates()):
-        #     # item is from the current batch of data loaded from self.data
-        #     item = self.batch[i]
-        #     obs.append({
-        #         'instr_id' : item['instr_id'],
-        #         'scan' : state.scanId,
-        #         'point': state.location.point,
-        #         'viewpoint' : state.location.viewpointId,
-        #         'viewIndex' : state.viewIndex,
-        #         'heading' : state.heading,
-        #         'elevation' : state.elevation,
-        #         'feature' : feature,
-        #         'step' : state.step,
-        #         'navigableLocations' : state.navigableLocations,
-        #         'instruction' : self.instructions[i],
-        #         # there can be more than 1 goal viewpoints for each datapt
-        #         'goal_viewpoints' : [path[-1] for path in item['paths']],
-        #         'init_viewpoint' : item['paths'][0][0]
-        #     })
-        #     # k computed when we load a new mini batch
-        #     obs[-1]['max_queries'] = self.max_queries_constraints[i]
-        #     # ^T computed when we load a new mini batch
-        #     obs[-1]['traj_len'] = self.traj_lens[i]
-        #     # # not sure if this is used anywhere
-        #     # if 'instr_encoding' in item:
-        #     #     obs[-1]['instr_encoding'] = item['instr_encoding']
-        # return obs
+        return viewix_env_actions_map, viewix_next_vertex_map, view_index_mask
 
 
 class VNLABatch():
@@ -389,12 +540,12 @@ class VNLABatch():
 
     def steps(self, multiple_actions):
         '''
-        multiple_actions : list of len=batch_size
+        multiple_actions : list/tuple of len=batch_size
                            each element is a list of env action tuples
         '''
         assert len(self.sims) == len(multiple_actions)
         for i in range(len(self.sims)):
-            # a list of tuples
+            # a list/tuple of tuples
             actions = multiple_actions[i]
             for index, heading, elevation in actions:
                 self.sims[i].makeAction(index, heading, elevation)
