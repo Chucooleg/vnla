@@ -21,6 +21,7 @@ import torch.nn.functional as F
 from utils import padding_idx
 from value_estimation_agent import ValueEstimationAgent
 from oracle import make_oracle
+from env import VNLAExplorationBatch
 
 
 class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
@@ -38,6 +39,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         # Used to initialize exploration environment, may not be necessary
         self.img_features = hparams.img_features
+        self.success_radius = hparams.success_radius
 
     @staticmethod
     def n_input_nav_actions():
@@ -73,7 +75,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         self.losses = [] # to accumulate more all types of losses (nav, ask, value,...)
         self.loss_types = ['value_losses']
         self.value_losses = []    
-        self.end_losses = []  
 
     def _populate_agent_state_to_obs(self, obs, ended):
         """modify obs in-place (but env is not modified)
@@ -85,7 +86,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
     def _compute_loss(self, global_iter_idx=None):
         '''computed once at the end of every sampled mini-batch from history buffer'''
 
-        self.loss = self.value_loss + self.end_loss
+        self.loss = self.value_loss
         # + self.ask_loss for ask agents
         # + self.recover_loss for recovery agents
 
@@ -95,14 +96,10 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         value_loss = self.value_loss.item()
         self.value_losses.append(value_loss)
 
-        end_loss = self.end_loss.item()
-        self.end_losses.append(end_loss)        
-
         # training mode
         if global_iter_idx: 
             self.SW.add_scalar('train loss per iter', loss, global_iter_idx)
             self.SW.add_scalar('train value loss per iter', value_loss, global_iter_idx)
-            self.SW.add_scalar('train end loss per iter', end_loss, global_iter_idx)
 
     def pred_training_batch(self, training_batch, global_iter_idx, output_res=False):
         '''
@@ -119,7 +116,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         batch_size = len(tr_timesteps)
 
         # Optional result book keeping
-        training_batch_results = {}
+        training_batch_results = []
         if output_res:
             training_batch_results = [{
                 # buffer indices
@@ -143,7 +140,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         ctx, _ = self.model.encode(seq, seq_lengths)
 
         # Initiate dummy Ask Actions
-        # This tensor is always zeros for decoder in No Ask agents
+        # This tensor is always dont_ask for decoder in No Ask agents
         ques_out_t = torch.ones(batch_size, dtype=torch.long, device=self.device) * \
             self.ask_actions.index('dont_ask')
 
@@ -186,7 +183,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             f_out_t = self.get_tr_variable_by_t(tr_key_pairs, t_ix, 'feature')
 
             # Run decoder forward pass
-            decoder_h, _, _, _, _, cov = self.model.decode_nav(a_out_t, ques_out_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov)
+            decoder_h, _, _, cov = self.model.decode_nav(a_out_t, ques_out_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov)
 
         time_report['decode_training_batch_history'] += time.time() - start_time
 
@@ -197,7 +194,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # shape (36, batch_size)
         # TODO require grad is True here?
         q_values_tr_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device, requires_grad=True)
-        end_tr_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device, requires_grad=True)
 
         # Loop through 36 view indices in the pano sphere
         # run 100 in parallel instead of 36*100 in parallel
@@ -205,16 +201,16 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
             # Get proposed macro-action that result in current viewIndex(rotation)
             # tensor shape (batch_size, max_macro_action_seq_len)
-            a_proposed = get_tr_view_indexed_action_by_t(tr_key_pairs, tr_timesteps, view_ix)
+            a_proposed = self.get_tr_view_indexed_action_by_t(tr_key_pairs, tr_timesteps, view_ix)
 
             # Get image feature at current viewIndex(rotation)
             # tensor shape (batch_size, feature_size)
-            f_proposed = get_tr_view_indexed_features_by_t(tr_key_pairs, tr_timesteps, view_ix)
+            f_proposed = self.get_tr_view_indexed_features_by_t(tr_key_pairs, tr_timesteps, view_ix)
 
             # Get mask at that viewIndex(rotation)
             # i.e. not all rotation angles can connect to other vertices on graph
             # tensor shape (batch_size,)
-            view_ix_mask = get_tr_view_indexed_mask_by_t(tr_key_pairs, tr_timesteps, view_ix)
+            view_ix_mask = self.get_tr_view_indexed_mask_by_t(tr_key_pairs, tr_timesteps, view_ix)
 
             # Use existing decoder_h, cov computed from recent history
             # TODO what do we do with the gradient? detach()?
@@ -223,12 +219,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # ques_asked = ...
 
             # Run decoder forward pass
-            decoder_h_curr, _, q_values_tr_estimate[view_ix], end_tr_estimate[view_ix], end_sigmoid, cov_curr = self.model.decode_nav(a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
+            # decoder_h_curr, _, q_values_tr_estimate[view_ix], cov_curr
+            _, _, q_values_tr_estimate[view_ix], _ = self.model.decode_nav(a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
 
         # Reshape q_values_tr_estimate for loss computation
         # to (batch_size, self.num_viewIndex)
         q_values_tr_estimate = q_values_tr_estimate.t()
-        end_tr_estimate = end_tr_estimate.t()
 
         time_report['decode_training_batch_frontier'] += time.time() - start_time
 
@@ -238,11 +234,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Get q_values_target from history buffer
         # tensor shape (batch_size, self.num_viewIndex)
         q_values_target = self.get_tr_variable_by_t(tr_key_pairs, tr_timesteps, 'q_values_target')
-        # tensor shape (batch_size, self.num_viewIndex)
-        end_target = self.get_tr_end_target_by_t(tr_key_pairs, tr_timesteps)
+        # # Get loss mask from history buffer -- same HB source as view_ix_mask
+        # # tensor shape (batch_size, self.num_viewIndex)
+        # loss_mask = self.get_tr_view_indexed_full_mask_by_t(tr_key_pairs, tr_timesteps, self.num_viewIndex)
         # Compute scalar loss
         self.value_loss = self.value_criterion(q_values_tr_estimate, q_values_target)
-        self.end_loss = self.end_criterion(end_tr_estimate, end_target) # TODO implement critierion
         time_report['compute_value_loss'] += time.time() - start_time
 
         # Save per batch loss to self.loss for backprop
@@ -294,7 +290,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             'agent_nav': [], # from env action, list of lists of tuples 
 
             # q-value related
-            'agent_q_values': [],  # list of per timestep vectors, if agent roll-in TODO, append empty if not agent roll-in
+            'agent_q_values': [],  
             'teacher_q_values': [],  # list of per timestep vectors
 
             # rollin
@@ -316,7 +312,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             self.nav_actions.index('<start>')
 
         # Initialize dummy ask action
-        # this tensor is always zeros in No Ask Agents
+        # this tensor is always don't ask in No Ask Agents
         # shape (batch_size,)
         ques_t = torch.ones(batch_size, dtype=torch.long, device=self.device) * \
             self.ask_actions.index('dont_ask')
@@ -327,7 +323,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         # Initialize trajectory 'end' markers
         # Whether agent has deided to <stop>
-        ended = np.array([False] * batch_size)  
+        ended = np.array([False] * batch_size)
 
         # Initialize rotation actions for env (i.e. batch of simulators)
         # each element is a list of max_macro_action_seq_len tuples
@@ -361,7 +357,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # None at <start> pos when t=0
             'view_index_mask_indices': None,
             'viewix_actions_map': None,
-            'end_target_indices': None,
             
             # training target
             'q_values_target': None,
@@ -380,9 +375,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             'a_t': a_t,
             'f_t': f_t,
             # Below are skipped -- always the same in No Ask Agents
-            # 'ques_t': ques_t,  
-            # 'ctx': ctx, 
-            # 'seq_mask': seq_mask, 
+            # 'ques_t': ques_t,
+            # 'ctx': ctx,
+            # 'seq_mask': seq_mask,
         }]
 
         # time keeping
@@ -398,70 +393,79 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             self._populate_agent_state_to_obs(obs, ended)
             time_report['pop_state_to_obs'] += time.time() - start_time
 
+            # ---------------------------- Review code here
+            # Get 
+            # view_index_mask           arr shape(36, batch_size)
+            # end_target                arr (batch_size,)
+            # viewix_env_actions_map    list (batch_size, 36, varies). Each [(0,1,0), (0,-1,1)... env action]
+            # viewix_actions_map        tensor shape(36, batch_size, self.max_macro_action_seq_len)
+            # q_values_target           tensor (batch_size, self.num_viewIndex=36)
 
-            # ---------------------------- ----------------------------
-
-            # Explore pano sphere TODO
-
-                # ARRAY
-                # build view_index_mask, shape(36, batch_size), np array!
-                view_index_mask = # arr shape(36, batch_size)
-
-                end_target = # arr shape(36, batch_size)
-
-                # TENSOR
-                # build viewix_actions_map
-                # list (batch_size, 36, varies)
-                viewix_env_actions_map = 
-
-                # don't change this shape
-                viewix_actions_map = # arr shape(36, batch_size, self.max_macro_action_seq_len), tensor!
-
-                # compute q_values_target tensor # shape (batch_size, self.num_viewIndex=36), tensor!
-                # TODO remember to convert target to tensor for training in experience batch
-                # TENSOR
-                q_values_target = torch.tensor(q_values_target_list, dtype=torch.long, device=self.device)
-
-            # ------- Try something here
-
-            # Outsource panorama exploration to a dedicated batch of simulators 
-            self.frontier_explore_env.reset(obs)
+            # Outsource panorama exploration to a dedicated light env
+            # with its own batch of simulators
+            start_time = time.time()
+            frontier_explore_env = VNLAExplorationBatch(obs)
+            time_report['initialize_frontier_explore_batch'] += time.time() - start_time
 
             # Oracle provide instructions for the simulators to explore(turn) around
-            # 3 lists, each of len batch_size.
+            # 3 lists of tuples, each of len batch_size.
+            start_time = time.time()
             explore_instructions = self.value_teacher.make_explore_instructions(obs)
+            time_report['make_explore_instructions'] += time.time() - start_time
 
-            # Simulators explore around, map panoramix index to actions and reachable vertices
-            # list (batch_size, 36, varies). Each [(0,1,0), (0,-1,1)]
-            # list (batch_size, 36, varies). Each string.
-            viewix_env_actions_map, viewix_next_vertex_map = \
-                self.frontier_explore_env.explore_sphere(explore_instructions)
+            # Simulators explore around, map panoramic view index to actions
+            # and reachable viewpoint Indices
+            # list (batch_size, 36, varies). Each [(0,1,0), (0,-1,0), (0,0,1)...]
+            # list (batch_size, 36). each viewpointId string
+            # arr shape(36, batch_size), each mask boolean.
+            start_time = time.time()
+            viewix_env_actions_map, viewix_next_vertex_map, view_index_mask = \
+                frontier_explore_env.explore_sphere(explore_instructions, self.num_viewIndex)
+            assert all(viewix_env_actions_map[i] <= self.max_macro_action_seq_len for i \
+                in range(len(viewix_env_actions_map)))
+            time_report['explore_sphere'] += time.time() - start_time
 
-            # oracle
-            # take viewix_next_vertex_map, make q_values_target, end_target
-            # take viewix_env_actions_map, make viewix_actions_map
-
-
-
-
+            # Oracle compute q-value targets
+            # arr shape (batch_size, self.num_viewIndex=36)
+            start_time = time.time()
+            q_values_target_list = self.value_teacher.compute_frontier_costs(obs, viewix_next_vertex_map)
+            # tensor shape (batch_size, self.num_viewIndex=36)
+            q_values_target = torch.tensor(q_values_target_list, dtype=torch.float, device=self.device)
+            # check if within success radius of 2
+            # arr shape (batch_size, )
+            end_target = np.array([np.any(q_vec <= self.success_radius) for q_vec in q_values_target_list])
+            time_report['make_q_targets'] += time.time() - start_time
+            
+            # Oracle map env level actions back to action indices as LSTM input
+            # actions are either rotation or <ignore>, no <end> or forward
+            # tensor shape(36, batch_size, self.max_macro_action_seq_len)
+            start_time = time.time()
+            viewix_actions_map = self.value_teacher.translate_env_actions(
+                obs, viewix_env_actions_map, self.max_macro_action_seq_len, self.num_viewIndex)
+            viewix_actions_map = torch.from_numpy(viewix_actions_map).long().to(self.device)
+            time_report['make_viewix_actions_map'] += time.time() - start_time
 
             # ---------------------------- ----------------------------
             # Determine next macro action sequence by expert or agent
             start_time = time.time()
+            # tensor shape (36, 100) if agent rollin
             q_values_rollout_estimate = None
+            # arr (batch_size) if agent rollin
+            end_estimated = None
 
             if expert_rollin_bool:
 
                 expert_select_start_time = time.time()
 
-                # Select the best view direction determined by expert 
+                # Select the best view direction determined by expert
                 # tensor shape (batch_size,)
                 best_view_ix = self.argmax(-q_values_target)
                 # tensor shape (1, batch_size, self.max_macro_action_seq_len)
                 best_view_ix_tiled = best_view_ix.view(-1, 1).repeat(1, viewix_actions_map.shape[2]).unsqueeze(0)
                 assert best_view_ix_tiled.shape == (1, batch_size, self.max_macro_action_seq_len)
 
-                # Select the macro-action associated with the best view direction
+                # Select the macro-rotation associated with the best view direction
+                # only rotation or ignore
                 # tensor shape (batch_size, self.max_macro_action_seq_len)
                 a_t =  viewix_actions_map.gather(0, best_view_ix_tiled).squeeze()
                 assert a_t.shape == (batch_size, self.max_macro_action_seq_len)
@@ -495,7 +499,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # tensor shape (batch_size, feature size)
                     f_out_t = local_buffer[t]['f_t']
 
-                    decoder_h, _, _, _, _, cov = self.model.decode_nav(a_out_t, ques_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov)
+                    decoder_h, _, _, cov = self.model.decode_nav(a_out_t, ques_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov)
                 time_report['decode_history'] += time.time() - decode_hist_start_time
 
                 # ------- LSTM unfold one step further at pano sphere
@@ -504,7 +508,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # Initialize tensor to store q-value estimates
                 # shape (36, 100)
                 q_values_rollout_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device)
-                ended_rollout_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device)
 
                 # Loop through 36 view indices in the pano sphere
                 # run 100 in parallel instead of 36*100 in parallel
@@ -528,37 +531,45 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # ques_asked = ...
 
                     # Run decoder forward pass
-                    decoder_h_curr, _, q_values_rollout_estimate[view_ix], ended_rollout_estimate[view_ix], end_sigmoid, cov_curr = self.model.decode_nav(a_proposed, ques_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
+                    # decoder_h_curr, _, q_values_rollout_estimate[view_ix], cov_curr
+                    _, _, q_values_rollout_estimate[view_ix], _ = self.model.decode_nav(a_proposed, ques_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
 
                 # Reshape q-value estimates back to (batch_size, self.num_viewIndex=36) 
                 # .t() expects 2-D tensor
                 q_values_rollout_estimate = q_values_rollout_estimate.t()
-                ended_rollout_estimate = ended_rollout_estimate.t()
 
                 time_report['decode_frontier'] += time.time() - decode_frontier_start_time
                 # -------
 
                 agent_select_start_time = time.time()
 
-                # Select the best view direction determined by expert 
+                # Select the best view direction determined by expert
                 # tensor shape (batch_size, ), gradient detached
                 best_view_ix = self.argmax(-q_values_rollout_estimate)
                 # tensor shape (1, batch_size, self.max_macro_action_seq_len)
                 best_view_ix_tiled = best_view_ix.view(-1, 1).repeat(1, viewix_actions_map.shape[2]).unsqueeze(0)
                 assert best_view_ix_tiled.shape == (1, batch_size, self.max_macro_action_seq_len)
 
-                # Select the macro-action associated with the best view direction
+                # Select the macro-rotation associated with the best view direction
+                # only rotation or <ignore>
                 # tensor shape (batch_size, max_macro_action_seq_len)
                 a_t =  viewix_actions_map.gather(0, best_view_ix_tiled).squeeze()
                 assert a_t.shape == (batch_size, self.max_macro_action_seq_len)
 
+                # Compute end markers
+                # (end after upcoming rotation and step-forward)
+                # array shape (batch_size,)
+                end_estimated = (torch.min(q_values_rollout_estimate, dim=1)[0] <= self.success_radius).data.numpy()
+                assert end_estimated.shape[0] == batch_size
+
                 time_report['select_agent_macro_action'] += time.time() - agent_select_start_time
 
             time_report['compute_next_nav_by_feedback'] += time.time() - start_time
-            # ---------------------------- 
+            # ----------------------------
 
             # Translate chosen macro-rotations to env actions
             start_time = time.time()
+            # only rotation or ignore
             a_t_list = a_t.data.tolist()
             for i, ob in enumerate(obs):
                 # list of length agent.max_macro_action_seq_len
@@ -570,35 +581,37 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
             # Simulators (batch) take the chosen env rotations
             start_time = time.time()
-            obs = self.env.steps(env_rotations)  # TODO rotate multiple times
+            # a sim can rotate multiple times
+            obs = self.env.steps(env_rotations)
             time_report['env_rotation_step'] += time.time() - start_time
 
             # Get image features after rotation
             # tensor (batch_size, feature size)
+            start_time = time.time()
             f_t = self.get_feature_variable(obs)
+            time_report['get_feature_after rotation'] += time.time() - start_time
 
             # Convert to batch_size first for experience update
             # tensor shape (batch_size, 36, self.max_macro_action_seq_len)
+            start_time = time.time()
             viewix_actions_map = viewix_actions_map.transpose(0, 1)
             # array shape (batch_size, 36)
             view_index_mask = view_index_mask.transpose()
-            # array shape (batch_size, 36)
-            end_target = end_target.transpose()
 
             # Convert tensor and arrays to list for saving to json
             # logging only
-            q_values_target_list = q_values_target.data.tolist()
-            if expert_rollin_bool:
+            if not expert_rollin_bool:
                 q_values_rollout_estimate_list = q_values_rollout_estimate.data.tolist()
+            time_report['prepare_tensors_for_saving'] += time.time() - start_time
 
             # Initialize new experience_batch_t
             # length <= batch_size because some ob may have ended already
+            start_time = time.time()
             experience_batch_t = []
 
             # Update experience batch & traj post rotation
             for i, ob in enumerate(obs):
                 if not ended[i]:
-
                     experience_batch_t.append({
                         # buffer indexing
                         'instr_id': ob['instr_id'],
@@ -612,15 +625,14 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                         # tensors shape (image feature size)
                         'feature': f_t[i],
                         # tensor shape (self.max_macro_action_seq_len)
-                        'action': a_t[i],  # TODO ending condition
+                        # rotation only. (won't save <ignore> because ended traj wont be added)
+                        'action': a_t[i],
 
                         # training data - pano sphere
                         # np array shape (varies)
                         'view_index_mask_indices': np.nonzero(view_index_mask[i])[0],
                         # tensors shape (self.num_viewIndex=36, self.max_macro_action_seq_len)
                         'viewix_actions_map': viewix_actions_map[i],
-                        # np array shape (varies)
-                        'end_target_indices': np.nonzero(end_target[i])[0], 
 
                         # training target
                         # tensors shape (self.num_viewIndex=36)
@@ -634,17 +646,21 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # q-values
                     traj[i]['agent_q_values'].append(None if expert_rollin_bool else q_values_rollout_estimate_list[i])
                     traj[i]['teacher_q_values'].append(q_values_target_list[i])
+            time_report['write_experience_batch'] += time.time() - start_time  
 
             # Write experience to history buffer
+            start_time = time.time()
             self.history_buffer.add_experience(experience_batch_t)
+            time_report['save_to_history_buffer'] += time.time() - start_time  
 
             # Append tensors for the whole batch for this time step
+            start_time = time.time()
             local_buffer.append({
                 'a_t': a_t,
                 'f_t': f_t,
                 # ask, instruction update in Ask Agents
-                # end marker TODO
             })
+            time_report['save_to_local_buffer'] += time.time() - start_time  
 
             # Simulators step forward to the direct-facing vertex after rotation
             start_time = time.time()
@@ -660,8 +676,13 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # add step-forward action to all env actions
                     traj[i]['agent_nav'].append(env_stepping[i])
 
-                # mark if 'ended' for each ob
-                ended[i] = # TODO
+                    # Mark if trajectory has ended
+                    if expert_rollin_bool:
+                        if end_target[i] or time_step >= ob['traj_len']:
+                            ended[i] = True
+                    else:
+                        if end_estimated[i] or time_step >= ob['traj_len']:
+                            ended[i] = True
 
             # Early exit if all trajectories in the batch has <end>ed
             if ended.all():
@@ -673,10 +694,3 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         time_report['total_rollout_time'] += time.time() - rollout_start_time
         return traj, time_report
-
-
-
-# implement explore pano & q_* calculations & determine a_t dimension
-# --------------------------
-# end problems
-# gradient problems
