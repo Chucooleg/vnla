@@ -37,32 +37,28 @@ class ValueEstimationAgent(NavigationAgent):
     def __init__(self, model, hparams, device):
         super(ValueEstimationAgent, self).__init__(model, hparams, device)
 
-        # Bootstrap DQN paper used Huber Loss
-        # https://en.wikipedia.org/wiki/Huber_loss
-        # if delta == 1 in Huber Loss
-        # https://pytorch.org/docs/stable/nn.html?highlight=smooth%20l1#torch.nn.SmoothL1Loss
-        self.value_criterion = nn.SmoothL1Loss(reduction='mean')
+        self.batch_size = hparams.batch_size
 
-        self.end_criterion = # TODO
+        self.value_criterion = nn.SmoothL1Loss(reduction='mean') 
 
         # Oracle
         self.value_teacher = make_oracle('frontier_shortest', self.nav_actions, self.env_actions)
 
         # Explore pano sphere
-        self.frontier_explore_env = VNLAExplorationBatch(batch_size=100)
-        self.max_macro_action_seq_len = # TODO
+        self.max_macro_action_seq_len = 8
 
         # Number of images in a pano sphere
         self.num_viewIndex = 36
 
-        # action tuple size
+        # Action tuple size
         self.env_action_tup_size = 3
 
         # Initialize History Buffer
         self.history_buffer = HistoryBuffer(hparams)
         self.min_history_to_learn = hparams.min_history_to_learn
 
-        self.batch_size = hparams.batch_size
+        # Initialize q-value threshold for agent to determine if its path should 'end'
+        self.end_q_val_threshold = hparams.end_q_val_threshold
 
         # Set expert rollin prob, decayed in training
         self.beta = 1.0
@@ -132,29 +128,29 @@ class ValueEstimationAgent(NavigationAgent):
 
         return variable
 
-    def get_tr_end_target_by_t(self, tr_key_pairs, tr_timesteps):
-        '''
-        Extract variable from history buffer by (instr_id, global_iter_idx), timestep and variable name. 
+    # def get_tr_end_target_by_t(self, tr_key_pairs, tr_timesteps):
+    #     '''
+    #     Extract variable from history buffer by (instr_id, global_iter_idx), timestep and variable name. 
 
-        Arguments:
-            tr_key_pairs: list of len(batch_size) tuples, each (instr_id, global_iter_idx)
-            tr_timesteps: list of len(batch_size) integers, each indicate sampled timestep
+    #     Arguments:
+    #         tr_key_pairs: list of len(batch_size) tuples, each (instr_id, global_iter_idx)
+    #         tr_timesteps: list of len(batch_size) integers, each indicate sampled timestep
 
-        Returns: 
-            (batch_size, self.max_macro_action_seq_len)
-        '''
-        # Create container to hold training data
-        end_target_dim = self.max_macro_action_seq_len
-        # shape (batch_size, self.max_macro_action_seq_len)
-        end_target = torch.empty(len(tr_key_pairs), end_target_dim, dtype=torch.float, device=self.device)
+    #     Returns: 
+    #         (batch_size, self.max_macro_action_seq_len)
+    #     '''
+    #     # Create container to hold training data
+    #     end_target_dim = self.max_macro_action_seq_len
+    #     # shape (batch_size, self.max_macro_action_seq_len)
+    #     end_target = torch.empty(len(tr_key_pairs), end_target_dim, dtype=torch.float, device=self.device)
 
-        # Fill container with data extracted from history buffer
-        for i, (key_pair, timestep) in enumerate(zip(tr_key_pairs, tr_timesteps)):
-            # list/arr of int indices -- can have >1 reachable goal points
-            end_target_ixs = self.history_buffer[key_pair]['end_target_indices'][timestep]
-            # fill the mask
-            end_target[i, end_target_ixs] = 1
-        return end_target
+    #     # Fill container with data extracted from history buffer
+    #     for i, (key_pair, timestep) in enumerate(zip(tr_key_pairs, tr_timesteps)):
+    #         # list/arr of int indices -- can have >1 reachable goal points
+    #         end_target_ixs = self.history_buffer[key_pair]['end_target_indices'][timestep]
+    #         # fill the mask
+    #         end_target[i, end_target_ixs] = 1
+    #     return end_target
 
     def get_tr_view_indexed_action_by_t(self, tr_key_pairs, tr_timesteps, view_ix):
         '''
@@ -195,13 +191,35 @@ class ValueEstimationAgent(NavigationAgent):
         '''
         # Create container to hold training data
         # shape (batch_size,) 
-        mask = torch.empty(len(tr_key_pairs), dtype=torch.uint8, device=self.device)
+        mask = torch.zeros(len(tr_key_pairs), dtype=torch.uint8, device=self.device)
 
         # Fill container with data extracted from history buffer
         for i, (key_pair, timestep) in enumerate(zip(tr_key_pairs, tr_timesteps)):
             mask[i] = int(view_ix in self.history_buffer[key_pair]['view_index_mask_indices'][timestep])
 
         return mask
+
+    # def get_tr_view_indexed_full_mask_by_t(self, tr_key_pairs, tr_timesteps, num_viewIndex):
+    #     '''
+    #     Extract variable associated with a viewIndex(rotation) from history buffer by 
+    #     (instr_id, global_iter_idx), timestep and variable name.
+
+    #     Arguments:
+    #         tr_key_pairs: list of len(batch_size) tuples, each (instr_id, global_iter_idx)
+    #         tr_timesteps: list of len(batch_size) integers, each indicate sampled timestep
+
+    #     Returns: 
+    #         (batch_size, agent.num_viewIndex)
+    #     '''
+    #     # Create container to hold training data
+    #     # shape (batch_size, agent.num_viewIndex)
+    #     mask = torch.zeros(len(tr_key_pairs, num_viewIndex), dtype=torch.uint8, device=self.device)
+
+    #     # Fill container with data extracted from history buffer
+    #     for i, (key_pair, timestep) in enumerate(zip(tr_key_pairs, tr_timesteps)):
+    #         indices = self.history_buffer[key_pair]['view_index_mask_indices'][timestep]
+    #         mask[i, indices] = 1
+    #     return mask
         
     def get_tr_view_indexed_features_by_t(self, tr_key_pairs, tr_timesteps, view_ix):
         '''
@@ -332,7 +350,7 @@ class ValueEstimationAgent(NavigationAgent):
             # Exponential decay expert-rollin probability beta
             if global_iter_idx >= self.start_beta_decay and global_iter_idx % self.decay_beta_every == 0:
                 self.beta *= (1 - self.beta_decay_rate)
-                print('New expert roll-in probability %f' % beta)
-            self.SW.add_scalar('beta per iter', beta, global_iter_idx)
+                print('New expert roll-in probability %f' % self.beta)
+            self.SW.add_scalar('beta per iter', self.beta, global_iter_idx)
 
         return last_traj, time_report        
