@@ -278,15 +278,13 @@ class AskAttnDecoderRegressorLSTM(nn.Module):
         super(AskAttnDecoderRegressorLSTM, self).__init__(hparams, agent_class, device)
 
         # Q-value regressor output dim is 1
-        self.nav_predictor = nn.Linear(hparams.hidden_size, 1)
-        # 'end' trajectory classifier
-        self.end_predictor = nn.Linear(hparams.hidden_size, 1)
+        self.q_predictor = nn.Linear(hparams.hidden_size, 1)
 
     def _lstm_and_attend(self, nav_action, ask_action, feature, h, ctx, ctx_mask, cov=None):
         '''run LSTM cell, run attention layer on coverage vector'''
 
         # Sum up macro action embeddings
-        # TODO how "end" works may affect nn.embedding dim 1
+        # TODO think about nav action embedding size again
         nav_embeds = self.nav_embedding(nav_action)
         nav_embeds_sum = torch.sum(nav_embeds, dim=1)
 
@@ -317,18 +315,11 @@ class AskAttnDecoderRegressorLSTM(nn.Module):
 
         # Predict q-value -- cost
         # tensor shape (batch_size, 1) -> (batch_size,)
-        q_value = self.nav_predictor(h_tilde).squeeze(-1)
+        q_value = self.q_predictor(h_tilde).squeeze(-1)
         # tensor shape (batch_size,)
-        q_value.data.masked_fill_(view_index_mask, float('inf'))
+        q_value.data.masked_fill_(view_index_mask, 1e9)
 
-        # Predict if the candidate viewpt is the end point
-        # tensor shape (batch_size, 1) -> (batch_size,)
-        end_logit = self.end_predictor(h_tilde).squeeze(-1)
-        end_sigmoid = torch.sigmoid(end_logit)
-        # tensor shape (batch_size,)
-        end_sigmoid.data.masked_fill_(view_index_mask, float('inf'))
-
-        return new_h, alpha, q_value, end_logit, end_sigmoid, new_cov
+        return new_h, alpha, q_value, new_cov
 
 
 class AttentionSeq2SeqFramesModel(nn.Module):
@@ -363,8 +354,8 @@ class AttentionSeq2SeqFramesModel(nn.Module):
         self.decoder = AskAttnDecoderRegressorLSTM(hparams, agent_class, device).to(device)
 
         if torch.cuda.device_count() > 1:
-            self.encoder = nn.DataParallel(self.encoder)
-            self.decoder = nn.DataParallel(self.decoder)
+            self.encoder = nn.DistributedDataParallel(self.encoder)
+            self.decoder = nn.DistributedDataParallel(self.decoder)
 
     def encode(self, *args, **kwargs):
         return self.encoder(*args, **kwargs)
@@ -408,8 +399,9 @@ class AttentionSeq2SeqContinuousModel(nn.Module):
         self.decoder = AskAttnDecoderClassifierLSTM(hparams, agent_class, device).to(device)
 
         if torch.cuda.device_count() > 1:
-            self.encoder = nn.DataParallel(self.encoder)
-            self.decoder = nn.DataParallel(self.decoder)
+            # https://pytorch.org/tutorials/intermediate/ddp_tutorial.html
+            self.encoder = nn.DistributedDataParallel(self.encoder)
+            self.decoder = nn.DistributedDataParallel(self.decoder)
 
     def encode(self, *args, **kwargs):
         return self.encoder(*args, **kwargs)
