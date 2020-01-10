@@ -74,7 +74,7 @@ class ActionImitationNoAskAgent(ActionImitationAgent):
     def _compute_loss(self, iter_idx=None):
         '''computed once at the end of every batch'''
 
-        self.loss = self.nav_loss 
+        self.loss = self.nav_loss
         # + self.ask_loss for ask agents
 
         # .item() get a scalar from torch
@@ -140,7 +140,7 @@ class ActionImitationNoAskAgent(ActionImitationAgent):
             self.nav_actions.index('<start>')
 
         # Initialize dummy ask action
-        # This tensor is always zeros because agent doesn't ask
+        # This tensor is always dont_ask because agent doesn't ask
         q_t = torch.ones(batch_size, dtype=torch.long, device=self.device) * \
             self.ask_actions.index('dont_ask')
 
@@ -192,9 +192,9 @@ class ActionImitationNoAskAgent(ActionImitationAgent):
             start_time = time.time()
             # we only need to update ob['ended'] for nav_teacher(oracle)
             self._populate_agent_state_to_obs(obs, ended)
-            time_report['pop_state_to_obs'] += time.time() - start_time 
+            time_report['pop_state_to_obs'] += time.time() - start_time
                         
-            # Query teacher for next nav target action   
+            # Query teacher for next nav target action
             start_time = time.time()
             nav_target = self.nav_teacher(obs)
             nav_target = torch.tensor(nav_target, dtype=torch.long, device=self.device)
@@ -206,13 +206,13 @@ class ActionImitationNoAskAgent(ActionImitationAgent):
             nav_softmax_list = nav_softmax.data.tolist()
             nav_logit_mask_list = nav_logit_mask.data.tolist()
             nav_target_list = nav_target.data.tolist()
-            time_report['log_nav'] += time.time() - start_time 
+            time_report['log_nav'] += time.time() - start_time
 
             # Compute nav loss
             start_time = time.time()
             if not self.is_eval:
                 self.nav_loss += self.nav_criterion(nav_logit, nav_target)
-            time_report['compute_nav_loss'] += time.time() - start_time 
+            time_report['compute_nav_loss'] += time.time() - start_time
 
             # Determine next nav action by teacher/argmax/sample
             start_time = time.time()
@@ -230,7 +230,7 @@ class ActionImitationNoAskAgent(ActionImitationAgent):
             # Simulator take nav action
             start_time = time.time()
             obs = self.env.step(env_action)
-            time_report['env_step'] += time.time() - start_time   
+            time_report['env_step'] += time.time() - start_time
 
             # Save trajectory output
             start_time = time.time()
