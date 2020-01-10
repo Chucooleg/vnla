@@ -39,7 +39,11 @@ class ValueEstimationAgent(NavigationAgent):
 
         self.batch_size = hparams.batch_size
 
-        self.value_criterion = nn.SmoothL1Loss(reduction='mean') 
+        # Bootstrap DQN paper used Huber Loss
+        # https://en.wikipedia.org/wiki/Huber_loss
+        # if delta == 1 in Huber Loss
+        # https://pytorch.org/docs/stable/nn.html?highlight=smooth%20l1#torch.nn.SmoothL1Loss
+        self.value_criterion = nn.SmoothL1Loss(reduction='mean')
 
         # Oracle
         self.value_teacher = make_oracle('frontier_shortest', self.nav_actions, self.env_actions)
