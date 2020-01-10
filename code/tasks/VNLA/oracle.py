@@ -84,7 +84,7 @@ class ShortestPathOracle(object):
             if loc.viewpointId == next_point:
                 # Look directly at the viewpoint before moving
                 if loc.rel_heading > math.pi/6.0:
-                      return (0, 1, 0) # Turn right 
+                      return (0, 1, 0) # Turn right
                 elif loc.rel_heading < -math.pi/6.0:
                       return (0,-1, 0) # Turn left
                 elif loc.rel_elevation > math.pi/6.0 and ob['viewIndex'] // 12 < 2:
@@ -153,7 +153,7 @@ class ShortestPathOracle(object):
 
         next_optimal_point = optimal_path[1]
 
-        # If the next optimal viewpoint is within 30 degrees of 
+        # If the next optimal viewpoint is within 30 degrees of
         # the center of the view, go to it.
         for i, loc in enumerate(ob['navigableLocations']):
             if loc.viewpointId == next_optimal_point:
@@ -178,20 +178,22 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
         super(FrontierShortestPathsOracle, self).__init__(agent_nav_actions, env_nav_actions)
 
         # self.env_nav_actions = env_nav_actions
-        self.valid_rotation_action_indices = [self.agent_nav_actions[r] for r in ('left', 'right', 'up', 'down', '<end>', '<ignore>')]
+        self.valid_rotation_action_indices = [self.agent_nav_actions.index(r) for r in ('left', 'right', 'up', 'down', '<ignore>')]
+
+    # inherit parent add_scans() function
 
     def interpret_agent_rotations(self, rotation_action_indices, ob):
         '''
         rotation_action_indices : a list of int action indices
         Returns:
-            list of length agent.max_macro_action_seq_len
+            list of fixed length agent.max_macro_action_seq_len (e.g. 8)
             e.g. [(0, 1, 0), (0, 1, -1), ..... (0,0,0)]
             e.g. [(0,0,0), ... (0,0,0)] if ob has ended.
         '''
         max_macro_action_seq_len = len(rotation_action_indices)
-        macro_rotations = [(0,0,0)] * max_macro_action_seq_len
+        macro_rotations = [self.agent_nav_actions.index('<ignore>')] * max_macro_action_seq_len
         if not ob['ended']:
-            for action_idx in rotation_action_indices:
+            for i, action_idx in enumerate(rotation_action_indices):
                 assert action_idx in self.valid_rotation_action_indices
                 macro_rotations[i] = self.env_nav_actions[action_idx]
         return macro_rotations
@@ -210,20 +212,20 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
 
     def make_explore_instructions(self, obs):
         '''
-        Make env level instructions of each ob to explore its own panoramic sphere.
+        Make env level rotation instructions of each ob to explore its own panoramic sphere. The output should be informative enough for agent to collect information from all 36 facets of its panoramic sphere.
 
         Returns:
         heading_adjusts:     list len=batch_size, each an env action tuple.
         elevation_adjusts_1: same.
-        elevation_adjusts_2: list len=batch_size, each either a single action tuple, or double action tuple.
+        elevation_adjusts_2: list len=batch_size, each either a single action tuple e.g.(0,1,0), or double action tuple e.g.((0,0,-1), (0,0,-1)).
         '''
         batch_size = len(obs)
 
         # How agent explore the entire pano sphere
         # Right*11, Up/Down, Right*11, Up/Down (*2), Right*11
         heading_adjusts = [()] * batch_size
-        elevation_adjusts_1 = [()] * batch_size 
-        elevation_adjusts_2 = [()] * batch_size 
+        elevation_adjusts_1 = [()] * batch_size
+        elevation_adjusts_2 = [()] * batch_size
 
         # (0,0,1)
         up_tup = self.env_nav_actions[self.agent_nav_actions.index('up')]
@@ -237,31 +239,102 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
         # Loop through each ob in the batch
         for i, ob in enumerate(obs):
             if ob['ended']:
-                # ignore all. 
+                # don't move at all.
                 heading_adjusts[i] = ignore_tup
+                elevation_adjusts_1[i] = ignore_tup
+                elevation_adjusts_2[i] = ignore_tup
             else:
-                # turn right for 12 times. 
+                # turn right for 11 times at every elevation level.
                 heading_adjusts[i] = right_tup
                 # check agent elevation
                 if ob['viewIndex'] // 12 == 0:
-                    # facing down, so need to look up twice. 
+                    # facing down, so need to look up twice.
                     elevation_adjusts_1[i] = elevation_adjusts_2[i] = up_tup
-                elif ob['viewIndex'] // 12 == 2: 
-                    # facing up, so need to look down twice. 
+                elif ob['viewIndex'] // 12 == 2:
+                    # facing up, so need to look down twice.
                     elevation_adjusts_1[i] = elevation_adjusts_2[i] = down_tup
                 else:  
                     # neutral, so need to look up once, and then look down twice
                     elevation_adjusts_1[i] = up_tup
                     elevation_adjusts_2[i] = (down_tup, down_tup)
 
-        return heading_adjusts, elevation_adjusts_1, elevation_adjusts_2 
+        return heading_adjusts, elevation_adjusts_1, elevation_adjusts_2
 
-    def _map_env_action_to_agent_action(self):
-        # TODO becareful or overriding parent
-        pass
+    def compute_frontier_cost_single(self, ob, next_viewpoint_index_str):
+        '''
+        next_viewpoint_index_str: single str indicating viewpoint index. 
+                                  e.g. '1e6b606b44df4a6086c0f97e826d4d15'
+        '''
+        cost_stepping = self.distances[ob['scan']][ob['viewpoint']][next_viewpoint_index_str]
+        cost_togo, _ = self._find_nearest_point(ob['scan'], ob['viewpoint'], ob['goal_viewpoints'])
+        assert cost_stepping > 0 and cost_togo > 0
+        return cost_togo + cost_stepping
 
-    def _compute_frontier_cost(self, ob):
-        # TODO
+    def compute_frontier_costs(self, obs, viewix_next_vertex_map):
+        '''
+        For each ob, compute:
+        cost = cost-to-go + cost-stepping for all reachable vertices
+        '''
+        assert len(obs) == len(viewix_next_vertex_map)
+        # arr shape (batch_size, 36)
+        q_values_target = np.ones(len(obs), len(viewix_next_vertex_map[0])) * 1e9
+        # Loop through batch
+        for i, ob in enumerate(obs):
+            # NOTE ended ob won't be added to hist buffer for training
+            if not ob['ended']:
+                costs = []
+                for proposed_vertex in viewix_next_vertex_map[i]:
+                    if proposed_vertex == '':
+                        costs.append(1e9)
+                    else:
+                        # add up cost-togo + cost-stepping
+                        costs.append(self.compute_frontier_cost_single(ob, proposed_vertex))
+                assert len(costs) == len(viewix_next_vertex_map[0])  # 36
+                q_values_target[i, :] = costs
+        return q_values_target
+
+    def _map_env_action_to_agent_action(self, action, ob):
+        '''
+        Translate rotation env action seq into agent action index seq.
+        '''
+        if ob['ended']:
+            return self.agent_nav_actions.index('<ignore>')
+
+        ix, heading_chg, elevation_chg = action
+
+        assert ix == 0, 'Accept only rotation or ignore actions'
+        assert heading_chg == 0 or elevation_chg == 0, 'Accept only one rotation action at a time'
+        
+        if heading_chg > 0:
+            return self.agent_nav_actions.index('right')
+        if heading_chg < 0:
+            return self.agent_nav_actions.index('left')
+        if elevation_chg > 0:
+            return self.agent_nav_actions.index('up')
+        if elevation_chg < 0:
+            return self.agent_nav_actions.index('down')        
+
+    def translate_env_actions(self, obs, viewix_env_actions_map, max_macro_action_seq_len, sphere_size):
+        '''
+        viewix_env_actions_map : list (batch_size, 36, varies). Each [(0,1,0), (0,0,-1), ...]
+
+        Returns:
+            viewix_actions_map : array shape(36, batch_size, self.max_macro_action_seq_len)
+        '''
+        # tensor shape(36, batch_size, self.max_macro_action_seq_len)
+        viewix_actions_map = np.ones((sphere_size, len(obs), max_macro_action_seq_len), dtype='int') * \
+            self.agent_nav_actions.index('<ignore>')
+
+        for i, ob in enumerate(obs): # 1-100
+            for j, env_action_tup_seq in viewix_env_actions_map[i]: # 1-36
+                assert len(env_action_tup_seq) <= 8
+                # map seq, length varies
+                agent_action_seq = list(map(self._map_env_action_to_agent_action, env_action_tup_seq, ob))
+                assert len(agent_action_seq) <= 8
+                # assign action index, seq is already padded to 8 during initialization
+                viewix_actions_map[j, i, :len(agent_action_seq)] = agent_action_seq
+
+        return viewix_actions_map
 
 
 class AskOracle(object):
@@ -558,6 +631,3 @@ def make_oracle(oracle_type, *args, **kwargs):
     #     return DiverseShortestPathsOracle(*args, **kwargs)
 
     return None
-
-
-
