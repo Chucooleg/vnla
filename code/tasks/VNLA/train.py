@@ -163,7 +163,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     train_feedback = { 'nav' : hparams.nav_feedback, 'ask' : hparams.ask_feedback, 'recover' : hparams.recover_feedback}
     test_feedback  = { 'nav' : 'argmax', 'ask' : 'argmax', 'recover' : 'argmax' }  
 
-    loss_types = ["nav_losses", 'ask_losses', 'value_losses', 'end_losses', 'recover_losses']
+    loss_types = ["nav_losses", 'ask_losses', 'value_losses', 'recover_losses']
 
     start = time.time()
 
