@@ -137,7 +137,7 @@ class VNLAExplorationBatch():
             each element is a single list of tuples. [(0,1,0), (0,-1,1), ...]
         '''
         # env should have taken 1 or more rotations already
-        assert all.([len(hist) > 0 for hist in self.rotation_history])
+        assert all([len(hist) > 0 for hist in self.rotation_history])
 
         def compress_single(l):
             '''
@@ -202,7 +202,7 @@ class VNLAExplorationBatch():
         for i, closest_vertex in enumerate(closest_navigable_locations_batch):
             # only a few rotation angles are connected to another vertex
             if closest_vertex:
-                
+
                 # if: 1) directly facing -- within 30deg of center of view
                 if  (closest_vertex.rel_heading < math.pi/6.0 and closest_vertex.rel_heading > -math.pi/6.0) or \
                     # 2,3) already looked up/down, but vertex is further up/down

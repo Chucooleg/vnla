@@ -110,7 +110,7 @@ class OutputData(object):
             self.output_data[i]['agent_ask_cross_ent'] = ask_cross_ent_list
 
     def compute_softmax_output_data(self):
-         for i in range(len(self.output_data)):
+        for i in range(len(self.output_data)):
             nav_softmax_initial_list, nav_softmax_final_list, ask_softmax_list = \
                 self.compute_softmax_per_datapt(self.output_data[i])
             self.output_data[i]['agent_nav_softmax_initial'] = nav_softmax_initial_list

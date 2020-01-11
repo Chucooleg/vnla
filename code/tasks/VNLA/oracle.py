@@ -14,7 +14,8 @@ import numpy as np
 import torch
 
 import utils
-sys.path.append('../../build')
+# sys.path.append('../../build/')  # if local
+sys.path.append('/opt/MatterSim/build/')  # if docker or Philly
 import MatterSim
 
 class ShortestPathOracle(object):
@@ -592,7 +593,7 @@ class StepByStepSubgoalOracle(object):
                     elif 'right' in action_name:
                         instruction.append('turn %d degrees right' % degree)
                     else:
-                        raise(ValueError, action_name)
+                        raise ValueError('action name {} error'.format(action_name))
                 elif 'go' in action_name:
                     instruction.append('%s %d steps' % (action_name, c))
             elif action_name != '':

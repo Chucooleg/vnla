@@ -49,7 +49,7 @@ class NavigationAgent(BaseAgent):
 
     def __init__(self, model, hparams, device):  
         # NOTE left out should make advisor for next level
-        super(NavigationAgent, self).__init__()
+        super(NavigationAgent, self).__init__(hparams)
 
         # traj params
         self.episode_len = hparams.max_episode_length

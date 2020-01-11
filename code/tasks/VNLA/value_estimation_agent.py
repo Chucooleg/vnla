@@ -86,6 +86,7 @@ class ValueEstimationAgent(NavigationAgent):
             tr_timesteps: list of len(batch_size) integers, each indicate sampled timestep
         '''
         # Extract language instruction and convert to token IDs
+        # self.env defined in subclass
         seq_tensor = np.array([self.env.encode(self.history_buffer[instr_iter_key]['instruction'][timestep]) \
             for (instr_iter_key, timestep) in zip(tr_key_pairs, tr_timesteps)])
 

@@ -525,7 +525,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # Get mask at that viewIndex(rotation)
                     # i.e. not all rotation angles can connect to other vertices on graph
                     # tensor shape (batch_size,)
-                    view_ix_mask = torch.tensor(view_index_mask[view_ix], dtype=uint8, device=self.device)
+                    view_ix_mask = torch.tensor(view_index_mask[view_ix], dtype=torch.uint8, device=self.device)
 
                     # If implementing Ask Agent
                     # ques_asked = ...
@@ -678,10 +678,10 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                     # Mark if trajectory has ended
                     if expert_rollin_bool:
-                        if end_target[i] or time_step >= ob['traj_len']:
+                        if end_target[i] or timestep >= ob['traj_len']:
                             ended[i] = True
                     else:
-                        if end_estimated[i] or time_step >= ob['traj_len']:
+                        if end_estimated[i] or timestep >= ob['traj_len']:
                             ended[i] = True
 
             # Early exit if all trajectories in the batch has <end>ed

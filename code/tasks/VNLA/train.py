@@ -493,7 +493,7 @@ def train_val(device, seed=None):
             #agent = ValueEstimationVerbalAskNoRecoveryAgent(model, hparams, device)
             raise NotImplementedError
 
-        elif hparams.uncertainty_handling == 'no_ask' hparams.recovery_strategy == 'learned_recovery':
+        elif hparams.uncertainty_handling == 'no_ask' and hparams.recovery_strategy == 'learned_recovery':
             print ("Aggrevate Agent: Cost-to-go Estimator, No Asking, Learned Recovery")
             #agent = ValueEstimationNoAskRecoveryAgent(model, hparams, device)
             raise NotImplementedError

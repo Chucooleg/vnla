@@ -21,7 +21,7 @@ class BaseAgent(object):
     Handles test results writing
     """
 
-    def __init__(self):
+    def __init__(self, hparams):
         random.seed(1)
         self.results = {}
         self.results_path = None
@@ -40,14 +40,15 @@ class BaseAgent(object):
             except:
                 import ipdb; ipdb.set_trace()
 
-    def rollout(self, iter_idx):
+    def rollout(self, iter_idx=None):
         raise NotImplementedError('Subclasses are expected to implement rollout')
 
     @staticmethod
     def get_agent(name):
         return globals()[name+"Agent"]
 
-    def base_test(self, env):
+    def base_test(self):
+        # self.env is defined in subclass
         self.env.reset_epoch()
 
         # self.is_eval is set to True in subclass

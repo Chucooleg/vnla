@@ -10,7 +10,7 @@ import numpy as np
 import random
 import time
 import copy
-from colllections import defaultdict
+from collections import defaultdict
 
 import torch
 import torch.nn as nn

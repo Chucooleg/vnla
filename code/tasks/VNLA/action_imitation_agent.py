@@ -67,7 +67,7 @@ class ActionImitationAgent(NavigationAgent):
             self.model.train()
         else:
             self.model.eval()
-        return self.base_test(self, env)
+        return self.base_test(env)
 
     def train(self, env, optimizer, n_iters, feedback, idx):
         '''Train for a given number `n_iters` of iterations. 

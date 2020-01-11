@@ -40,7 +40,7 @@ def load_nav_graphs(scan, path=None):
                 for j, conn in enumerate(item['unobstructed']):
                     if conn and data[j]['included']:
                         positions[item['image_id']] = np.array([item['pose'][3],
-                                item['pose'][7], item['pose'][11]]);
+                                item['pose'][7], item['pose'][11]])
                         assert data[j]['unobstructed'][i], 'Graph should be undirected'
                         G.add_edge(item['image_id'],data[j]['image_id'],
                             weight=distance(item,data[j]))
@@ -51,7 +51,7 @@ def load_region_map(scan):
     # TODO this funstion is not used anywhere
     DATA_DIR = os.getenv('PT_DATA_DIR')
     region_map = {}
-    # TODO this path is problematice
+    # TODO this path is problematic
     with open(os.path.join(DATA_DIR, 'view_to_region/%s.panorama_to_region.txt' % scan)) as f:
         for line in f:
             fields = line.rstrip().split()
