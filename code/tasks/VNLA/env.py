@@ -11,16 +11,18 @@ import networkx as nx
 from collections import defaultdict
 import scipy.stats
 
-# sys.path.append('../../build/')  # if local
-sys.path.append('/opt/MatterSim/build/')  # if docker or Philly
-import MatterSim
-
 from oracle import make_oracle
 from utils import load_datasets, load_nav_graphs
 import utils
 
-csv.field_size_limit(sys.maxsize)
+try:
+    sys.path.append('/opt/MatterSim/build/')  # local docker or Philly
+    import MatterSim
+except:
+    sys.path.append('/opt/MatterSim/build/')  # local conda env only
+    import MatterSim
 
+csv.field_size_limit(sys.maxsize)``
 
 class EnvBatch():
 

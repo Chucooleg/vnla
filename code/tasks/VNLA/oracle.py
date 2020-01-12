@@ -12,11 +12,14 @@ import copy
 import numpy as np
 
 import torch
-
 import utils
-# sys.path.append('../../build/')  # if local
-sys.path.append('/opt/MatterSim/build/')  # if docker or Philly
-import MatterSim
+
+try:
+    sys.path.append('/opt/MatterSim/build/')  # local docker or Philly
+    import MatterSim
+except:
+    sys.path.append('/opt/MatterSim/build/')  # local conda env only
+    import MatterSim
 
 class ShortestPathOracle(object):
     ''' Shortest navigation teacher '''
