@@ -24,7 +24,9 @@ mkdir -p $OUTPUT_DIR
 # command="python -u -m pdb -c continue train.py ..."
 # command="python -u -m torch.utils.bottleneck train.py ..."
 # command="python -u -m cProfile -o $OUTPUT_DIR/restats train.py ..."
-command="python -u -m cProfile -o $OUTPUT_DIR/restats train.py -exp $exp_name -job $job_name -config $config_file $extras"
+# command="python -u -m cProfile -o $OUTPUT_DIR/restats train.py -exp $exp_name -job $job_name -config $config_file $extras"
+
+command="python -u -m pdb -c continue train.py -exp $exp_name -job $job_name -config $config_file $extras"
 
 echo $command
 $command

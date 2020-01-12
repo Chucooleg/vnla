@@ -6,7 +6,8 @@ import argparse
 def make_parser():
     parser = argparse.ArgumentParser()
 
-    # main python call
+    # override main python call in train_*.sh
+    # (not in master config, deprecated.)
     parser.add_argument('-config_file', type=str, 
         help='configuration file')
     parser.add_argument('-load_path', type=str,
@@ -16,30 +17,154 @@ def make_parser():
     parser.add_argument('-job_name', type=str,
         help='name of the job')  
 
-    # take care of any extras from main python call here
-
-    # Baselines
-    parser.add_argument('-uncertainty_handling', type=str,
-        help='options to handle agent uncertainty')
-
-    # Vocab
+    # Vocab (not in master config)
     parser.add_argument('-external_main_vocab', type=str,
-        help='provide a different vocab file')
+        help='provide a different vocab file path')
 
-    # Advisor
+    # Dataset
+    parser.add_argument('-seed', type=int,
+        help='random seed')
+    parser.add_argument('-data_dir', type=str,
+        help='data directory')
+    parser.add_argument('-img_features', type=str,
+        help='path to pretrained image embeddings')
+    parser.add_argument('-img_feature_size', type=int, default=2048,
+        help='image embedding size')
+
+    # Choice of algorithm
+    parser.add_argument('-interaction_mode', type=str,
+        help='expert_agent, human_agent, or none_agent')
+    parser.add_argument('-uncertainty_handling', type=str,
+        help='whether agent can ask questions or not. no_ask or learned_ask_flag')  
+    parser.add_argument('-recovery_strategy', type=str,
+        help='whether agent can recover or not. no_recovery or learned_recovery') 
+    parser.add_argument('-navigation_objective', type=str,
+        help='navigation objective. either "value_estimateion" or "action_imitation"') 
     parser.add_argument('-ask_advisor', type=str,
-        help="type of ask advisor ('direct' or 'verbal_easy' or 'verbal_hard'")
+        help="type of ask advisor ('direct' or 'verbal'")
+    parser.add_argument('-nav_feedback', type=str,
+        help='navigation training method (deprecated)')
+    parser.add_argument('-ask_feedback', type=str,
+        help='asking training method (deprecated)')
+    parser.add_argument('-recover_feedback', type=str,
+        help='recover training method (deprecated)')
+
+    # Meta-level algorithm parameters
+    parser.add_argument('-max_episode_length', type=int,
+        help='maximum number of actions per epsiode')
+    parser.add_argument('--deviate_threshold', type=float)
+    parser.add_argument('--uncertain_threshold', type=float)
+    parser.add_argument('--unmoved_threshold', type=int)      
+    parser.add_argument('-success_radius', type=float,
+        help='success radius')
+
+    # Learned asking parameters
+    parser.add_argument('-query_ratio', type=float,
+        help='ratio between number of steps the agent is assisted and total number of steps (tau)')   
+    parser.add_argument('-max_ask_budget', type=int,
+        help='budget upperbound')
+    parser.add_argument('-budget_embed_size', type=int,
+        help='ask budget embed dim integer.')
+    parser.add_argument('-n_subgoal_steps', type=int,
+        help='number of next actions suggested by a subgoal')
+    # (Not in master config)
+    parser.add_argument('-rule_a_e', type=int,
+        help='Use rules (a) and (e) only for help-requesting teacher')
+    parser.add_argument('-rule_b_d', type=int,
+        help='Use rules (b) to (d) only for help-requesting teacher')
+    # Don't touch these ones
+    parser.add_argument('-backprop_softmax', type=int, default=1)
+    parser.add_argument('-backprop_ask_features', type=int)
+
+    # Aggrevate parameters
+    parser.add_argument('-start_beta_decay', type=int,
+        help='aggrevate: minimum number of iterations before beta decay')
+    parser.add_argument('-beta_decay_rate', type=float,
+        help='aggrevate: exponential decay rate for beta, between 0.0 and 1.0')
+    parser.add_argument('-decay_beta_every', type=int,
+        help='aggrevate: number of iterations between calling decay on beta')
+    parser.add_argument('-min_history_to_learn', type=int,
+        help='aggrevate: minimum history buffer size before training can start')
+    parser.add_argument('-num_recent_frames', type=int,
+        help='aggrevate: number of steps in recent history for LSTM unfold through, before predicting q-values for current time steps')      
+
+    # History buffer parameters
+    parser.add_argument('-max_buffer_size', type=int,
+        help='maximum number of examples history buffer can save')   
+
+    # Training Loop parameters
+    parser.add_argument('-n_iters', type=int,
+        help='number of training iterations (batches)')
+    parser.add_argument('-batch_size', type=int,
+        help='batch size (both training and evaluation)')      
+    parser.add_argument('-save_every', type=int,
+        help='number of iterations between model savings')
+    parser.add_argument('-log_every', type=int,
+        help='number of iterations between information loggings') 
+
+    # Optimizer parameters
+    parser.add_argument('-lr', type=float,
+        help='learning rate')
+    parser.add_argument('-weight_decay', type=float,
+        help='L2-regularization weight')
+    parser.add_argument('-start_lr_decay', type=int,
+        help='iteration to start decaying learning rate')
+    parser.add_argument('-lr_decay_rate', type=float,
+        help='learning rate decay rate')
+    parser.add_argument('-decay_lr_every', type=int,
+        help='number of iterations between learning rate decays')
+
+    # Vocabulary parameters
     parser.add_argument('-subgoal_vocab', type=str,
         help='subgoal vocabulary')
+    parser.add_argument('-min_word_count', type=str,
+        help='minimum word count cutoff when building vocabulary')
+    parser.add_argument('-split_by_spaces', type=int,
+        help='split word by spaces (always set true)')          
 
-    # Bootstrapping settings
-    parser.add_argument('-bootstrap', type=int, default=1,
+    # LSTM parameters
+    parser.add_argument('-word_embed_size', type=int,
+        help='word embed dim integer.')
+    parser.add_argument('-nav_embed_size', type=int,
+        help='nav embed dim integer.')      
+    parser.add_argument('-ask_embed_size', type=int,
+        help='ask embed dim integer.') 
+    parser.add_argument('-max_input_length', type=int,
+        help='max input length for language input tokens.') 
+    parser.add_argument('-num_lstm_layers', type=int,
+        help='number of lstm layers.') 
+    parser.add_argument('-hidden_size', type=int,
+        help='hidden size for LSTM cell.') 
+    parser.add_argument('-coverage_size', type=int,
+        help='coverage size for attention mechanism.') 
+    parser.add_argument('-bidirectional', type=int,
+        help='whether to use (1/0) bidirectional LSTM.') 
+    parser.add_argument('-dropout_ratio', type=float,
+        help='dropout ratio float.') 
+
+    # bootstrap parameters
+    parser.add_argument('-bootstrap', type=int,
         help='bootstrap on (1) or off (0)')
-    parser.add_argument('-n_ensemble', type=int, default=10,
+    parser.add_argument('-n_ensemble', type=int,
         help='number of bootstrap heads')
-    parser.add_argument('-bernoulli_probability', type=float, default=1.0,
+    parser.add_argument('-bernoulli_probability', type=float,
         help='bernoulli probability that a datapt is exposed to backprop a head')
-    parser.add_argument('-bootstrap_majority_vote', type=int, default=1,
+    parser.add_argument('-bootstrap_majority_vote', type=int,
         help='majority vote among heads (1) or sampling heads (0)')
+
+    # tensorboard logging
+    parser.add_argument('-plot_to_philly', type=int,
+        help='plot to philly web interface on (1) or off (0)')
+
+    # Evaluation (Not in master config)
+    parser.add_argument('-eval_only', type=int,
+        help='evaluation mode')
+    parser.add_argument('-multi_seed_eval', type=int,
+        help='evaluate with multiple seeds (automatically set -eval_only 1)')
+
+    # Others (Not in master config)
+    parser.add_argument('-device_id', type=int, default=0,
+        help='gpu id')
+    
 
     return parser

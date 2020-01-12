@@ -18,7 +18,7 @@ from pprint import pprint
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 from scipy import stats
 
-from utils import read_vocab,write_vocab,build_vocab,Tokenizer,padding_idx,timeSince
+from utils import read_vocab, write_vocab, build_vocab, Tokenizer, padding_idx, timeSince
 from env import VNLABatch
 from model import AttentionSeq2SeqModel, AttentionSeq2SeqModelMultiHead
 from ask_agent import AskAgent
@@ -405,7 +405,7 @@ def train_val(device, seed=None):
     # Set vocabulary
     train_vocab_path = os.path.join(hparams.data_path, 'train_vocab.txt')
     if hasattr(hparams, 'external_main_vocab') and hparams.external_main_vocab:
-        train_vocab_path = hparams.external_main_vocab    
+        train_vocab_path = hparams.external_main_vocab 
     # Optionally add subgoal vocabulary
     if 'verbal' in hparams.ask_advisor:
         subgoal_vocab_path = os.path.join(hparams.data_path, hparams.subgoal_vocab)

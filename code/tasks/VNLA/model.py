@@ -391,7 +391,7 @@ class AttentionSeq2SeqContinuousModel(nn.Module):
         if hparams.uncertainty_handling == 'no_ask':
             agent_class = ActionImitationNoAskAgent
         elif hparams.uncertainty_handling == 'learned_ask_flag':
-            assert hparams.advisor == 'verbal', ('only verbal advisor is supported')
+            assert hparams.ask_advisor == 'verbal', ('only verbal advisor is supported')
             agent_class = ActionImitationVerbalAskAgent
         else:
             sys.exit('%s uncertainty handling not supported, no matching agent classes.' % hparams.uncertainty_handling)

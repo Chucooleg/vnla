@@ -1,0 +1,78 @@
+{
+    # Dataset
+    "seed"                  : 1,
+    "data_dir"              : "asknav",
+    "img_features"          : "img_features/ResNet-152-imagenet.tsv",
+
+    # Choice of algorithm
+    "interaction_mode"      : {"expert_agent", "human_agent", "none_agent"},
+    "uncertainty_handling"  : {"no_ask", "learned_ask_flag"},
+    "recovery_strategy"     : {"no_recovery", "learned_recovery"},
+    "navigation_objective"  : {"value_estimation", "action_imitation"},
+    "ask_advisor"           : {"verbal", "direct"},
+    "nav_feedback"          : {"sample", "teacher", "argmax"},
+    "ask_feedback"          : {"sample", "teacher", "argmax"},
+    "recover_feedback"      : {"sample", "teacher", "argmax"},
+
+    # Meta-level algorithm parameters
+    "max_episode_length"    : 25,
+    "deviate_threshold"     : 8.0,
+    "uncertain_threshold"   : 1.0,
+    "unmoved_threshold"     : 9,
+    "success_radius"        : 2.0,
+
+    # Learned asking parameters
+    "query_ratio"           : 0.4,
+    "max_ask_budget"        : 10,
+    "budget_embed_size"     : 16,
+    "backprop_ask_features" : 0,
+    "n_subgoal_steps"       : 4,
+
+    # Aggrevate parameters
+    "start_beta_decay"      : 5000,
+    "beta_decay_rate"       : [0.0 - 1.0],
+    "decay_beta_every"      : 1000,
+    "min_history_to_learn"  : 5000,
+    "num_recent_frames"     : 4,
+
+    # History buffer parameters
+    "max_buffer_size"       : 100000,
+
+    # Training Loop parameters
+    "n_iters"               : 100000,
+    "batch_size"            : 100,
+    "save_every"            : 1000,
+    "log_every"             : 1000, 
+
+    # Optimizer parameters
+    "lr"                    : 1e-4,
+    "weight_decay"          : 5e-4,
+    "start_lr_decay"        : 5000,
+    "lr_decay_rate"         : 1,  # [0.0 - 1.0]
+    "decay_lr_every"        : 1000,
+
+    # Vocabulary parameters
+    "subgoal_vocab"         : "verbal_hard_vocab.txt",
+    "min_word_count"        : 1,
+    "split_by_spaces"       : true,
+
+    # LSTM parameters
+    "word_embed_size"       : 256,
+    "nav_embed_size"        : 32,
+    "ask_embed_size"        : 32,
+    "max_input_length"      : 50,
+    "num_lstm_layers"       : 1,
+    "hidden_size"           : 512,
+    "coverage_size"         : 10,
+    "bidirectional"         : false,
+    "dropout_ratio"         : 0.5,
+
+    # bootstrap parameters
+    "bootstrap"             : {1, 0},
+    "n_ensemble"            : [2-10],
+    "bernoulli_probability" : [0.0 - 1.0],
+    "bootstrap_majority_vote" : {1, 0},
+
+    # tensorboard logging
+    "plot_to_philly"        : {1, 0}
+}
