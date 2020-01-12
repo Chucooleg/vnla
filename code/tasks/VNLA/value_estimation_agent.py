@@ -276,7 +276,7 @@ class ValueEstimationAgent(NavigationAgent):
             self.model.train()
         else:
             self.model.eval()
-        return self.base_test(self, env)
+        return self.base_test()
 
     def train(self, env, optimizer, n_iters, feedback, idx):
         '''
@@ -289,6 +289,9 @@ class ValueEstimationAgent(NavigationAgent):
         # Set up self.env, feedback(teacher/argmax/learned)
         # Initialize losses, add scans to teachers/advisors
         self._setup(env, feedback)
+
+        # do not use dropout
+        self.model.train()
 
         # Check expert roll-in prob
         assert self.beta > 0.0 # always > 0.0 in exponential decay
@@ -305,12 +308,11 @@ class ValueEstimationAgent(NavigationAgent):
             # Global training iteration index
             global_iter_idx = idx + itr
 
-            optimizer.zero_grad()
-
             # Rollout the agent
             # History is added to buffer within this rollout() call
             # See subclass implementation
             traj, iter_time_report_rollout = self.rollout(global_iter_idx)
+            self.SW.add_scalar('history_buffer_size', len(self.history_buffer), global_iter_idx)
 
             # Keep time for the rollout processes
             for key in iter_time_report_rollout.keys():
@@ -339,6 +341,7 @@ class ValueEstimationAgent(NavigationAgent):
 
                 # Compute gradients
                 start_time = time.time()
+                optimizer.zero_grad()
                 self.loss.backward()
 
                 # NOTE add code to divide up gradients by 1/n_ensemble in the shared encoder if we are bootstrapping

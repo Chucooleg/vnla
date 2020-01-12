@@ -48,7 +48,7 @@ class BaseAgent(object):
         return globals()[name+"Agent"]
 
     def base_test(self):
-        # self.env is defined in subclass
+        # self.env is defined in subclass _setup()
         self.env.reset_epoch()
 
         # self.is_eval is set to True in subclass
@@ -81,6 +81,8 @@ class BaseAgent(object):
                             'agent_ask',
                             'agent_ask_logits', 'agent_ask_softmax',
                             'agent_ask_logit_masks', 'teacher_ask', 'teacher_ask_reason',
+                            # value estimation no ask no recovery agent
+                            'agent_q_values', 'teacher_q_values', 'beta', 'expert_rollin_bool',
                             ]:
 
                             if k in tr:

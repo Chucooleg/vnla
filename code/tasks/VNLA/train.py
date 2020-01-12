@@ -54,7 +54,11 @@ def set_path():
     hparams.load_path = hparams.load_path if hasattr(hparams, 'load_path') and \
         hparams.load_path is not None else \
         os.path.join(hparams.exp_dir, '%s_last.ckpt' % hparams.model_prefix)    
-    
+
+    # Set history buffer load path
+    hparams.history_buffer_path = hparams.history_buffer_path if hasattr(hparams, 'history_buffer_path') and \
+        hparams.history_buffer_path is not None else os.path.join(hparams.exp_dir, '%s_history_buffer_last.pickle' % hparams.model_prefix)
+
     # Set data load path
     DATA_DIR = os.getenv('PT_DATA_DIR')
     hparams.data_path = os.path.join(DATA_DIR, hparams.data_dir)  #e.g. $PT_DATA_DIR/asknav/
@@ -333,6 +337,11 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                 save(save_path, model, optimizer, iter, best_metrics, train_env)
                 print("Saved %s model to %s" % (env_name, save_path))
 
+            # Save latest history buffer
+            if (iter == end_iter or iter % hparams.save_every == 0) and \
+                hparams.navigation_objective == 'value_estimation':
+                agent.history_buffer.save_buffer(hparams.history_buffer_path)
+
             # log time again after saving
             print('%s (%d %d%%) %s' % (timeSince(start, float(iter)/end_iter),
                 iter, float(iter)/end_iter*100, loss_str)) 
@@ -437,7 +446,7 @@ def train_val(device, seed=None):
         raise NotImplementedError
     elif hparams.navigation_objective == 'value_estimation' and not hparams.bootstrap:
         print ("Value Estimation model: Cost-to-go Estimator with single-head and recent-frames LSTM decoder") 
-        model = AttentionSeq2SeqFramesModel(len(vocab), hparams, device) #TODO model implement now
+        model = AttentionSeq2SeqFramesModel(len(vocab), hparams, device)
     elif hparams.navigation_objective == 'value_estimation' and hparams.bootstrap:
         print ("Value Estimation model: Cost-to-go Estimator with mutli-head and recent-frames LSTM decoder")
         # model = AttentionSeq2SeqFramesMultiHeadModel(len(vocab), hparams, device)
@@ -486,7 +495,7 @@ def train_val(device, seed=None):
 
         if hparams.uncertainty_handling == 'no_ask' and hparams.recovery_strategy == 'no_recovery':
             print ("Aggrevate Agent: Cost-to-go Estimator, No Asking, No Recovery")
-            agent = ValueEstimationNoAskNoRecoveryAgent(model, hparams, device) #TODO implement now
+            agent = ValueEstimationNoAskNoRecoveryAgent(model, hparams, device) 
 
         elif hparams.uncertainty_handling == 'learned_ask_flag' and hparams.recovery_strategy == 'no_recovery':
             print ("Aggrevate Agent: Cost-to-go Estimator, Learned Asking, No Recovery")
@@ -506,13 +515,17 @@ def train_val(device, seed=None):
         else:
             raise ValueError
 
+        # Load history buffer
+        if os.path.exists(hparams.load_path):
+            print('Load history buffer from %s' % hparams.history_buffer_path)
+            agent.history_buffer.load_buffer(hparams.history_buffer_path)
+
     else:
         raise ValueError('agent definition is not clear. check navigation_objective')
 
     # Train
     return train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
           best_metrics, eval_mode)
-
 
 if __name__ == "__main__":
 

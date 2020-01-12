@@ -67,7 +67,7 @@ class ActionImitationAgent(NavigationAgent):
             self.model.train()
         else:
             self.model.eval()
-        return self.base_test(env)
+        return self.base_test()
 
     def train(self, env, optimizer, n_iters, feedback, idx):
         '''Train for a given number `n_iters` of iterations. 
@@ -80,6 +80,9 @@ class ActionImitationAgent(NavigationAgent):
         # Initialize losses, add scans to teachers/advisors
         self._setup(env, feedback)
 
+        # do not use dropout
+        self.model.train()
+
         # time report
         time_report = defaultdict(int)
 
@@ -91,8 +94,6 @@ class ActionImitationAgent(NavigationAgent):
 
             # Global training iteration index
             global_iter_idx = idx + itr
-
-            optimizer.zero_grad()
 
             # Rollout the agent, collect losses
             traj, iter_time_report = self.rollout(global_iter_idx)
@@ -107,6 +108,7 @@ class ActionImitationAgent(NavigationAgent):
 
            # Compute gradients
             start_time = time.time()
+            optimizer.zero_grad()
             self.loss.backward()
 
             # NOTE add code to divide up gradients by 1/n_ensemble in the shared encoder if we are bootstrapping

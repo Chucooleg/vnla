@@ -40,18 +40,23 @@ class HistoryBuffer(object):
     def save_buffer(self, file_path):
         '''save buffer to a filepath'''
         # can try to find a better way than pickling...
-        pickle.dump({
-            '_indexed_data': self._indexed_data,
-            '_earliest_iter_idx': self._earliest_iter_idx,
-            '_iter_instr_map': self._iter_instr_map,
-            '_instr_iter_keys': self._instr_iter_keys,
-            '_curr_buffer_size': self._curr_buffer_size,
-            '_max_buffer_size': self._max_buffer_size,
-        }, file=file_path)
+
+        with open(file_path, 'wb') as handle:
+            pickle.dump({
+                '_indexed_data': self._indexed_data,
+                '_earliest_iter_idx': self._earliest_iter_idx,
+                '_iter_instr_map': self._iter_instr_map,
+                '_instr_iter_keys': self._instr_iter_keys,
+                '_curr_buffer_size': self._curr_buffer_size,
+                '_max_buffer_size': self._max_buffer_size,
+            }, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def load_buffer(self, file_path):
         '''load buffer from a filepath'''
-        loaded = pickle.load(file_path)
+
+        with open(file_path, 'rb') as handle:
+            loaded = pickle.load(handle)
+
         self._indexed_data = loaded['_indexed_data']
         self._earliest_iter_idx = loaded['_earliest_iter_idx']
         self._iter_instr_map = loaded['_iter_instr_map']
