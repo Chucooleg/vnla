@@ -61,9 +61,6 @@ class ValueEstimationAgent(NavigationAgent):
         self.history_buffer = HistoryBuffer(hparams)
         self.min_history_to_learn = hparams.min_history_to_learn
 
-        # Initialize q-value threshold for agent to determine if its path should 'end'
-        self.end_q_val_threshold = hparams.end_q_val_threshold
-
         # Set expert rollin prob, decayed in training
         self.beta = 1.0
         self.start_beta_decay = hparams.start_beta_decay
@@ -307,6 +304,9 @@ class ValueEstimationAgent(NavigationAgent):
 
             # Global training iteration index
             global_iter_idx = idx + itr
+            
+            # Debug
+            print ("global_iter_idx = {}".format(global_iter_idx))
 
             # Rollout the agent
             # History is added to buffer within this rollout() call

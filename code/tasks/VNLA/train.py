@@ -20,9 +20,10 @@ from scipy import stats
 
 from utils import read_vocab, write_vocab, build_vocab, Tokenizer, padding_idx, timeSince
 from env import VNLABatch
-from model import AttentionSeq2SeqModel, AttentionSeq2SeqModelMultiHead
-from ask_agent import AskAgent
-from verbal_ask_agent import VerbalAskAgent
+from model import AttentionSeq2SeqFramesModel, AttentionSeq2SeqContinuousModel
+from action_imitation_no_ask_agent import ActionImitationNoAskAgent
+from action_imitation_verbal_ask_agent import ActionImitationVerbalAskAgent
+from value_estimation_no_ask_no_recovery_agent import ValueEstimationNoAskNoRecoveryAgent
 from tensorboardX import SummaryWriter
 
 from eval import Evaluation
@@ -527,6 +528,7 @@ def train_val(device, seed=None):
     return train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
           best_metrics, eval_mode)
 
+
 if __name__ == "__main__":
 
     parser = make_parser()
@@ -545,7 +547,7 @@ if __name__ == "__main__":
     set_path()
 
     device = torch.device('cuda')
-    print ("CUDA device count :".format(torch.cuda.device_count()))
+    print ("CUDA device count : {}".format(torch.cuda.device_count()))
 
     if hasattr(hparams, 'multi_seed_eval') and hparams.multi_seed_eval:
         hparams.eval_only = 1
@@ -565,3 +567,56 @@ if __name__ == "__main__":
         # Train
         train_val(device)        
 
+
+# TURN OFF WHEN NOT USING VS code debugger------------------------------------------------------------------------------
+hparams = None
+args = None
+
+def vs_code_debug(args_temp):
+
+    global hparams
+    global args
+
+    parser = make_parser()
+    args = parser.parse_args()
+
+    # Read configuration from a json file
+    with open(args_temp["config_file"]) as f:
+        hparams = Namespace(**json.load(f)) 
+
+    # Overwrite hparams by args
+    for flag in vars(args):
+        value = getattr(args, flag)
+        if value is not None:
+            setattr(hparams, flag, value)   
+
+    # Overwrite hparams by args_temp
+    for flag in args_temp:
+        value = args_temp[flag]
+        setattr(hparams, flag, value)
+
+    set_path()
+    print ("set_path() is done")
+
+    device = torch.device('cuda')
+
+    print ("CUDA device count = {}".format(torch.cuda.device_count()))
+
+    if hasattr(hparams, 'multi_seed_eval') and hparams.multi_seed_eval:
+        hparams.eval_only = 1
+        seeds = [123, 435, 6757, 867, 983]
+        metrics = defaultdict(lambda: defaultdict(list))
+        for seed in seeds:
+            this_metrics = train_val(seed=seed)
+            for metric in this_metrics:
+                for k, v in this_metrics[metric].items():
+                    if 'rate' in metric:
+                        v *= 100
+                    metrics[metric][k].append(v)
+        for metric in metrics:
+            for k, v in metrics[metric].items():
+                print('%s %s: %.2f %.2f' % (metric, k, np.average(v), stats.sem(v) * 1.95))
+    else:
+        # Train
+        train_val(device)
+# ------------------------------------------------------------------------------

@@ -186,7 +186,7 @@ class AskAttnDecoderLSTM(nn.Module):
         self.backprop_ask_features = hparams.backprop_ask_features
 
 
-class AskAttnDecoderClassifierLSTM(nn.Module):
+class AskAttnDecoderClassifierLSTM(AskAttnDecoderLSTM):
 
     def __init__(self, hparams, agent_class, device):
 
@@ -271,7 +271,7 @@ class AskAttnDecoderClassifierLSTM(nn.Module):
             return self.forward_nav(nav_action, ask_action, feature, h, ctx, ctx_mask, nav_logit_mask, cov)
 
 
-class AskAttnDecoderRegressorLSTM(nn.Module):
+class AskAttnDecoderRegressorLSTM(AskAttnDecoderLSTM):
 
     def __init__(self, hparams, agent_class, device):
 

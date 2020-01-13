@@ -15,7 +15,7 @@ class HistoryBuffer(object):
         
         # Stored data format
         # (instr_id, global_iter_idx) : {viewpointIndex:[], scan:'', instruction: [], feature: [], action: [], q_values_target: [], ... etc}
-        self._indexed_data = defaultdict(defaultdict(list))
+        self._indexed_data = defaultdict(lambda: defaultdict(list))
 
         # Use this to remove earliest experience when buffer is full
         self._earliest_iter_idx = 0

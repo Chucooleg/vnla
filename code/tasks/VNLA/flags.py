@@ -8,6 +8,11 @@ def make_parser():
 
     # override main python call in train_*.sh
     # (not in master config, deprecated.)
+    parser.add_argument('-debug_mode', type=int, 
+        help='debug mode on/off, 1 or 0.')
+
+    # override main python call in train_*.sh
+    # (not in master config, deprecated.)
     parser.add_argument('-config_file', type=str, 
         help='configuration file')
     parser.add_argument('-load_path', type=str,

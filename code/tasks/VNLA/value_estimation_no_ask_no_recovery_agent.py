@@ -40,6 +40,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Used to initialize exploration environment, may not be necessary
         self.img_features = hparams.img_features
         self.success_radius = hparams.success_radius
+        self.debug_mode = hparams.debug_mode
 
     @staticmethod
     def n_input_nav_actions():
@@ -146,7 +147,15 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         # time keeping
         time_report['initial_setup_training'] += time.time() - start_time
-      
+
+        # Debug data before it goes into model
+        if self.debug_mode:
+            # tr_key_pairs, tr_timesteps, training_batch_results
+            # seq, seq_mask, seq_lengths
+            # ctx
+            # ques_out_t
+            import pdb; pdb.set_trace()
+
         # -----------------------------------------------------------------
         # LSTM unfold through the recent history frames e.g. t-3, t-2, t-1, t-0
         # Purpose: to compute decoder_h and cov from history
@@ -181,6 +190,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
             # Get image feature as a result of the macro-action decision at history time t
             f_out_t = self.get_tr_variable_by_t(tr_key_pairs, t_ix, 'feature')
+
+            # Debug data before it goes into model
+            if self.debug_mode:
+                # t_ix, a_out_t, f_out_t
+                import pdb; pdb.set_trace()
 
             # Run decoder forward pass
             decoder_h, _, _, cov = self.model.decode_nav(a_out_t, ques_out_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov)
@@ -218,6 +232,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # If implementing Ask Agent
             # ques_asked = ...
 
+            # Debug data before it goes into model
+            if self.debug_mode:
+                # a_proposed, f_proposed, view_ix_mask
+                import pdb; pdb.set_trace()
+
             # Run decoder forward pass
             # decoder_h_curr, _, q_values_tr_estimate[view_ix], cov_curr
             _, _, q_values_tr_estimate[view_ix], _ = self.model.decode_nav(a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
@@ -237,6 +256,10 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # # Get loss mask from history buffer -- same HB source as view_ix_mask
         # # tensor shape (batch_size, self.num_viewIndex)
         # loss_mask = self.get_tr_view_indexed_full_mask_by_t(tr_key_pairs, tr_timesteps, self.num_viewIndex)
+        # Debug data 
+        if self.debug_mode:
+            # q_values_target
+            import pdb; pdb.set_trace()
         # Compute scalar loss
         self.value_loss = self.value_criterion(q_values_tr_estimate, q_values_target)
         time_report['compute_value_loss'] += time.time() - start_time
@@ -245,6 +268,10 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Append to *_losses for logging
         start_time = time.time()
         self._compute_loss(global_iter_idx)
+        # Debug loss data 
+        if self.debug_mode:
+            # self.loss, self.value_loss, self.losses, self.value_losses
+            import pdb; pdb.set_trace()
         time_report['compute_loss_per_training_batch'] += time.time() - start_time
 
         # Optional save training batch results
@@ -260,11 +287,17 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         return training_batch_results, time_report
 
     def rollout(self, global_iter_idx=None):
-        
+
+        # Debug
+        print("inside rollout")
+
         # time keeping
         time_report = defaultdict(int)
         rollout_start_time = time.time()
         start_time = time.time() 
+
+        # Debug
+        print("after time keeping")
 
         # Draw expert-rollin boolean
         if self.is_eval:
@@ -272,9 +305,17 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         else:
             expert_rollin_bool = np.random.binomial(1, self.beta)
 
+        # Debug
+        print("drawing expert boolean")
+
         # Reset environment
         obs = self.env.reset(self.is_eval)
+        # Debug
+        print("after calling resset")
         batch_size = len(obs)     
+
+        # Debug
+        print("set env and got obs")
 
         # Start roll-out book keeping
         # one trajectory per ob
@@ -298,12 +339,16 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             'expert_rollin_bool': 0 if self.is_eval else expert_rollin_bool,
         } for ob in obs]
 
+        # Debug
+        print("right before making sequence")        
+
         # Index initial command
         # Stays the same in No Ask Agents
         seq, seq_mask, seq_lengths = self.make_instruction_batch(obs)
 
         # Encode initial command
         # ctx will not update in No Ask Agents
+        # tensor shape (100, 8, 512)
         ctx, _ = self.model.encode(seq, seq_lengths)
 
         # Initialize rotation actions
@@ -318,7 +363,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             self.ask_actions.index('dont_ask')
 
         # Get initial image features at starting position
-        # shape (batch_size, feature size)
+        # shape (batch_size, feature size=2048)
         f_t = self.get_feature_variable(obs)
 
         # Initialize trajectory 'end' markers
@@ -335,6 +380,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Initialize ^T time budget, different for each data point
         # Precomputed per trajectory when Env() was initialized
         episode_len = max(ob['traj_len'] for ob in obs)  
+
+        # Debug initial data
+        if self.debug_mode:
+            # check seq, seq_mask, seq_lengths, ctx, a_t, ques_t, f_t, ended, env_rotations, env_stepping, episode_len
+            import pdb; pdb.set_trace()
 
         # Initialize experience batch at <start> when t=0
         # A new experience batch will be saved at every following time step
@@ -369,6 +419,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Write <start> t=0 experience to history buffer
         self.history_buffer.add_experience(experience_batch_t)
 
+        # Debug history buffer
+        if self.debug_mode:
+            # check experience_batch_t, self.history_buffer contents
+            import pdb; pdb.set_trace()
+
         # Initialize local buffer at <start>, append per timestep
         # Keep past j frames i.e.{} for continuous LSTM decoding
         local_buffer = [{
@@ -379,6 +434,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # 'ctx': ctx,
             # 'seq_mask': seq_mask,
         }]
+
+        # Debug local buffer
+        if self.debug_mode:
+            # local_buffer
+            import pdb; pdb.set_trace()
 
         # time keeping
         time_report['initial_setup'] += time.time() - start_time
@@ -391,6 +451,10 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # Modify obs in-place to indicate if any ob has 'ended'
             start_time = time.time()
             self._populate_agent_state_to_obs(obs, ended)
+            # Debug
+            if self.debug_mode:
+                # take a look at obs
+                import pdb; pdb.set_trace()
             time_report['pop_state_to_obs'] += time.time() - start_time
 
             # ---------------------------- Review code here
@@ -405,6 +469,10 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # with its own batch of simulators
             start_time = time.time()
             frontier_explore_env = VNLAExplorationBatch(obs)
+            # Debug explore env
+            if self.debug_mode:
+                # frontier_explore_env
+                import pdb; pdb.set_trace()
             time_report['initialize_frontier_explore_batch'] += time.time() - start_time
 
             # Oracle provide instructions for the simulators to explore(turn) around
@@ -445,6 +513,18 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             viewix_actions_map = torch.from_numpy(viewix_actions_map).long().to(self.device)
             time_report['make_viewix_actions_map'] += time.time() - start_time
 
+            # Debug
+            if self.debug_mode:
+                # explore_instructions
+                # viewix_env_actions_map
+                # viewix_next_vertex_map
+                # view_index_mask
+                # q_values_target_list
+                # end_target
+                # viewix_actions_map
+                # take note of time_report
+                import pdb; pdb.set_trace()
+
             # ---------------------------- ----------------------------
             # Determine next macro action sequence by expert or agent
             start_time = time.time()
@@ -471,6 +551,14 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 assert a_t.shape == (batch_size, self.max_macro_action_seq_len)
 
                 time_report['select_expert_macro_action'] += time.time() - expert_select_start_time
+
+                # Debug
+                if self.debug_mode:
+                    # best_view_ix
+                    # best_view_ix_tiled
+                    # a_t
+                    # take note of time_report
+                    import pdb; pdb.set_trace()
 
             else:
                 # Sanity check local buffer size
@@ -499,8 +587,25 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # tensor shape (batch_size, feature size)
                     f_out_t = local_buffer[t]['f_t']
 
+                    # Debug before decoding
+                    if self.debug_mode:
+                        # a_out_t, f_out_t
+                        import pdb; pdb.set_trace()
+
                     decoder_h, _, _, cov = self.model.decode_nav(a_out_t, ques_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov)
+
+                    # Debug after decoding
+                    if self.debug_mode:
+                        # decoder_h, cov
+                        import pdb; pdb.set_trace()
+
                 time_report['decode_history'] += time.time() - decode_hist_start_time
+
+                # Debug after decoding all 4 past frames
+                if self.debug_mode:
+                    # decoder_h, _, _, cov
+                    # take note of time_report
+                    import pdb; pdb.set_trace()
 
                 # ------- LSTM unfold one step further at pano sphere
                 decode_frontier_start_time = time.time()
@@ -530,6 +635,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # If implementing Ask Agent
                     # ques_asked = ...
 
+                    # Debug before decoding
+                    if self.debug_mode:
+                        # a_proposed, f_proposed, view_ix_mask
+                        import pdb; pdb.set_trace()
+
                     # Run decoder forward pass
                     # decoder_h_curr, _, q_values_rollout_estimate[view_ix], cov_curr
                     _, _, q_values_rollout_estimate[view_ix], _ = self.model.decode_nav(a_proposed, ques_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
@@ -539,6 +649,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 q_values_rollout_estimate = q_values_rollout_estimate.t()
 
                 time_report['decode_frontier'] += time.time() - decode_frontier_start_time
+
+                # Debug before decoding
+                if self.debug_mode:
+                    # q_values_rollout_estimate
+                    import pdb; pdb.set_trace()
                 # -------
 
                 agent_select_start_time = time.time()
@@ -564,6 +679,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                 time_report['select_agent_macro_action'] += time.time() - agent_select_start_time
 
+                # Debug after decoding
+                if self.debug_mode:
+                    # best_view_ix, best_view_ix_tiled, a_t, end_estimated
+                    import pdb; pdb.set_trace()
+
             time_report['compute_next_nav_by_feedback'] += time.time() - start_time
             # ----------------------------
 
@@ -578,6 +698,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # forward (1,0,0) or ignore (0,0,0)
                 env_stepping[i] = self.value_teacher.interpret_agent_forward(ob)
             time_report['translate_to_env_actions'] += time.time() - start_time
+
+            # Debug env steps
+            if self.debug_mode:
+                # a_t_list, env_rotations, a_t, env_stepping
+                import pdb; pdb.set_trace()
 
             # Simulators (batch) take the chosen env rotations
             start_time = time.time()
@@ -603,6 +728,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             if not expert_rollin_bool:
                 q_values_rollout_estimate_list = q_values_rollout_estimate.data.tolist()
             time_report['prepare_tensors_for_saving'] += time.time() - start_time
+
+            # Debug
+            if self.debug_mode:
+                # obs, f_t, viewix_actions_map, q_values_rollout_estimate_list
+                import pdb; pdb.set_trace()
 
             # Initialize new experience_batch_t
             # length <= batch_size because some ob may have ended already
@@ -648,10 +778,20 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     traj[i]['teacher_q_values'].append(q_values_target_list[i])
             time_report['write_experience_batch'] += time.time() - start_time  
 
+            # Debug
+            if self.debug_mode:
+                # experience_batch_t, traj
+                import pdb; pdb.set_trace()
+
             # Write experience to history buffer
             start_time = time.time()
             self.history_buffer.add_experience(experience_batch_t)
             time_report['save_to_history_buffer'] += time.time() - start_time  
+
+            # Debug
+            if self.debug_mode:
+                # check if experience is added
+                import pdb; pdb.set_trace()
 
             # Append tensors for the whole batch for this time step
             start_time = time.time()
@@ -666,6 +806,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             start_time = time.time()
             obs = self.env.step(env_stepping)
             time_report['env_forward_step'] += time.time() - start_time  
+
+            # Debug
+            if self.debug_mode:
+                # local buffer, obs 
+                import pdb; pdb.set_trace()
 
             # Update traj after stepping forward
             start_time = time.time()
@@ -684,6 +829,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                         if end_estimated[i] or timestep >= ob['traj_len']:
                             ended[i] = True
 
+            # Debug
+            if self.debug_mode:
+                # traj, end_target, end_estimated, ended
+                import pdb; pdb.set_trace()
+
             # Early exit if all trajectories in the batch has <end>ed
             if ended.all():
                 break
@@ -691,6 +841,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
             # Increment timestep for the next While loop
             timestep += 1
+        
+        # Debug
+        if self.debug_mode:
+            # traj, end_target, end_estimated, ended
+            import pdb; pdb.set_trace()
 
         time_report['total_rollout_time'] += time.time() - rollout_start_time
         return traj, time_report

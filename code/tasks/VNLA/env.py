@@ -18,11 +18,14 @@ import utils
 try:
     sys.path.append('/opt/MatterSim/build/')  # local docker or Philly
     import MatterSim
-except:
-    sys.path.append('/opt/MatterSim/build/')  # local conda env only
+except: 
+    # local conda env only
+    # sys.path.append('../../build/')  
+    # print('cwd: %s' % os.getcwd())
+    sys.path.append('/home/hoyeung/Documents/vnla/code/build')  
     import MatterSim
 
-csv.field_size_limit(sys.maxsize)``
+csv.field_size_limit(sys.maxsize)
 
 class EnvBatch():
 
@@ -90,7 +93,11 @@ class VNLAExplorationBatch():
     def __init__(self, obs):
         # assign a new simulator for each ob in the batch
         self.batch_size = len(obs)
-        for i in range(batch_size):
+        self.image_w = 640
+        self.image_h = 480
+        self.vfov = 60
+        self.sims = []
+        for i in range(self.batch_size):
             sim = MatterSim.Simulator()
             sim.setRenderingEnabled(False)
             sim.setDiscretizedViewingAngles(True)
@@ -206,8 +213,8 @@ class VNLAExplorationBatch():
             if closest_vertex:
 
                 # if: 1) directly facing -- within 30deg of center of view
+                # 2,3) already looked up/down, but vertex is further up/down
                 if  (closest_vertex.rel_heading < math.pi/6.0 and closest_vertex.rel_heading > -math.pi/6.0) or \
-                    # 2,3) already looked up/down, but vertex is further up/down
                     (viewix_batch[i] // 12 == 2 and loc.rel_elevation > math.pi/6.0) or \
                     (viewix_batch[i] // 12 == 0 and loc.rel_elevation < -math.pi/6.0):
                     next_vertex_batch[i] = closest_vertex.viewpointId
@@ -350,7 +357,7 @@ class VNLAExplorationBatch():
             self._explore_horizontally(viewix_env_actions_map, viewix_next_vertex_map, heading_adjusts)
 
         # assert all 36 views are covered for each ob in the batch (no Nones at all)
-        assert all.([v_str is not None for task_sphere in viewix_next_vertex_map for v_str in task_sphere])
+        assert all([v_str is not None for task_sphere in viewix_next_vertex_map for v_str in task_sphere])
 
         # arr shape(36, batch_size), each boolean
         view_index_mask = (np.char.array(viewix_next_vertex_map) == '').t()
@@ -466,6 +473,7 @@ class VNLABatch():
     def _get_obs(self):
         '''get obs for current batch from self.data and simulators'''
         obs = []
+
         # feature, state are from the current batch of simulators
         for i, (feature, state) in enumerate(self.env.getStates()):
             # item is from the current batch of data loaded from self.data
@@ -512,6 +520,7 @@ class VNLABatch():
         viewpointIds = [item['paths'][0][0] for item in self.batch]
         headings = [item['heading'] for item in self.batch]
         self.instructions = [item['instruction'] for item in self.batch]
+
         self.env.newEpisodes(scanIds, viewpointIds, headings)
 
         self.max_queries_constraints = [None] * self.batch_size

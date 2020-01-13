@@ -17,8 +17,11 @@ import utils
 try:
     sys.path.append('/opt/MatterSim/build/')  # local docker or Philly
     import MatterSim
-except:
-    sys.path.append('/opt/MatterSim/build/')  # local conda env only
+except: 
+    # local conda env only
+    # sys.path.append('../../build/')  
+    # print('cwd: %s' % os.getcwd())
+    sys.path.append('/home/hoyeung/Documents/vnla/code/build')  
     import MatterSim
 
 class ShortestPathOracle(object):

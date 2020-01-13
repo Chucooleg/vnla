@@ -1,5 +1,8 @@
 {
 
+    "debug_mode"            : 0,
+
+
     "seed"                  : 1,
     "data_dir"              : "asknav",
     "img_features"          : "img_features/ResNet-152-imagenet.tsv",

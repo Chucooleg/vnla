@@ -3,10 +3,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-# export PT_DATA_DIR=/home/hoyeung/blob_matterport3d/
-# export PT_OUTPUT_DIR=/home/hoyeung/blob_experiments/asknav/output_local/
-# export PT_DATA_DIR=/mnt/matterport3d/
-# export PT_OUTPUT_DIR=/mnt/experiment-results-philly/asknav/output_philly/
 source define_vars.sh
 
 cd ../
@@ -25,7 +21,6 @@ mkdir -p $OUTPUT_DIR
 # command="python -u -m torch.utils.bottleneck train.py ..."
 # command="python -u -m cProfile -o $OUTPUT_DIR/restats train.py ..."
 # command="python -u -m cProfile -o $OUTPUT_DIR/restats train.py -exp $exp_name -job $job_name -config $config_file $extras"
-
 command="python -u -m pdb -c continue train.py -exp $exp_name -job $job_name -config $config_file $extras"
 
 echo $command

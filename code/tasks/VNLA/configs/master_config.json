@@ -1,4 +1,7 @@
 {
+    # Debug mode
+    "debug_mode"            : 1,  # [0.0 - 1.0]
+
     # Dataset
     "seed"                  : 1,
     "data_dir"              : "asknav",
