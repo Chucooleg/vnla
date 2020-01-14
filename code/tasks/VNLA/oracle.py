@@ -198,7 +198,8 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
             e.g. [(0,0,0), ... (0,0,0)] if ob has ended.
         '''
         max_macro_action_seq_len = len(rotation_action_indices)
-        macro_rotations = [self.agent_nav_actions.index('<ignore>')] * max_macro_action_seq_len
+        # [(0,0,0)] * 8
+        macro_rotations = [self.env_nav_actions[self.agent_nav_actions.index('<ignore>')]] * max_macro_action_seq_len
         if not ob['ended']:
             for i, action_idx in enumerate(rotation_action_indices):
                 assert action_idx in self.valid_rotation_action_indices
@@ -256,10 +257,12 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
                 # check agent elevation
                 if ob['viewIndex'] // 12 == 0:
                     # facing down, so need to look up twice.
-                    elevation_adjusts_1[i] = elevation_adjusts_2[i] = up_tup
+                    elevation_adjusts_1[i] = up_tup
+                    elevation_adjusts_2[i] = up_tup
                 elif ob['viewIndex'] // 12 == 2:
                     # facing up, so need to look down twice.
-                    elevation_adjusts_1[i] = elevation_adjusts_2[i] = down_tup
+                    elevation_adjusts_1[i] = down_tup
+                    elevation_adjusts_2[i] = down_tup
                 else:  
                     # neutral, so need to look up once, and then look down twice
                     elevation_adjusts_1[i] = up_tup
@@ -284,7 +287,7 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
         '''
         assert len(obs) == len(viewix_next_vertex_map)
         # arr shape (batch_size, 36)
-        q_values_target = np.ones(len(obs), len(viewix_next_vertex_map[0])) * 1e9
+        q_values_target = np.ones((len(obs), len(viewix_next_vertex_map[0]))) * 1e9
         # Loop through batch
         for i, ob in enumerate(obs):
             # NOTE ended ob won't be added to hist buffer for training
@@ -300,13 +303,10 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
                 q_values_target[i, :] = costs
         return q_values_target
 
-    def _map_env_action_to_agent_action(self, action, ob):
+    def _map_env_action_to_agent_action(self, action):
         '''
         Translate rotation env action seq into agent action index seq.
         '''
-        if ob['ended']:
-            return self.agent_nav_actions.index('<ignore>')
-
         ix, heading_chg, elevation_chg = action
 
         assert ix == 0, 'Accept only rotation or ignore actions'
@@ -319,7 +319,9 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
         if elevation_chg > 0:
             return self.agent_nav_actions.index('up')
         if elevation_chg < 0:
-            return self.agent_nav_actions.index('down')        
+            return self.agent_nav_actions.index('down')
+        else:
+            return self.agent_nav_actions.index('<ignore>')      
 
     def translate_env_actions(self, obs, viewix_env_actions_map, max_macro_action_seq_len, sphere_size):
         '''
@@ -333,13 +335,14 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
             self.agent_nav_actions.index('<ignore>')
 
         for i, ob in enumerate(obs): # 1-100
-            for j, env_action_tup_seq in viewix_env_actions_map[i]: # 1-36
-                assert len(env_action_tup_seq) <= 8
-                # map seq, length varies
-                agent_action_seq = list(map(self._map_env_action_to_agent_action, env_action_tup_seq, ob))
-                assert len(agent_action_seq) <= 8
-                # assign action index, seq is already padded to 8 during initialization
-                viewix_actions_map[j, i, :len(agent_action_seq)] = agent_action_seq
+            if not ob['ended']:
+                for j, env_action_tup_seq in enumerate(viewix_env_actions_map[i]): # 1-36
+                    assert len(env_action_tup_seq) <= 8
+                    # map seq, length varies
+                    agent_action_seq = list(map(self._map_env_action_to_agent_action, env_action_tup_seq))
+                    assert len(agent_action_seq) <= 8
+                    # assign action index, seq is already padded to 8 during initialization
+                    viewix_actions_map[j, i, :len(agent_action_seq)] = agent_action_seq
 
         return viewix_actions_map
 

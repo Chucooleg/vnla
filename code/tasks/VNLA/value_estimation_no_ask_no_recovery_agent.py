@@ -288,34 +288,25 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
     def rollout(self, global_iter_idx=None):
 
-        # Debug
-        print("inside rollout")
-
         # time keeping
         time_report = defaultdict(int)
         rollout_start_time = time.time()
         start_time = time.time() 
 
-        # Debug
-        print("after time keeping")
-
         # Draw expert-rollin boolean
         if self.is_eval:
             expert_rollin_bool = 0
+            print ("eval-mode. agent roll-in")
         else:
             expert_rollin_bool = np.random.binomial(1, self.beta)
-
-        # Debug
-        print("drawing expert boolean")
+            if expert_rollin_bool:
+                print ("train-mode. expert roll-in")
+            else:
+                print ("train-mode. agent roll-in")
 
         # Reset environment
         obs = self.env.reset(self.is_eval)
-        # Debug
-        print("after calling resset")
         batch_size = len(obs)     
-
-        # Debug
-        print("set env and got obs")
 
         # Start roll-out book keeping
         # one trajectory per ob
@@ -338,9 +329,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             'beta': None if self.is_eval else self.beta,
             'expert_rollin_bool': 0 if self.is_eval else expert_rollin_bool,
         } for ob in obs]
-
-        # Debug
-        print("right before making sequence")        
 
         # Index initial command
         # Stays the same in No Ask Agents
@@ -379,7 +367,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         # Initialize ^T time budget, different for each data point
         # Precomputed per trajectory when Env() was initialized
-        episode_len = max(ob['traj_len'] for ob in obs)  
+        episode_len = max(ob['traj_len'] for ob in obs)
+        print ("maximum episode length in batch = {}".format(episode_len))
 
         # Debug initial data
         if self.debug_mode:
@@ -448,6 +437,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         timestep = 1
         while timestep <= episode_len:
 
+            print ("time step = {}".format(timestep))
+
             # Modify obs in-place to indicate if any ob has 'ended'
             start_time = time.time()
             self._populate_agent_state_to_obs(obs, ended)
@@ -468,7 +459,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # Outsource panorama exploration to a dedicated light env
             # with its own batch of simulators
             start_time = time.time()
-            frontier_explore_env = VNLAExplorationBatch(obs)
+            frontier_explore_env = VNLAExplorationBatch(obs, self.nav_actions, self.env_actions)
             # Debug explore env
             if self.debug_mode:
                 # frontier_explore_env
@@ -488,9 +479,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # arr shape(36, batch_size), each mask boolean.
             start_time = time.time()
             viewix_env_actions_map, viewix_next_vertex_map, view_index_mask = \
-                frontier_explore_env.explore_sphere(explore_instructions, self.num_viewIndex)
-            assert all(viewix_env_actions_map[i] <= self.max_macro_action_seq_len for i \
-                in range(len(viewix_env_actions_map)))
+                frontier_explore_env.explore_sphere(explore_instructions, self.num_viewIndex, timestep)
+            # Debug
+            for i in range(len(viewix_env_actions_map)):
+                for j in range(len(viewix_env_actions_map[i])):
+                    assert len(viewix_env_actions_map[i][j]) <= self.max_macro_action_seq_len # TODO
             time_report['explore_sphere'] += time.time() - start_time
 
             # Oracle compute q-value targets
@@ -625,12 +618,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                     # Get image feature at current viewIndex(rotation)
                     # tensor shape (batch_size, feature_size)
-                    f_proposed = torch.stack([self.env.features[ob['scan'] + '_' + ob['viewpoint']][view_ix, :] for ob in obs])
+                    f_proposed = torch.stack([torch.tensor(self.env.env.features[ob['scan'] + '_' + ob['viewpoint']][view_ix, :], dtype=torch.float, device=self.device) for ob in obs])
                     
                     # Get mask at that viewIndex(rotation)
                     # i.e. not all rotation angles can connect to other vertices on graph
                     # tensor shape (batch_size,)
-                    view_ix_mask = torch.tensor(view_index_mask[view_ix], dtype=torch.uint8, device=self.device)
+                    view_ix_mask = torch.tensor(view_index_mask[view_ix], dtype=torch.bool, device=self.device)
 
                     # If implementing Ask Agent
                     # ques_asked = ...
@@ -673,8 +666,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                 # Compute end markers
                 # (end after upcoming rotation and step-forward)
-                # array shape (batch_size,)
-                end_estimated = (torch.min(q_values_rollout_estimate, dim=1)[0] <= self.success_radius).data.numpy()
+                # array shape (batch_size,)  # TODO check here.
+                end_estimated = (torch.min(q_values_rollout_estimate, dim=1)[0] <= self.success_radius).cpu().data.numpy()
                 assert end_estimated.shape[0] == batch_size
 
                 time_report['select_agent_macro_action'] += time.time() - agent_select_start_time
@@ -796,8 +789,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # Append tensors for the whole batch for this time step
             start_time = time.time()
             local_buffer.append({
-                'a_t': a_t,
-                'f_t': f_t,
+                'a_t': a_t,     #a out
+                'f_t': f_t,     #f out
                 # ask, instruction update in Ask Agents
             })
             time_report['save_to_local_buffer'] += time.time() - start_time  

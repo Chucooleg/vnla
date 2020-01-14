@@ -62,7 +62,7 @@ class ValueEstimationAgent(NavigationAgent):
         self.min_history_to_learn = hparams.min_history_to_learn
 
         # Set expert rollin prob, decayed in training
-        self.beta = 1.0
+        self.beta = float(hparams.start_beta) if hasattr(hparams, "start_beta") else 1.0
         self.start_beta_decay = hparams.start_beta_decay
         self.decay_beta_every = hparams.decay_beta_every
         self.beta_decay_rate = hparams.beta_decay_rate
@@ -118,11 +118,12 @@ class ValueEstimationAgent(NavigationAgent):
             (batch_size, corresponding variable size)
         '''
         assert var_name in ('action', 'feature', 'q_values_target')
+        tensor_dtype = torch.long if var_name == 'action' else torch.float
 
         # Create container to hold training data
         variable_dim = self.history_buffer[tr_key_pairs[0]][var_name][tr_timesteps[0]].shape[0]
         # shape (batch_size, variable size)
-        variable = torch.empty(len(tr_key_pairs), variable_dim, dtype=torch.float, device=self.device)
+        variable = torch.empty(len(tr_key_pairs), variable_dim, dtype=tensor_dtype, device=self.device)
 
         # Fill container with data extracted from history buffer
         for i, (key_pair, timestep) in enumerate(zip(tr_key_pairs, tr_timesteps)):

@@ -122,8 +122,12 @@ class HistoryBuffer(object):
         assert len(self._indexed_data) >= batch_size, \
             '''Buffer doesn't have enough history to sample a batch'''
 
-        # Sample by (global_idx, instr_id) key pair
-        sampled_iter_instr_key_pair = np.random.choice(list(self._instr_iter_keys), size=batch_size)
+        # Sample (global_idx, instr_id) key pairs
+        # shape (number of unique key pairs, 2)
+        instr_key_pairs_list = list(self._instr_iter_keys)
+        # shape (batch_size, 2)
+        sampling_indices = np.random.randint(len(instr_key_pairs_list), size=batch_size)
+        sampled_iter_instr_key_pair = [instr_key_pairs_list[idx] for idx in sampling_indices]
 
         # Further sample the time step
         traj_lens = [len(self._indexed_data[key]['action']) for key in sampled_iter_instr_key_pair]

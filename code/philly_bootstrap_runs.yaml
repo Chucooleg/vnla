@@ -14,8 +14,8 @@ environment:
   setup:
     - pip install scikit-learn --user
     - python -m pip install networkx==2.3 --user
-    - CUDA_VISIBILE_DEVICES=0
-    # - CUDA_VISIBILE_DEVICES=0,1,2,3
+    - CUDA_VISIBLE_DEVICES=0
+    # - CUDA_VISIBLE_DEVICES=0,1,2,3
     # - pip install ipdb --user
 
 storage:
@@ -28,7 +28,7 @@ storage:
     storage_account_name: msrairesidentssa4
     container_name: experiment-results
     mount_dir: /mnt/experiment-results-philly
-    # local_dir: /home/hoyeung/Documents/vnla/code/tasks/VNLA/output
+    # local_dir: /home/hoyeung/blob_experiments/
 
 code:
   # local directory of the code. this will be uploaded to the server.

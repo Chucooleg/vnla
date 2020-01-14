@@ -28,7 +28,7 @@ args['exp_name'] = exp_name
 args['job_name'] = job_name
 
 # extras here!
-# args[''] = ?
+args['start_beta'] = 1.0
+args['min_history_to_learn'] = 50
 
-print ("calling train.py now...")
 vs_code_debug(args)

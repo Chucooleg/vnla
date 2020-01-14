@@ -71,7 +71,8 @@ class Evaluation(object):
         self.scores['instr_id'].append(instr_id)
         self.scores['trajectory_steps'].append(len(path) - 1)
 
-        nav_errors = oracle_errors = 1e9
+        nav_errors = 1e9
+        oracle_errors = 1e9
         # there can be more than one ground truth path for the same datapt
         # e.g. two bathrooms with mirrors
         for shortest_path in gt['paths']:

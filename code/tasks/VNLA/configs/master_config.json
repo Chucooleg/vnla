@@ -32,6 +32,7 @@
     "n_subgoal_steps"       : 4,
 
     # Aggrevate parameters
+    "start_beta"            : 1.0,
     "start_beta_decay"      : 5000,
     "beta_decay_rate"       : [0.0 - 1.0],
     "decay_beta_every"      : 1000,

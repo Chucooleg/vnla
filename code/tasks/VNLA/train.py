@@ -547,7 +547,7 @@ if __name__ == "__main__":
     set_path()
 
     device = torch.device('cuda')
-    print ("CUDA device count : {}".format(torch.cuda.device_count()))
+    print ("CUDA device count = {}".format(torch.cuda.device_count()))
 
     if hasattr(hparams, 'multi_seed_eval') and hparams.multi_seed_eval:
         hparams.eval_only = 1

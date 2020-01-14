@@ -284,7 +284,6 @@ class AskAttnDecoderRegressorLSTM(AskAttnDecoderLSTM):
         '''run LSTM cell, run attention layer on coverage vector'''
 
         # Sum up macro action embeddings
-        # TODO think about nav action embedding size again
         nav_embeds = self.nav_embedding(nav_action)
         nav_embeds_sum = torch.sum(nav_embeds, dim=1)
 
@@ -316,8 +315,9 @@ class AskAttnDecoderRegressorLSTM(AskAttnDecoderLSTM):
         # Predict q-value -- cost
         # tensor shape (batch_size, 1) -> (batch_size,)
         q_value = self.q_predictor(h_tilde).squeeze(-1)
-        # tensor shape (batch_size,)
-        q_value.data.masked_fill_(view_index_mask, 1e9)
+        if view_index_mask is not None:
+            # tensor shape (batch_size,)
+            q_value.data.masked_fill_(view_index_mask, 1e9)
 
         return new_h, alpha, q_value, new_cov
 

@@ -82,6 +82,8 @@ def make_parser():
     parser.add_argument('-backprop_ask_features', type=int)
 
     # Aggrevate parameters
+    parser.add_argument('-start_beta', type=float,
+        help='aggrevate: expert rollin probability beta to start with, between 0.0 and 1.0')    
     parser.add_argument('-start_beta_decay', type=int,
         help='aggrevate: minimum number of iterations before beta decay')
     parser.add_argument('-beta_decay_rate', type=float,
