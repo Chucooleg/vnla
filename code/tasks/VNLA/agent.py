@@ -34,11 +34,14 @@ class BaseAgent(object):
             item.update(v)
             output.append(item)
 
-        with open(self.results_path, 'w') as f:
-            try:
+        try:
+            with open(self.results_path, 'w') as f:
                 json.dump(output, f)
-            except:
-                import ipdb; ipdb.set_trace()
+        except:
+            with open("/home/hoyeung/Documents/vnla/code/tasks/VNLA/output.pickle", "wb") as handle:
+                import pickle
+                pickle.dump(output, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            print ("failed to write output object to json. check this pickled file {}".format('/home/hoyeung/Documents/vnla/code/tasks/VNLA/output.pickle'))
 
     def rollout(self, iter_idx=None):
         raise NotImplementedError('Subclasses are expected to implement rollout')

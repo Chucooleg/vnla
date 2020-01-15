@@ -6,6 +6,11 @@ from collections import defaultdict
 import numpy as np
 
 
+def nested_defaultdict():
+    '''Use this rather than lambda to allow defaultdict objects to be pickled'''
+    return defaultdict(list)
+
+
 class HistoryBuffer(object):
     '''
     History Buffer for training value estimation agents
@@ -15,7 +20,7 @@ class HistoryBuffer(object):
         
         # Stored data format
         # (instr_id, global_iter_idx) : {viewpointIndex:[], scan:'', instruction: [], feature: [], action: [], q_values_target: [], ... etc}
-        self._indexed_data = defaultdict(lambda: defaultdict(list))
+        self._indexed_data = defaultdict(nested_defaultdict)
 
         # Use this to remove earliest experience when buffer is full
         self._earliest_iter_idx = 0
@@ -40,7 +45,7 @@ class HistoryBuffer(object):
     def save_buffer(self, file_path):
         '''save buffer to a filepath'''
         # can try to find a better way than pickling...
-
+        print ('''saving history buffer to pickle''')
         with open(file_path, 'wb') as handle:
             pickle.dump({
                 '_indexed_data': self._indexed_data,
@@ -53,7 +58,7 @@ class HistoryBuffer(object):
 
     def load_buffer(self, file_path):
         '''load buffer from a filepath'''
-
+        print ('''loading history buffer from pickle''')
         with open(file_path, 'rb') as handle:
             loaded = pickle.load(handle)
 

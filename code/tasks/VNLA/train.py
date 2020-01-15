@@ -220,7 +220,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             for loss_type in loss_types:
                 if hasattr(agent, loss_type):
                     # e.g. agent.nav_losses, agent.ask_losses, agent.value_losses, agent.recover_losses
-                    train_loss_type_avg = np.average(np.array(agent.loss_type))
+                    train_loss_type_avg = np.average(np.array(getattr(agent ,loss_type)))
                     # convert "ask_losses" to "ask loss"
                     typ_str = " ".join(loss_type[:-2].split("_"))  
                     loss_str += ', %s: %.4f' % (typ_str, train_loss_type_avg)
@@ -248,7 +248,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             for loss_type in loss_types:
                 if hasattr(agent, loss_type):
                     # e.g. agent.nav_losses, agent.ask_losses, agent.value_losses, agent.recover_losses
-                    val_loss_type_avg = np.average(np.array(agent.loss_type))
+                    val_loss_type_avg = np.average(np.array(getattr(agent ,loss_type)))
                     # convert "ask_losses" to "ask loss" for logging
                     typ_str = " ".join(loss_type[:-2].split("_"))  
                     loss_str += ', %s: %.4f' % (typ_str, val_loss_type_avg)
@@ -261,7 +261,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             # Write the validation results out to json file
             # Compute in both train and test modes
             agent.results_path = hparams.load_path.replace('.ckpt', '_') + env_name + '_for_eval.json'
-            agent.write_results(traj) # doesn't write is_success results yet
+            agent.write_results() # doesn't write is_success results yet
             score_summary, _, is_success = evaluator.score(agent.results_path)
 
             # Add success 1/0 to each traj
@@ -270,7 +270,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                 agent.results_path = hparams.load_path.replace('.ckpt', '_') + env_name + '_for_eval_complete.json'
                 agent.add_is_success(is_success)
                 print('Save result with is_success metric to', agent.results_path)
-                agent.write_results(traj)
+                agent.write_results()
             
             # compute success metrics and print in terminal 
             for metric, val in score_summary.items():

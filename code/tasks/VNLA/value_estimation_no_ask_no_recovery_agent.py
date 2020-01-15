@@ -495,12 +495,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # Oracle compute q-value targets
             # arr shape (batch_size, self.num_viewIndex=36)
             start_time = time.time()
-            q_values_target_list = self.value_teacher.compute_frontier_costs(obs, viewix_next_vertex_map)
+            q_values_target_arr = self.value_teacher.compute_frontier_costs(obs, viewix_next_vertex_map)
             # tensor shape (batch_size, self.num_viewIndex=36)
-            q_values_target = torch.tensor(q_values_target_list, dtype=torch.float, device=self.device)
+            q_values_target = torch.tensor(q_values_target_arr, dtype=torch.float, device=self.device)
             # check if within success radius of 2
             # arr shape (batch_size, )
-            end_target = np.array([np.any(q_vec <= self.success_radius) for q_vec in q_values_target_list])
+            end_target = np.array([np.any(q_vec <= self.success_radius) for q_vec in q_values_target_arr])
             time_report['make_q_targets'] += time.time() - start_time
             
             # Oracle map env level actions back to action indices as LSTM input
@@ -518,7 +518,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # viewix_env_actions_map
                 # viewix_next_vertex_map
                 # view_index_mask
-                # q_values_target_list
+                # q_values_target_arr
                 # end_target
                 # viewix_actions_map
                 # take note of time_report
@@ -560,8 +560,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     import pdb; pdb.set_trace()
 
             else:
-                # Sanity check local buffer size
-                assert local_buffer and len(local_buffer) <= self.num_recent_frames
 
                 # ------- LSTM unfold through recent history (j frames)
                 # Purpose: only to get the last decoder_h and cov
@@ -738,6 +736,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             start_time = time.time()
             experience_batch_t = []
 
+            # Convert np array to list for traj logging
+            q_values_target_list = q_values_target_arr.tolist()
+
             # Update experience batch & traj post rotation
             for i, ob in enumerate(obs):
                 if not ended[i]:
@@ -794,6 +795,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
             # Append tensors for the whole batch for this time step
             start_time = time.time()
+            # Sanity check local buffer size
+            if len(local_buffer) >= self.num_recent_frames:
+                local_buffer.pop(0)
             local_buffer.append({
                 'a_t': a_t,     #a out
                 'f_t': f_t,     #f out

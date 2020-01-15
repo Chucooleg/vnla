@@ -31,7 +31,7 @@ args['job_name'] = job_name
 # extras here!
 args['start_beta'] = 1.0
 args['min_history_to_learn'] = 50
-args['save_every'] = 10
-args['log_every'] = 10
+args['save_every'] = 2
+args['log_every'] = 2
 
 vs_code_debug(args)
