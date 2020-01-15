@@ -43,7 +43,7 @@ class ValueEstimationAgent(NavigationAgent):
         # https://en.wikipedia.org/wiki/Huber_loss
         # if delta == 1 in Huber Loss
         # https://pytorch.org/docs/stable/nn.html?highlight=smooth%20l1#torch.nn.SmoothL1Loss
-        self.value_criterion = nn.SmoothL1Loss(reduction='mean')
+        self.value_criterion = nn.SmoothL1Loss(reduction='sum')
 
         # Oracle
         self.value_teacher = make_oracle('frontier_shortest', self.nav_actions, self.env_actions)
@@ -172,7 +172,7 @@ class ValueEstimationAgent(NavigationAgent):
         # Create container to hold training data
         action_dim = self.history_buffer[tr_key_pairs[0]]['viewix_actions_map'][tr_timesteps[0]][view_ix].shape[0]
         # shape (batch_size, max macro-action sequence length) 
-        actions = torch.empty(len(tr_key_pairs), action_dim, dtype=torch.float, device=self.device)
+        actions = torch.empty(len(tr_key_pairs), action_dim, dtype=torch.long, device=self.device)
 
         # Fill container with data extracted from history buffer
         for i, (key_pair, timestep) in enumerate(zip(tr_key_pairs, tr_timesteps)):
@@ -194,7 +194,7 @@ class ValueEstimationAgent(NavigationAgent):
         '''
         # Create container to hold training data
         # shape (batch_size,) 
-        mask = torch.zeros(len(tr_key_pairs), dtype=torch.uint8, device=self.device)
+        mask = torch.zeros(len(tr_key_pairs), dtype=torch.bool, device=self.device)
 
         # Fill container with data extracted from history buffer
         for i, (key_pair, timestep) in enumerate(zip(tr_key_pairs, tr_timesteps)):
@@ -247,7 +247,7 @@ class ValueEstimationAgent(NavigationAgent):
             viewpoint_idx = self.history_buffer[key_pair]['viewpointIndex'][timestep]
             scan_id = self.history_buffer[key_pair]['scan']
             long_id = scan_id + '_' + viewpoint_idx
-            features[i,:] = self.env.features[long_id][view_ix, :]
+            features[i,:] = self.env.env.features[long_id][view_ix, :]
 
         return torch.from_numpy(features).to(self.device)
 

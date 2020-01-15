@@ -427,6 +427,7 @@ class VNLAExplorationBatch():
 
         # assert all 36 views are covered for each ob in the batch (no Nones at all)
         assert all([v_str is not None for task_sphere in viewix_next_vertex_map for v_str in task_sphere])
+        assert all([action_list is not None for task_sphere in viewix_env_actions_map for action_list in task_sphere])
 
         # arr shape(36, batch_size), each boolean
         view_index_mask = (np.array(viewix_next_vertex_map) == '').transpose()
@@ -451,8 +452,11 @@ class VNLABatch():
         self.batch_size = hparams.batch_size
         self.max_episode_length = hparams.max_episode_length
         self.n_subgoal_steps = hparams.n_subgoal_steps
+
         self.traj_len_ref = 'paths' if hparams.navigation_objective == 'value_estimation' \
             else 'trajectories'
+        # self.sort_data_by_len = True if hparams.navigation_objective == 'value_estimation' \
+        #     else False
 
         # time budget ^T
         self.traj_len_estimates = defaultdict(list)
@@ -518,23 +522,74 @@ class VNLABatch():
 
         self.reset_epoch()
 
+        # # sort data by length to learn from easier trajectories first
+        # if self.sort_data_by_len:
+        #     min_traj_len = lambda d: min([len(p) for p in d['paths']])
+        #     self.data = sorted(self.data, lambda x: min_traj_len(x))
+
         if self.split is not None:
             print('VNLABatch loaded with %d instructions, using split: %s' % (
                 len(self.data), self.split))
 
     def _next_minibatch(self):
+
         '''put the next batch of data into self.batch from self.data'''
         if self.ix == 0:
             self.random.shuffle(self.data)
         batch = self.data[self.ix:self.ix+self.batch_size]
         # if the batch runs out of data pt
         if len(batch) < self.batch_size:
-            self.random.shuffle(self.data)
+            # full dataset - batch
+            remaining_data = self.data[:self.ix]
+            # new ix
             self.ix = self.batch_size - len(batch)
-            batch += self.data[:self.ix]
+            # sample from remaining data
+            self.random.shuffle(remaining_data)
+            batch_add = remaining_data[:self.ix]
+            # shuffle existing batch as well
+            self.random.shuffle(batch)
+            # update full dataset
+            self.data = remaining_data + batch
+            # batch for training
+            batch = batch + batch_add
+            assert len(batch) == self.batch_size
         else:
             self.ix += self.batch_size
-        self.batch = batch
+        self.batch = batch     
+
+        # '''put the next batch of data into self.batch from self.data'''
+        # if self.ix == 0:
+        #     self.random.shuffle(self.data)
+        # batch = self.data[self.ix:self.ix+self.batch_size]
+        # # if the batch runs out of data pt
+        # if len(batch) < self.batch_size:
+        #     self.random.shuffle(self.data)
+        #     self.ix = self.batch_size - len(batch)
+        #     batch += self.data[:self.ix]
+        # else:
+        #     self.ix += self.batch_size
+        # self.batch = batch       
+
+        # '''put the next batch of data into self.batch from self.data'''
+        # if self.ix == 0 and not self.sort_data_by_len:
+        #     self.random.shuffle(self.data)
+        # batch = self.data[self.ix:self.ix+self.batch_size]
+        # # if current epoch runs out of data pt for the next batch
+        # if len(batch) < self.batch_size:
+        #     if self.sort_data_by_len:
+        #         # if data should be sorted, do not shuffle
+        #         self.ix = self.batch_size - len(batch)
+        #         batch += self.data[:self.ix] 
+        #     else:
+        #         # otherwise, shuffle but data can repeat in the same batch
+        #         self.random.shuffle(self.data)
+        #         self.ix = self.batch_size - len(batch)
+        #         batch += self.data[:self.ix]
+        #     # no ix tracking solution
+        #     # batch += self.random.choice(self.data[:self.ix], self.batch_size - len(batch))      
+        # else:
+        #     self.ix += self.batch_size
+        # self.batch = batch
 
     def reset_epoch(self):
         '''start a new epoch. 

@@ -196,7 +196,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
 
             # Report time for rollout and backprop
             for time_key in sorted(time_report.keys()):
-                print ("Train {} time = {}".format(time_key, time_report[key]))    
+                print ("Train {} time = {}".format(time_key, time_report[time_key]))    
 
             # Report per `interval` agent rollout losses
             # Main training loss -- summed all loss types
@@ -213,7 +213,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                 assert hasattr(agent, "value_losses") and len(agent.value_losses) == interval
             if hparams.uncertainty_handling != 'no_ask':
                 assert hasattr(agent, "ask_losses") and len(agent.ask_losses) == interval
-            if hparams.uncertainty_handling != 'no_recovery':
+            if hparams.recovery_strategy != 'no_recovery':
                 assert hasattr(agent, "recover_losses") and len(agent.recover_losses) == interval            
 
             # Log individual training loss types (navigation, ask, value, recovery)

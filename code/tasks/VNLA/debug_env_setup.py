@@ -27,8 +27,11 @@ args['config_file'] = config_file
 args['exp_name'] = exp_name
 args['job_name'] = job_name
 
+
 # extras here!
 args['start_beta'] = 1.0
 args['min_history_to_learn'] = 50
+args['save_every'] = 10
+args['log_every'] = 10
 
 vs_code_debug(args)

@@ -206,8 +206,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         start_time = time.time()
         # Initialize tensor to store q-value estimates
         # shape (36, batch_size)
-        # TODO require grad is True here?
-        q_values_tr_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device, requires_grad=True)
+        q_values_tr_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device)
+        # count non-masked predictions to normalize loss value
+        tot_pred = 0
 
         # Loop through 36 view indices in the pano sphere
         # run 100 in parallel instead of 36*100 in parallel
@@ -225,6 +226,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # i.e. not all rotation angles can connect to other vertices on graph
             # tensor shape (batch_size,)
             view_ix_mask = self.get_tr_view_indexed_mask_by_t(tr_key_pairs, tr_timesteps, view_ix)
+            # torch scalar
+            tot_pred += batch_size - torch.sum(view_ix_mask)
 
             # Use existing decoder_h, cov computed from recent history
             # TODO what do we do with the gradient? detach()?
@@ -232,7 +235,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # If implementing Ask Agent
             # ques_asked = ...
 
-            # Debug data before it goes into model
+            # Debug
+            if not all(view_ix_mask.data.tolist()):
+                print ("found 0s in mask!")
+
+            # Debug data before it goes into model # TODO view_ix_mask is all 1
             if self.debug_mode:
                 # a_proposed, f_proposed, view_ix_mask
                 import pdb; pdb.set_trace()
@@ -256,12 +263,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # # Get loss mask from history buffer -- same HB source as view_ix_mask
         # # tensor shape (batch_size, self.num_viewIndex)
         # loss_mask = self.get_tr_view_indexed_full_mask_by_t(tr_key_pairs, tr_timesteps, self.num_viewIndex)
-        # Debug data 
-        if self.debug_mode:
-            # q_values_target
-            import pdb; pdb.set_trace()
         # Compute scalar loss
-        self.value_loss = self.value_criterion(q_values_tr_estimate, q_values_target)
+        self.value_loss = self.value_criterion(q_values_tr_estimate, q_values_target) / tot_pred
         time_report['compute_value_loss'] += time.time() - start_time
 
         # Save per batch loss to self.loss for backprop
@@ -306,7 +309,10 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         # Reset environment
         obs = self.env.reset(self.is_eval)
-        batch_size = len(obs)     
+        batch_size = len(obs)
+
+        # History buffer requires that the same instr_id doesn't appear more than once in a batch
+        assert len(set([ob['instr_id'] for ob in obs])) == len([ob['instr_id'] for ob in obs])
 
         # Start roll-out book keeping
         # one trajectory per ob
