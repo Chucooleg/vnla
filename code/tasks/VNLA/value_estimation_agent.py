@@ -262,12 +262,9 @@ class ValueEstimationAgent(NavigationAgent):
     def test(self, env, feedback, use_dropout=False, allow_cheat=False):
         ''' Evaluate once on each instruction in the current environment '''
 
-        self.allow_cheat = allow_cheat
-        self.is_eval = not allow_cheat
-
-        # expert roll-in prob
-        if self.allow_cheat:
-            assert self.beta > 0.0  # always > 0.0 in exponential decay
+        self.is_eval = True
+        # messy legacy setup in train.py()
+        self.compute_rollout_loss = use_dropout
 
         self._setup(env, feedback)
         if use_dropout:
@@ -281,8 +278,10 @@ class ValueEstimationAgent(NavigationAgent):
         Train for a given number `n_iters` of iterations. 
         `n_iters` is set to hparams.log_every (default 1000) or remaining.
         '''
+        interval_training_iter_start_time = time.time()
 
         self.is_eval = False
+        self.compute_rollout_loss = False
 
         # Set up self.env, feedback(teacher/argmax/learned)
         # Initialize losses, add scans to teachers/advisors
@@ -305,9 +304,7 @@ class ValueEstimationAgent(NavigationAgent):
 
             # Global training iteration index
             global_iter_idx = idx + itr
-            
-            # Debug
-            print ("global_iter_idx = {}".format(global_iter_idx))
+            print ("Training, global_iter_idx = {}".format(global_iter_idx))
 
             # Rollout the agent
             # History is added to buffer within this rollout() call
@@ -324,7 +321,7 @@ class ValueEstimationAgent(NavigationAgent):
                 last_traj.extend(traj)
 
             # If history buffer has enough history to update policy
-            if len(self.history_buffer) > self.min_history_to_learn:
+            if len(self.history_buffer) >= self.min_history_to_learn:
                 
                 # Sample a minibatch from the history buffer
                 start_time = time.time()
@@ -362,4 +359,5 @@ class ValueEstimationAgent(NavigationAgent):
                 print('New expert roll-in probability %f' % self.beta)
             self.SW.add_scalar('beta per iter', self.beta, global_iter_idx)
 
+        time_report['per_training_interval'] += time.time() - interval_training_iter_start_time
         return last_traj, time_report        

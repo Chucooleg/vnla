@@ -7,6 +7,7 @@ import math
 import base64
 import json
 import random
+import time
 import networkx as nx
 from collections import defaultdict
 import scipy.stats
@@ -90,12 +91,17 @@ class EnvBatch():
 
 class VNLAExplorationBatch():
 
-    def __init__(self, obs, agent_nav_actions, env_nav_actions):
-        # assign a new simulator for each ob in the batch
-        self.batch_size = len(obs)
+    def __init__(self, agent_nav_actions, env_nav_actions, obs=None, batch_size=None):
+        
+        assert (obs is not None) or (batch_size is not None), \
+            ('must provide either obs or batch_size to initialize exploration environment.')
+        self.batch_size = len(obs) if obs is not None else batch_size
+
         self.image_w = 640
         self.image_h = 480
         self.vfov = 60
+
+        # Assign a new simulator for each ob in the batch
         self.sims = []
         for i in range(self.batch_size):
             sim = MatterSim.Simulator()
@@ -107,22 +113,23 @@ class VNLAExplorationBatch():
                 os.path.join(os.getenv('PT_DATA_DIR'), 'connectivity'))
             sim.init()
             self.sims.append(sim)
-        self._reset(obs)
+        
+        # Put simulators into houses
+        if obs is not None:
+            self.reset_explorers(obs)
+
+        self.agent_nav_actions = agent_nav_actions
+        self.env_nav_actions = env_nav_actions
+
+    def reset_explorers(self, obs):
+        '''set x_curr and psi_curr for each simulator in beginning of episodes'''
+        for i, ob in enumerate(obs):
+            self.sims[i].newEpisode(ob['scan'], ob['viewpoint'], ob['heading'], ob['elevation'])
 
         # list length=batch_size, each element is a list of 35 rotation tuples.
         # e.g. [[(0,1,0), (0,-1,1), ...], [(0,1,0), (0,-1,1), ...], ....]
         # [[None]] * self.batch_size
         self._rotation_history = [[] for _ in range(self.batch_size)]
-
-        self.agent_nav_actions = agent_nav_actions
-        self.env_nav_actions = env_nav_actions
-
-    def _reset(self, obs):
-        '''set x_curr and psi_curr for each simulator in beginning of episodes'''
-        for i, ob in enumerate(obs):
-            self.sims[i].newEpisode(ob['scan'], ob['viewpoint'], ob['heading'], ob['elevation'])
-
-#-------------------
 
     def _getStates(self):
         '''
@@ -260,11 +267,18 @@ class VNLAExplorationBatch():
             viewix_batch: list of integers, length = batch_size.
             closest_vertex_batch: list of viewpointId strings, length = batch_size.
         '''
-        next_vertex_batch = [''] * self.batch_size 
+        # time keeping
+        time_report = defaultdict(int)
+
+        next_vertex_batch = [''] * self.batch_size
+
+        start_time = time.time()
         # list len=batch_size, each int
         # list len=batch_size, each a dictionary
         viewix_batch, closest_navigable_locations_batch = self._getStates()
+        time_report['explore_get_states'] += time.time() - start_time
 
+        start_time = time.time()
         # check if whether we are looking at the closest navigable vertex directly.
         for i, closest_vertex in enumerate(closest_navigable_locations_batch):
             # only a few rotation angles are connected to another vertex
@@ -276,9 +290,10 @@ class VNLAExplorationBatch():
                     (viewix_batch[i] // 12 == 0 and self._check_below(closest_vertex)):
                     next_vertex_batch[i] = closest_vertex.viewpointId
                 # otherwise, remain ''
+        time_report['explore_find_direct_vertex'] += time.time() - start_time
 
         # list length batch_size, list length batch_size
-        return viewix_batch, next_vertex_batch
+        return viewix_batch, next_vertex_batch, time_report
 
     def _take_explore_step(self, rotation_instruction=None):
         '''
@@ -292,22 +307,44 @@ class VNLAExplorationBatch():
             Each element in the returned list is a tuple with signature:
             (view_ix integer, list of env action tuples, vertex string)
         '''
+        # time keeping
+        time_report = defaultdict(int)
+
         if rotation_instruction is None:
             # env skip rotation
 
             # list length batch_size (int), list length batch_size (str)
-            viewix_batch, next_vertex_batch = self._retrieve_curr_viewix_and_next_vertex()
+            start_time = time.time()
+            viewix_batch, next_vertex_batch, retrieval_time_report = self._retrieve_curr_viewix_and_next_vertex()
+            time_report['explore_retrieval'] += time.time() - start_time
+
+            # time keeping
+            for key in retrieval_time_report.keys():
+                time_report[key] += retrieval_time_report[key]
+
             efficient_rotations_batch = [[self.env_nav_actions[self.agent_nav_actions.index('<ignore>')]] for _ in range(self.batch_size)]
         else:
             # rotate and update rotation history
-            self._rotates(rotation_instruction)  
-            viewix_batch, next_vertex_batch = self._retrieve_curr_viewix_and_next_vertex()
+            start_time = time.time()
+            self._rotates(rotation_instruction) 
+            time_report['explore_rotate'] += time.time() - start_time
+
+            start_time = time.time()
+            viewix_batch, next_vertex_batch, retrieval_time_report = self._retrieve_curr_viewix_and_next_vertex()
+            time_report['explore_retrieval'] += time.time() - start_time
+
+            # time keeping
+            for key in retrieval_time_report.keys():
+                time_report[key] += retrieval_time_report[key]
+
+            start_time = time.time()
             efficient_rotations_batch = self._map_to_efficient_rotation(self._rotation_history)
+            time_report['explore_map_to_efficient_rotation'] += time.time() - start_time
             
         assert len(efficient_rotations_batch) == len(viewix_batch) == len(next_vertex_batch) == self.batch_size
 
         # length = batch_size, [(view_ix, efficient actions, vertex), ...]
-        return list(zip(viewix_batch, efficient_rotations_batch, next_vertex_batch))
+        return list(zip(viewix_batch, efficient_rotations_batch, next_vertex_batch)), time_report
 
 #---------------------------------
     def _update_action_and_vertex_maps(self, viewix_env_actions_map, viewix_next_vertex_map, 
@@ -333,14 +370,28 @@ class VNLAExplorationBatch():
         viewix_env_actions_map: list (batch_size, 36, varies). Each [(0,1,0), (0,-1,1), ...]
         viewix_next_vertex_map: list (batch_size, 36, varies). Each string.
         '''
+        # time keeping
+        time_report = defaultdict(int)
+
         for _ in range(11):
+
             # list, length = batch_size, [(view_ix, efficient actions, vertex), ...]
-            viewix_actions_vertex_tuples = self._take_explore_step(heading_adjusts)
+            start_time = time.time()
+            viewix_actions_vertex_tuples, step_time_report = self._take_explore_step(heading_adjusts)
+            time_report['explore_take_step'] += time.time() - start_time
+
+            # time keeping
+            for key in step_time_report.keys():
+                time_report[key] += step_time_report[key]
+
+            start_time = time.time()
             viewix_env_actions_map, viewix_next_vertex_map = self._update_action_and_vertex_maps( 
                 viewix_env_actions_map, 
                 viewix_next_vertex_map, 
                 viewix_actions_vertex_tuples)
-        return viewix_env_actions_map, viewix_next_vertex_map
+            time_report['explore_update_maps'] += time.time() - start_time
+
+        return viewix_env_actions_map, viewix_next_vertex_map, time_report
 
     def _explore_elevation(self, viewix_env_actions_map, viewix_next_vertex_map, elevation_adjusts, timestep=None):
         '''
@@ -349,10 +400,24 @@ class VNLAExplorationBatch():
         viewix_env_actions_map: list (batch_size, 36, varies). Each [(0,1,0), (0,-1,1), ...]
         viewix_next_vertex_map: list (batch_size, 36, varies). Each string.
         '''
+        # time keeping
+        time_report = defaultdict(int)
+
         # list, length = batch_size, [(view_ix, efficient actions, vertex), ...]
-        viewix_actions_vertex_tuples = self._take_explore_step(elevation_adjusts) 
-        return self._update_action_and_vertex_maps(viewix_env_actions_map, viewix_next_vertex_map, \
-            viewix_actions_vertex_tuples)
+        start_time = time.time()
+        viewix_actions_vertex_tuples, step_time_report = self._take_explore_step(elevation_adjusts)
+        time_report['explore_take_step'] += time.time() - start_time
+
+        # time keeping
+        for key in step_time_report.keys():
+            time_report[key] += step_time_report[key]
+
+        start_time = time.time()
+        viewix_env_actions_map, viewix_next_vertex_map = self._update_action_and_vertex_maps(viewix_env_actions_map, \
+            viewix_next_vertex_map, viewix_actions_vertex_tuples)
+        time_report['explore_update_maps'] += time.time() - start_time
+
+        return viewix_env_actions_map, viewix_next_vertex_map, time_report
 
     def _explore_current(self, viewix_env_actions_map, viewix_next_vertex_map, timestep=None):
         '''
@@ -361,11 +426,25 @@ class VNLAExplorationBatch():
         viewix_env_actions_map: list (batch_size, 36, varies). Each [(0,1,0), (0,-1,1), ...]
         viewix_next_vertex_map: list (batch_size, 36, varies). Each string.
         '''
+        # time keeping
+        time_report = defaultdict(int)
+
         # list, length = batch_size, 
         # i.e. [(view_ix int, efficient actions, vertex str), ...]
-        viewix_actions_vertex_tuples = self._take_explore_step(None)
-        return self._update_action_and_vertex_maps(viewix_env_actions_map, viewix_next_vertex_map, \
-            viewix_actions_vertex_tuples)
+        start_time = time.time()
+        viewix_actions_vertex_tuples, step_time_report = self._take_explore_step(None)
+        time_report['explore_take_step'] += time.time() - start_time
+
+        # time keeping
+        for key in step_time_report.keys():
+            time_report[key] += step_time_report[key]
+
+        start_time = time.time()
+        viewix_env_actions_map, viewix_next_vertex_map = self._update_action_and_vertex_maps(viewix_env_actions_map, \
+            viewix_next_vertex_map, viewix_actions_vertex_tuples)
+        time_report['explore_update_maps'] += time.time() - start_time
+
+        return viewix_env_actions_map, viewix_next_vertex_map, time_report
 
     def explore_sphere(self, explore_instructions, sphere_size, timestep=None):
         '''
@@ -385,55 +464,104 @@ class VNLAExplorationBatch():
 
             view_index_mask: array shape (36, batch_size). True if a particular view angle doesn't have any directly reachable next vertex on the floor plan graph.
         ''' 
+        # time keeping
+        time_report = defaultdict(int)
+
+        # Initialize maps
+        start_time = time.time()
         viewix_env_actions_map = [[None for s in range(sphere_size)] for _ in range(self.batch_size)]
         viewix_next_vertex_map = [[None for s in range(sphere_size)] for _ in range(self.batch_size)]
+        time_report['explore_initialize_maps'] += time.time() - start_time
 
         # elaborate condensed exploration instructions into 35 steps that cover the sphere
         heading_adjusts, elevation_adjusts_1, elevation_adjusts_2 = explore_instructions
 
         # capture current - 1 time
-        viewix_env_actions_map, viewix_next_vertex_map = \
+        start_time = time.time()
+        viewix_env_actions_map, viewix_next_vertex_map, explore_step_time_report = \
             self._explore_current(viewix_env_actions_map, viewix_next_vertex_map, timestep)
+        time_report['explore_catpure_current'] += time.time() - start_time
+
+        # time keeping
+        for key in explore_step_time_report.keys():
+            time_report[key] += explore_step_time_report[key]
 
         # turn around horizontally - 11 times
-        viewix_env_actions_map, viewix_next_vertex_map = \
+        start_time = time.time()
+        viewix_env_actions_map, viewix_next_vertex_map, explore_step_time_report = \
             self._explore_horizontally(viewix_env_actions_map, viewix_next_vertex_map, heading_adjusts, timestep)
+        time_report['explore_horizontal_1'] += time.time() - start_time
+
+        # time keeping
+        for key in explore_step_time_report.keys():
+            time_report[key] += explore_step_time_report[key]
 
         # adjust elevation - 1 time
-        viewix_env_actions_map, viewix_next_vertex_map = \
+        start_time = time.time()
+        viewix_env_actions_map, viewix_next_vertex_map, explore_step_time_report = \
             self._explore_elevation(viewix_env_actions_map, viewix_next_vertex_map, elevation_adjusts_1)
+        time_report['explore_vertical_1'] += time.time() - start_time
+
+        # time keeping
+        for key in explore_step_time_report.keys():
+            time_report[key] += explore_step_time_report[key]
 
         # turn around horizontally - 11 times
-        viewix_env_actions_map, viewix_next_vertex_map = \
+        start_time = time.time()
+        viewix_env_actions_map, viewix_next_vertex_map, explore_step_time_report = \
             self._explore_horizontally(viewix_env_actions_map, viewix_next_vertex_map, heading_adjusts)
+        time_report['explore_horizontal_2'] += time.time() - start_time
+
+        # time keeping
+        for key in explore_step_time_report.keys():
+            time_report[key] += explore_step_time_report[key]
 
         # adjust elevation - 1 time
-        viewix_env_actions_map, viewix_next_vertex_map = \
+        start_time = time.time()
+        viewix_env_actions_map, viewix_next_vertex_map, explore_step_time_report = \
             self._explore_elevation(viewix_env_actions_map, viewix_next_vertex_map, elevation_adjusts_2)
+        time_report['explore_vertical_2'] += time.time() - start_time
+
+        # time keeping
+        for key in explore_step_time_report.keys():
+            time_report[key] += explore_step_time_report[key]
 
         # turn around horizontally - 11 times
-        viewix_env_actions_map, viewix_next_vertex_map = \
+        start_time = time.time()
+        viewix_env_actions_map, viewix_next_vertex_map, explore_step_time_report = \
             self._explore_horizontally(viewix_env_actions_map, viewix_next_vertex_map, heading_adjusts)
+        time_report['explore_vertical_3'] += time.time() - start_time
+
+        # time keeping
+        for key in explore_step_time_report.keys():
+            time_report[key] += explore_step_time_report[key]
 
         # Replace None in env actions and next vertex if an ob has ended
         # loop through batch
+        start_time = time.time()
         for i in range(len(heading_adjusts)):  # 0 - 100
             if heading_adjusts[i] == elevation_adjusts_1[i] == elevation_adjusts_2[i] == self.env_nav_actions[self.agent_nav_actions.index('<ignore>')]:
+                # Debug only
                 for j in range(sphere_size):  # 0 - 35
                     if viewix_env_actions_map[i][j] is None:
                         assert viewix_next_vertex_map[i][j] is None
-                        viewix_env_actions_map[i][j] = [(0,0,0)]
-                        viewix_next_vertex_map[i][j] = ''
+                viewix_env_actions_map[i] = [[(0,0,0)] for _ in range(sphere_size)]
+                viewix_next_vertex_map[i] = [''] * sphere_size
+        time_report['explore_fill_in_Nones'] += time.time() - start_time
 
         # assert all 36 views are covered for each ob in the batch (no Nones at all)
+        start_time = time.time()
         assert all([v_str is not None for task_sphere in viewix_next_vertex_map for v_str in task_sphere])
         assert all([action_list is not None for task_sphere in viewix_env_actions_map for action_list in task_sphere])
+        time_report['explore_validate_no_nones'] += time.time() - start_time
 
-        # arr shape(36, batch_size), each boolean
+        # arr shape(36, batch_size), each boolean.
+        start_time = time.time()
         view_index_mask = (np.array(viewix_next_vertex_map) == '').transpose()
         assert view_index_mask.shape == (sphere_size, self.batch_size)
+        time_report['explore_make_index_mask'] += time.time() - start_time
 
-        return viewix_env_actions_map, viewix_next_vertex_map, view_index_mask
+        return viewix_env_actions_map, viewix_next_vertex_map, view_index_mask, time_report
 
 
 class VNLABatch():
@@ -467,6 +595,7 @@ class VNLABatch():
         self.no_room = hasattr(hparams, 'no_room') and hparams.no_room
 
         if self.split is not None:
+            print ("Using env split = {}".format(self.split))
             self.load_data(load_datasets([split], hparams.data_path,
                 prefix='noroom' if self.no_room else 'asknav'))
 
@@ -637,7 +766,7 @@ class VNLABatch():
         frac_max_queries = max_queries - int_max_queries
         return int_max_queries + (self.random.random() < frac_max_queries)
 
-    def reset(self, is_eval):
+    def reset(self, use_expected_traj_len):
         ''' Load a new minibatch / episodes. '''
 
         self._next_minibatch()
@@ -654,12 +783,14 @@ class VNLABatch():
 
         for i, item in enumerate(self.batch):
             # Assign time budget
-            if is_eval:
-                # If eval use expected trajectory length between start_region and end_region
+            if use_expected_traj_len:
+                # For validation NOT under training conditions
+                # Use expected trajectory length between start_region and end_region
                 key = self.make_traj_estimate_key(item)
                 traj_len_estimate = self.traj_len_estimates[key]
             else:
-                # If train use average oracle trajectory length
+                # For training, and validation under training conditions
+                # Use average oracle trajectory length 
                 traj_len_estimate = sum(len(t)
                     for t in item[self.traj_len_ref]) / len(item[self.traj_len_ref])
             # ^T

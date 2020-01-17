@@ -277,7 +277,7 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
         '''
         cost_stepping = self.distances[ob['scan']][ob['viewpoint']][next_viewpoint_index_str]
         cost_togo, _ = self._find_nearest_point(ob['scan'], ob['viewpoint'], ob['goal_viewpoints'])
-        assert cost_stepping > 0 and cost_togo > 0
+        assert cost_stepping > 0 and cost_togo >= 0
         return cost_togo + cost_stepping
 
     def compute_frontier_costs(self, obs, viewix_next_vertex_map):

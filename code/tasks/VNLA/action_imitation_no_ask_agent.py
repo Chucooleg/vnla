@@ -98,7 +98,7 @@ class ActionImitationNoAskAgent(ActionImitationAgent):
         start_time = time.time() 
 
         # Reset environment
-        obs = self.env.reset(self.is_eval)
+        obs = self.env.reset(use_expected_traj_len=self.is_eval)
         batch_size = len(obs)
 
         # Index initial command

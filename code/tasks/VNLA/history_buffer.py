@@ -4,6 +4,7 @@
 import pickle
 from collections import defaultdict
 import numpy as np
+import os
 
 
 def nested_defaultdict():
@@ -33,7 +34,7 @@ class HistoryBuffer(object):
 
         # max storage limit -- number of examples
         self._curr_buffer_size = 0
-        self._max_buffer_size = hparams.max_buffer_size
+        self.max_buffer_size = hparams.max_buffer_size
 
     def __len__(self):
         return len(self._indexed_data)
@@ -42,50 +43,86 @@ class HistoryBuffer(object):
         '''instr_iter_key should be (instr_id, global_iter_idx)'''
         return self._indexed_data[instr_iter_key]
 
-    def save_buffer(self, file_path):
-        '''save buffer to a filepath'''
-        # can try to find a better way than pickling...
-        print ('''saving history buffer to pickle''')
-        with open(file_path, 'wb') as handle:
-            pickle.dump({
-                '_indexed_data': self._indexed_data,
-                '_earliest_iter_idx': self._earliest_iter_idx,
-                '_iter_instr_map': self._iter_instr_map,
-                '_instr_iter_keys': self._instr_iter_keys,
-                '_curr_buffer_size': self._curr_buffer_size,
-                '_max_buffer_size': self._max_buffer_size,
-            }, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    def save_buffer(self, dir_path):
+        '''save history buffer files to a directory)'''
+        
+        print ('saving history buffer to {}'.format(dir_path))
+        
+        info_dict = {}
+        info_dict['_earliest_iter_idx'] = self._earliest_iter_idx
+        info_dict['_iter_instr_map'] = self._iter_instr_map
+        info_dict['_instr_iter_keys'] = self._instr_iter_keys
+        info_dict['_curr_buffer_size'] = self._curr_buffer_size
+        info_dict['max_buffer_size'] = self.max_buffer_size
+        
+        data_dict = {}
+        for key in self._instr_iter_keys:
+            data_dict[key] = {
+                'viewpointIndex' : self._indexed_data[key]['viewpointIndex'],
+                'scan' : self._indexed_data[key]['scan'],
+                'instruction' : self._indexed_data[key]['instruction'],
+                'feature' : self._indexed_data[key]['feature'],
+                'action' : self._indexed_data[key]['action'],
+                'view_index_mask_indices' : self._indexed_data[key]['view_index_mask_indices'],
+                'viewix_actions_map' : self._indexed_data[key]['viewix_actions_map'],
+                'q_values_target' : self._indexed_data[key]['q_values_target']
+                }
 
-    def load_buffer(self, file_path):
-        '''load buffer from a filepath'''
-        print ('''loading history buffer from pickle''')
-        with open(file_path, 'rb') as handle:
-            loaded = pickle.load(handle)
+        info_file_path = os.path.join(dir_path, 'history_buffer_info.pickle')
+        data_file_path = os.path.join(dir_path, 'history_buffer_data.pickle') 
+        with open(info_file_path, 'wb') as handle:
+            pickle.dump(info_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(data_file_path, 'wb') as handle:
+            pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)	
+        
+    def load_buffer(self, dir_path):
+        '''load history buffer files to object'''
+        
+        print ('loading history buffer from {}'.format(dir_path))
+        
+        info_file_path = os.path.join(dir_path, 'history_buffer_info.pickle')
+        data_file_path = os.path.join(dir_path, 'history_buffer_data.pickle') 
+        with open(info_file_path, 'rb') as handle:
+            info_dict = pickle.load(handle)
+        with open(data_file_path, 'rb') as handle:
+            data_dict = pickle.load(handle)
+            
+        self._earliest_iter_idx = info_dict['_earliest_iter_idx']
+        self._iter_instr_map = info_dict['_iter_instr_map']
+        self._instr_iter_keys = info_dict['_instr_iter_keys']
+        self._curr_buffer_size = info_dict['_curr_buffer_size']
+        self.max_buffer_size = info_dict['max_buffer_size']
+            
+        for key in self._instr_iter_keys:
+            self._indexed_data[key]['viewpointIndex'] = data_dict[key]['viewpointIndex']
+            self._indexed_data[key]['scan'] = data_dict[key]['scan']
+            self._indexed_data[key]['instruction'] = data_dict[key]['instruction']
+            self._indexed_data[key]['feature'] = data_dict[key]['feature']
+            self._indexed_data[key]['action'] = data_dict[key]['action']
+            self._indexed_data[key]['view_index_mask_indices'] = data_dict[key]['view_index_mask_indices']
+            self._indexed_data[key]['viewix_actions_map'] = data_dict[key]['viewix_actions_map']
+            self._indexed_data[key]['q_values_target'] = data_dict[key]['q_values_target']
 
-        self._indexed_data = loaded['_indexed_data']
-        self._earliest_iter_idx = loaded['_earliest_iter_idx']
-        self._iter_instr_map = loaded['_iter_instr_map']
-        self._instr_iter_keys = loaded['_instr_iter_keys']
-        self._curr_buffer_size = loaded['_curr_buffer_size']
-        self._max_buffer_size = loaded['_max_buffer_size']
+    def remove_earliest_experience(self, batch_size):
+        '''Remove earliest iterations of experiences from buffer, until we have room to add the next batch.'''
+        while self._curr_buffer_size + batch_size >= self.max_buffer_size:
+            
+            for instr_id in self._iter_instr_map[self._earliest_iter_idx]:
+                del self._indexed_data[(instr_id, self._earliest_iter_idx)]
 
-    def remove_earliest_experience(self):
-        '''Remove earliest iteration of experiences from buffer'''
-        for instr_id in self._iter_instr_map[self._earliest_iter_idx]:
-            del self._indexed_data[(instr_id, self._earliest_iter_idx)]
-        self._earliest_iter_idx += 1
-        self._curr_buffer_size -= len(self._iter_instr_map[self._earliest_iter_idx])
+            self._curr_buffer_size -= len(self._iter_instr_map[self._earliest_iter_idx])
+            self._earliest_iter_idx += 1
 
     def is_full(self):
         '''Check if the buffer has stored up to its storage limit'''
-        return self._curr_buffer_size >= self._max_buffer_size
+        return self._curr_buffer_size >= self.max_buffer_size
 
     def add_experience(self, experience_batch):
         '''
         Add a single batch of experience to the buffer.
         Called per time step during rollout().
         '''
-        assert not self.is_full()
+        assert not self.is_full(), 'check if history buffer limit is lower than batch_size * traj_len'
 
         # Write experience to buffer
         for experience in experience_batch:

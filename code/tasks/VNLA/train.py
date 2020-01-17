@@ -57,8 +57,10 @@ def set_path():
         os.path.join(hparams.exp_dir, '%s_last.ckpt' % hparams.model_prefix)    
 
     # Set history buffer load path
-    hparams.history_buffer_path = hparams.history_buffer_path if hasattr(hparams, 'history_buffer_path') and \
-        hparams.history_buffer_path is not None else os.path.join(hparams.exp_dir, '%s_history_buffer_last.pickle' % hparams.model_prefix)
+    hparams.history_buffer_path = hparams.history_buffer_path if (hasattr(hparams, 'history_buffer_path') \
+        and hparams.history_buffer_path is not None) else os.path.join(hparams.exp_dir, 'history_buffer')
+    if not os.path.exists(hparams.history_buffer_path):
+        os.makedirs(hparams.history_buffer_path)
 
     # Set data load path
     DATA_DIR = os.getenv('PT_DATA_DIR')
@@ -158,6 +160,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     - calls agent.test() which writes results to json files
     - print losses and metrics to stdout using `loss_str`
     '''
+    start = time.time()
 
     SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
 
@@ -169,8 +172,6 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     test_feedback  = { 'nav' : 'argmax', 'ask' : 'argmax', 'recover' : 'argmax' }  
 
     loss_types = ["nav_losses", 'ask_losses', 'value_losses', 'recover_losses']
-
-    start = time.time()
 
     # Set criteria for replacing the best model
     sr = 'success_rate'
@@ -195,8 +196,8 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             traj, time_report = agent.train(train_env, optimizer, interval, train_feedback, idx)
 
             # Report time for rollout and backprop
-            for time_key in sorted(time_report.keys()):
-                print ("Train {} time = {}".format(time_key, time_report[time_key]))    
+            for time_key, time_val in sorted(list(time_report.items()), key=lambda x: x[1], reverse=True):
+                print ("Train {} time = {}".format(time_key, time_val))    
 
             # Report per `interval` agent rollout losses
             # Main training loss -- summed all loss types
@@ -339,9 +340,11 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                 print("Saved %s model to %s" % (env_name, save_path))
 
             # Save latest history buffer
-            if (iter == end_iter or iter % hparams.save_every == 0) and \
-                hparams.navigation_objective == 'value_estimation':
-                agent.history_buffer.save_buffer(hparams.history_buffer_path)
+            # save_buffer_start_time = time.time()
+            # if (iter == end_iter or iter % hparams.save_every == 0) and \
+            #     hparams.navigation_objective == 'value_estimation':
+            #     agent.history_buffer.save_buffer(hparams.history_buffer_path)
+            # print("Saving history buffer time = {}".format(time.time() - save_buffer_start_time))
 
             # log time again after saving
             print('%s (%d %d%%) %s' % (timeSince(start, float(iter)/end_iter),
