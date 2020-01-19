@@ -3,8 +3,8 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "20190116_debug_aggrevate"
-job_name = "train_batch_1000"
+exp_name = "20200119_debug_aggrevate"
+job_name = "train_batch_100_data_101"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh
@@ -31,13 +31,16 @@ args['job_name'] = job_name
 # args['start_beta'] = 1.0
 # args['n_iters'] = 1000
 # data must be larger than batch_size
-args['batch_size'] = 1000
-args['start_beta_decay'] = 500
-args['decay_beta_every'] = 100
+args['batch_size'] = 100
+args['start_beta_decay'] = 5
+args['decay_beta_every'] = 5
 args['min_history_to_learn'] = 1000
+args['max_buffer_size'] = 10000
 
 args['save_every'] = 5
 args['log_every'] = 5
 args['plot_to_philly'] = 0
+
+args['data_suffix'] = 'small_three_houses_single_goal_short'
 
 vs_code_debug(args)
