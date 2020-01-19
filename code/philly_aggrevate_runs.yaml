@@ -1,0 +1,65 @@
+description: VNLA aggrevate experiments
+# experiment named vnla_time_comparisons
+
+target:
+  # which virtual cluster you belong to (msrlabs, etc.). Everyone has access to "msrlabs".
+  vc: msrlabs
+  # physical cluster to use (cam, gcr, rr1, rr2) or Azure clusters (eu1, eu2, etc.)
+  cluster: eu2
+
+environment:
+  image: philly/jobs/test/pytorch:pytorch1.2.0-py36-mattersim
+  registry: phillyregistry.azurecr.io
+
+  setup:
+    - pip install scikit-learn --user
+    - python -m pip install networkx==2.3 --user
+    - CUDA_VISIBLE_DEVICES=0
+    # - CUDA_VISIBLE_DEVICES=0,1,2,3
+    # - pip install ipdb --user
+
+storage:
+  input1:
+    storage_account_name: msrairesidentssa4
+    container_name: matterport3d
+    mount_dir: /mnt/matterport3d
+    # local_dir: /home/hoyeung/blob_matterport3d/
+  output:
+    storage_account_name: msrairesidentssa4
+    container_name: experiment-results
+    mount_dir: /mnt/experiment-results-philly
+    # local_dir: /home/hoyeung/blob_experiments/
+
+code:
+  # local directory of the code. this will be uploaded to the server.
+  # $CONFIG_DIR is expanded to the directory of this config file
+  local_dir: $CONFIG_DIR/
+
+# data:
+#   data upload is not required for this example
+
+# list of jobs to run, we run 2 jobs in this example
+jobs:
+  # name must be unique across the jobs
+- name: overfit_batch_500
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_500_data_1078" "configs/experiment.json" -batch_size 500 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short
+- name: overfit_batch_250
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_250_data_1078" "configs/experiment.json" -batch_size 250 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short
+- name: overfit_batch_100_data_101
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_100_data_101" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short
+
+
+#   - name: overfit_batch_1000
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20190118_philly_debug_aggrevate" "train_batch_1000" "configs/experiment.json" -batch_size 1000 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 1
+# - name: overfit_batch_100
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20190118_philly_debug_aggrevate" "train_batch_1000" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 1
