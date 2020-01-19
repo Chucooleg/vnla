@@ -11,6 +11,7 @@ import time
 import networkx as nx
 from collections import defaultdict
 import scipy.stats
+from functools import reduce
 
 from oracle import make_oracle
 from utils import load_datasets, load_nav_graphs
@@ -192,8 +193,10 @@ class VNLAExplorationBatch():
             Example : [(0,1,0)] * 11 + [(0, 0, -1)] + [(0,1,0)] * 11 + [(0, 0, -1)] + [(0,1,0)] * 4
                     returns [(0, 1, 0), (0, 1, 0), (0, 0, -1), (0, 0, -1)]
             '''
-            seq = np.array(l)
-            head, ele = np.sum(seq, axis=0)[1:]
+            # seq = np.array(l)
+            # head, ele = np.sum(seq, axis=0)[1:]
+            sum_tups = lambda a,b: (a[0]+b[0], a[1]+b[1], a[2]+b[2])
+            _, head, ele = reduce(sum_tups, l)
             
             # original sign 1 or -1 after summing
             h = 0 if head == 0 else int(head/abs(head))
@@ -530,7 +533,7 @@ class VNLAExplorationBatch():
         start_time = time.time()
         viewix_env_actions_map, viewix_next_vertex_map, explore_step_time_report = \
             self._explore_horizontally(viewix_env_actions_map, viewix_next_vertex_map, heading_adjusts)
-        time_report['explore_vertical_3'] += time.time() - start_time
+        time_report['explore_horizontal_3'] += time.time() - start_time
 
         # time keeping
         for key in explore_step_time_report.keys():
@@ -596,8 +599,11 @@ class VNLABatch():
 
         if self.split is not None:
             print ("Using env split = {}".format(self.split))
-            self.load_data(load_datasets([split], hparams.data_path,
-                prefix='noroom' if self.no_room else 'asknav'))
+            self.load_data(load_datasets(
+                splits=[split], 
+                path=hparams.data_path, 
+                prefix='noroom' if self.no_room else 'asknav', 
+                suffix=hparams.data_suffix if hasattr(hparams, 'data_suffix') else ''))
 
         # Estimate time budget ^T
         # key k -- (item['start_region_name'], item['end_region_name'])

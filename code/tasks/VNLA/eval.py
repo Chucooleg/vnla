@@ -22,14 +22,16 @@ class Evaluation(object):
 
         self.no_room = hasattr(hparams, 'no_room') and hparams.no_room
         if splits:
-            self.load_data(load_datasets(splits, data_path,
-                prefix='noroom' if self.no_room else 'asknav'))
+            self.load_data(load_datasets(
+                splits=splits, 
+                path=data_path,
+                prefix='noroom' if self.no_room else 'asknav',
+                suffix=hparams.data_suffix if hasattr(hparams, 'data_suffix') else ''))
 
         self.region_label_to_name = load_region_label_to_name()
         self.panos_to_region = {}
         for scan in self.scans:
             self.panos_to_region[scan] = load_panos_to_region(scan, self.region_label_to_name)
-
 
     def load_data(self, data):
         self.gt = {}

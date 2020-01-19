@@ -44,12 +44,14 @@ def set_path():
         hparams.model_prefix = '{}_bootstrap'.format(hparams.model_prefix)
 
     # Set tensorboard log dir
-    if hparams.plot_to_philly :
+    if hparams.plot_to_philly:
         hparams.tensorboard_dir = os.environ.get('PHILLY_LOG_DIRECTORY', '.')
     else:
         hparams.tensorboard_dir = os.path.join(hparams.exp_dir, "tensorboard")
         if not os.path.exists(hparams.tensorboard_dir):
-            os.makedirs(hparams.tensorboard_dir)  
+            os.makedirs(hparams.tensorboard_dir)
+            os.makedirs(os.path.join(hparams.tensorboard_dir, 'main'))
+            os.makedirs(os.path.join(hparams.tensorboard_dir, 'agent'))
 
     # Set model load path
     hparams.load_path = hparams.load_path if hasattr(hparams, 'load_path') and \
@@ -162,7 +164,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     '''
     start = time.time()
 
-    SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
+    SW = SummaryWriter(os.path.join(hparams.tensorboard_dir, 'main'), flush_secs=30)
 
     if not eval_mode:
         print('Training with with lr = %f' % optimizer.param_groups[0]['lr'])
@@ -202,20 +204,20 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             # Report per `interval` agent rollout losses
             # Main training loss -- summed all loss types
             train_losses = np.array(agent.losses)
-            assert len(train_losses) == interval  # one scalar per batch (i.e. iter)
+            assert len(train_losses) <= interval  # one scalar per batch (i.e. iter)
             train_loss_avg = np.average(train_losses)  # across 1000 batches (i.e. iters)  
             loss_str = '\n * train loss: %.4f' % train_loss_avg
             SW.add_scalar('train - all losses', train_loss_avg, iter)
 
             # sanity check all necessary loss types exist
             if hparams.navigation_objective == 'action_imitation':
-                assert hasattr(agent, "nav_losses") and len(agent.nav_losses) == interval
+                assert hasattr(agent, "nav_losses") and len(agent.nav_losses) <= interval
             if hparams.navigation_objective == 'value_estimation':
-                assert hasattr(agent, "value_losses") and len(agent.value_losses) == interval
+                assert hasattr(agent, "value_losses") and len(agent.value_losses) <= interval
             if hparams.uncertainty_handling != 'no_ask':
-                assert hasattr(agent, "ask_losses") and len(agent.ask_losses) == interval
+                assert hasattr(agent, "ask_losses") and len(agent.ask_losses) <= interval
             if hparams.recovery_strategy != 'no_recovery':
-                assert hasattr(agent, "recover_losses") and len(agent.recover_losses) == interval            
+                assert hasattr(agent, "recover_losses") and len(agent.recover_losses) <= interval        
 
             # Log individual training loss types (navigation, ask, value, recovery)
             for loss_type in loss_types:
@@ -375,7 +377,8 @@ def setup(seed=None):
                     max_length=hparams.max_input_length,
                     split_by_spaces=hparams.split_by_spaces,
                     prefix='noroom' if hasattr(hparams, 'no_room') and
-                           hparams.no_room else 'asknav'),
+                           hparams.no_room else 'asknav',
+                    suffix=hparams.data_suffix if hasattr(hparams, 'data_suffix') else ''),
             train_vocab_path)     
 
 def train_val(device, seed=None):
@@ -458,13 +461,17 @@ def train_val(device, seed=None):
     else:
         raise ValueError('model definition is not clear. check navigation_objective argument in hparams config')
 
+    # Debug
+    print ("before optimizer")
+
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
         weight_decay=hparams.weight_decay)
-
+    
     # used to determine if we should checkpt the model
     best_metrics = { 'val_seen'  : -1,
                      'val_unseen': -1,
                      'combined'  : -1 }
+
 
     # Load model parameters from a checkpoint (if any)
     if ckpt is not None:
