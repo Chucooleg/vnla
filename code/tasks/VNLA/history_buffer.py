@@ -39,6 +39,9 @@ class HistoryBuffer(object):
     def __len__(self):
         return len(self._indexed_data)
 
+    def curr_buffer_size(self):
+        return self._curr_buffer_size
+
     def __getitem__(self, instr_iter_key):
         '''instr_iter_key should be (instr_id, global_iter_idx)'''
         return self._indexed_data[instr_iter_key]
@@ -106,12 +109,16 @@ class HistoryBuffer(object):
     def remove_earliest_experience(self, batch_size):
         '''Remove earliest iterations of experiences from buffer, until we have room to add the next batch.'''
         while self._curr_buffer_size + batch_size >= self.max_buffer_size:
-            
+            print("removing earliest experience")
+            remove_size = 0
             for instr_id in self._iter_instr_map[self._earliest_iter_idx]:
+                remove_size += len(self._indexed_data[(instr_id, self._earliest_iter_idx)]['action'])
                 del self._indexed_data[(instr_id, self._earliest_iter_idx)]
-
-            self._curr_buffer_size -= len(self._iter_instr_map[self._earliest_iter_idx])
+                self._instr_iter_keys.remove((instr_id, self._earliest_iter_idx))
+            self._curr_buffer_size -= remove_size
             self._earliest_iter_idx += 1
+            print("current buffer size = {}".format(self._curr_buffer_size))
+            print("current earliest iter idx = {}".format(self._earliest_iter_idx))
 
     def is_full(self):
         '''Check if the buffer has stored up to its storage limit'''
@@ -122,7 +129,15 @@ class HistoryBuffer(object):
         Add a single batch of experience to the buffer.
         Called per time step during rollout().
         '''
-        assert not self.is_full(), 'check if history buffer limit is lower than batch_size * traj_len'
+
+        batch_size = len(experience_batch)
+        if self._curr_buffer_size + batch_size >= self.max_buffer_size:
+            self.remove_earliest_experience(batch_size)
+
+        try:
+            assert not self.is_full()
+        except:
+            print("debug")
 
         # Write experience to buffer
         for experience in experience_batch:
@@ -156,7 +171,7 @@ class HistoryBuffer(object):
             # Build set of keys for sampling
             self._instr_iter_keys.add(key)
 
-        self._curr_buffer_size += len(experience_batch)
+        self._curr_buffer_size += batch_size
 
     def sample_minibatch(self, batch_size):
         '''Sample a training batch for training'''
@@ -173,6 +188,10 @@ class HistoryBuffer(object):
 
         # Further sample the time step
         traj_lens = [len(self._indexed_data[key]['action']) for key in sampled_iter_instr_key_pair]
+
+        # Debug
+        if 1 in traj_lens or 0 in traj_lens:
+            print ("debug")
 
         # Sample timesteps
         # do not sample from t=0 at <start> state

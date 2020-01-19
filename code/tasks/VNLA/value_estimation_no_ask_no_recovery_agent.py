@@ -430,16 +430,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 'q_values_target': None,
             } for (i, ob) in enumerate(obs)]        
 
-            # Remove earliest iteration of experience from buffer if buffer is full
-            if self.history_buffer.is_full():
-                print("Going to hit history buffer upper size limit {}, currently at size {} removing earliest experiences..."\
-                    .format(self.history_buffer.max_buffer_size, len(self.history_buffer)))
-                self.history_buffer.remove_earliest_experience(batch_size)
-                print("After removal, history buffer size = {}".format(len(self.history_buffer)))
-
-            # Write <start> t=0 experience to history buffer
+            # Add experience, remove earliest experiences if buffer is full
             self.history_buffer.add_experience(experience_batch_t)
-            print("After adding current batch experiences, history buffer size = {}".format(len(self.history_buffer)))
+            print("Added new experience, history buffer size = {}".format(self.history_buffer.curr_buffer_size()))
 
         # Initialize local buffer at <start>, append per timestep
         # Keep past j frames i.e.{} for continuous LSTM decoding
@@ -459,6 +452,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # 1 time step = 1 rotation + 1 step forward
         timestep = 1
         while timestep <= episode_len:
+
+            print ("time step = {}".format(timestep))
 
             # Modify obs in-place to indicate if any ob has 'ended'
             start_time = time.time()
@@ -738,6 +733,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # Write experience to history buffer
                 start_time = time.time()
                 self.history_buffer.add_experience(experience_batch_t)
+                print("Added new experience, history buffer size = {}".format(self.history_buffer.curr_buffer_size()))
                 time_report['save_to_history_buffer'] += time.time() - start_time  
 
             # Append tensors for the whole batch for this time step
