@@ -24,6 +24,7 @@
     "uncertain_threshold"   : 1.0,
     "unmoved_threshold"     : 9,
     "success_radius"        : 2.0,
+    "agent_end_criteria"    : 3.0,
 
 
     "query_ratio"           : 0.4,

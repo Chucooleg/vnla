@@ -57,7 +57,7 @@ class ActionImitationAgent(NavigationAgent):
         # - add scans to teachers/advisors
         raise NotImplementedError('Subclasses are expected to implement _setup')      
 
-    def test(self, env, feedback, use_dropout=False, allow_cheat=False):
+    def test(self, env, feedback, explore_env=None, use_dropout=False, allow_cheat=False):
         ''' Evaluate once on each instruction in the current environment '''
 
         self.allow_cheat = allow_cheat
@@ -69,7 +69,7 @@ class ActionImitationAgent(NavigationAgent):
             self.model.eval()
         return self.base_test()
 
-    def train(self, env, optimizer, n_iters, feedback, idx):
+    def train(self, env, optimizer, n_iters, feedback, idx, explore_env=None):
         '''Train for a given number `n_iters` of iterations. 
         `n_iters` is hparams.log_every (default 1000) or remaining.
         '''

@@ -1,4 +1,4 @@
-description: VNLA aggrevate experiments
+description: VNLA aggrevate experiments decompose decocode frontier time
 # experiment named vnla_time_comparisons
 
 target:
@@ -41,18 +41,169 @@ code:
 # list of jobs to run, we run 2 jobs in this example
 jobs:
   # name must be unique across the jobs
-- name: overfit_batch_500
+- name: overfit_batch_100_data_100_decompose_decoding_time
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_500_data_1078" "configs/experiment.json" -batch_size 500 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short
-- name: overfit_batch_250
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200123_philly_debug_aggrevate" "overfit_batch_100_data_100_decompose_decoding_time" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 500
+- name: overfit_batch_100_data_1078_decompose_decoding_time
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_250_data_1078" "configs/experiment.json" -batch_size 250 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short
-- name: overfit_batch_100_data_101
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200123_philly_debug_aggrevate" "overfit_batch_100_data_1078_decompose_decoding_time" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 500
+- name: overfit_batch_100_data_94798_decompose_decoding_time
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_100_data_101" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200123_philly_debug_aggrevate" "overfit_batch_100_data_94798_decompose_decoding_time" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 500
+
+
+
+
+
+# - name: overfit_batch_100_data_100_new_map_rotation
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200123_philly_debug_aggrevate" "overfit_batch_100_data_100_new_map_rotation" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 500
+# - name: overfit_batch_100_data_1078_new_map_rotation
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200123_philly_debug_aggrevate" "overfit_batch_100_data_1078_new_map_rotation" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 500
+# - name: overfit_batch_100_data_94798_new_map_rotation
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200123_philly_debug_aggrevate" "overfit_batch_100_data_94798_new_map_rotation" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 500
+
+
+
+
+# - name: overfit_batch_100_data_100_move_env_out
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200122_philly_debug_aggrevate" "overfit_batch_100_data_100_move_env_out" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 500
+# - name: overfit_batch_100_data_1078_move_env_out
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200122_philly_debug_aggrevate" "overfit_batch_100_data_1078_move_env_out" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 500
+# - name: overfit_batch_100_data_94798_move_env_out
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200122_philly_debug_aggrevate" "overfit_batch_100_data_94798_move_env_out" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 500
+
+
+
+
+# - name: overfit_batch_100_data_100_timestep1_track
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200121_philly_debug_aggrevate" "overfit_batch_100_data_100_timestep1_track" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 500
+# - name: overfit_batch_100_data_1078_timestep1_track
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200121_philly_debug_aggrevate" "overfit_batch_100_data_1078_timestep1_track" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 500
+# - name: overfit_batch_100_data_94798_timestep1_track
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200121_philly_debug_aggrevate" "overfit_batch_100_data_94798_timestep1_track" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 500
+
+
+
+
+# - name: overfit_batch_100_data_94798
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200121_philly_debug_aggrevate" "overfit_batch_100_data_94798" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 8000
+
+
+
+
+# - name: overfit_batch_750_data_1078_no_dropout_avg_threshold
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200120_philly_debug_aggrevate" "overfit_batch_750_data_1078_no_dropout_avg_threshold" "configs/experiment.json" -batch_size 750 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 8000
+# - name: overfit_batch_500_data_1078_no_dropout_avg_threshold
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200120_philly_debug_aggrevate" "overfit_batch_500_data_1078_no_dropout_avg_threshold" "configs/experiment.json" -batch_size 500 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 8000
+# - name: overfit_batch_250_data_1078_no_dropout_avg_threshold
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200120_philly_debug_aggrevate" "overfit_batch_250_data_1078_no_dropout_avg_threshold" "configs/experiment.json" -batch_size 250 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 8000
+# - name: overfit_batch_100_data_1078_no_dropout_avg_threshold
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200120_philly_debug_aggrevate" "overfit_batch_100_data_1078_no_dropout_avg_threshold" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 8000
+# - name: overfit_batch_100_data_100_no_dropout_avg_threshold
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200120_philly_debug_aggrevate" "overfit_batch_100_data_100_no_dropout_avg_threshold" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short -dropout_ratio 0.0 -agent_end_criteria 2.5 -n_iters 8000
+
+
+
+
+# - name: overfit_batch_100_data_100_tb_outputdir
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "overfit_batch_100_data_100_tb_outputdir" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 5 -log_every 5 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short -dropout_ratio 0.0 -agent_end_criteria 2.5
+# - name: overfit_batch_100_data_100_tb_phillylogdir
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "overfit_batch_100_data_100_tb_phillylogdir" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 5 -log_every 5 -plot_to_philly 1 -data_suffix small_three_houses_single_goal_short -dropout_ratio 0.0 -agent_end_criteria 2.5
+
+
+
+# - name: overfit_batch_500_no_dropout_avg_threshold
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_500_data_1078_no_dropout_avg_threshold" "configs/experiment.json" -batch_size 500 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0 -agent_end_criteria 2.5
+# - name: overfit_batch_250_no_dropout_fixed_target_avg_threshold
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_250_data_1078_no_dropout_avg_threshold" "configs/experiment.json" -batch_size 250 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0 -agent_end_criteria 2.5
+# - name: overfit_batch_100_data_101_no_dropout_fixed_target_avg_threshold
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_100_data_101_no_dropout_avg_threshold" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short -dropout_ratio 0.0 -agent_end_criteria 2.5
+
+
+
+# - name: overfit_batch_500_no_dropout_fixed_target
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_500_data_1078_no_dropout_fixed_target" "configs/experiment.json" -batch_size 500 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0
+# - name: overfit_batch_250_no_dropout_fixed_target
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_250_data_1078_no_dropout_fixed_target" "configs/experiment.json" -batch_size 250 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0
+# - name: overfit_batch_100_data_101_no_dropout_fixed_target
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_100_data_101_no_dropout_fixed_target" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short -dropout_ratio 0.0
+
+
+# - name: overfit_batch_500_no_dropout
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_500_data_1078_no_dropout" "configs/experiment.json" -batch_size 500 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0
+# - name: overfit_batch_250_no_dropout
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_250_data_1078_no_dropout" "configs/experiment.json" -batch_size 250 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.0
+# - name: overfit_batch_100_data_101_no_dropout
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_100_data_101_no_dropout" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short -dropout_ratio 0.0
+
+
+# - name: overfit_batch_500
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_500_data_1078" "configs/experiment.json" -batch_size 500 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short
+# - name: overfit_batch_250
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_250_data_1078" "configs/experiment.json" -batch_size 250 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_goals_short
+# - name: overfit_batch_100_data_101
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200119_philly_debug_aggrevate" "train_batch_100_data_101" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 50 -log_every 50 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short
 
 
 #   - name: overfit_batch_1000

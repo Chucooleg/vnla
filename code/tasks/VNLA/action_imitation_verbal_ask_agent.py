@@ -120,10 +120,10 @@ class ActionImitationVerbalAskAgent(ActionImitationAgent):
         self.ask_losses.append(iter_ask_loss_avg)
 
         # training mode
-        if iter_idx: 
-            self.SW.add_scalar('train loss per iter', iter_loss_avg, iter_idx)
-            self.SW.add_scalar('train nav loss per iter', iter_nav_loss_avg, iter_idx)
-            self.SW.add_scalar('train ask loss per iter', iter_ask_loss_avg, iter_idx)
+        # if iter_idx: 
+            # self.SW.add_scalar('train loss per iter', iter_loss_avg, iter_idx)
+            # self.SW.add_scalar('train nav loss per iter', iter_nav_loss_avg, iter_idx)
+            # self.SW.add_scalar('train ask loss per iter', iter_ask_loss_avg, iter_idx)
   
     def rollout(self, iter_idx=None):
         

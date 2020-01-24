@@ -39,7 +39,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         # Used to initialize exploration environment, may not be necessary
         self.img_features = hparams.img_features
-        self.success_radius = hparams.success_radius
+        self.agent_end_criteria = hparams.agent_end_criteria
         self.debug_mode = hparams.debug_mode
 
     @staticmethod
@@ -64,14 +64,14 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # cannot output <start> or <ignore> so -2
         return len(ValueEstimationNoAskNoRecoveryAgent.ask_actions) - 2 
 
-    def _setup(self, env, feedback):
+    def _setup(self, env, explore_env, feedback):
         '''called in train() in parent class'''
 
         self.nav_feedback = feedback['nav']
         assert self.nav_feedback in self.feedback_options
 
         self.env = env
-        self.frontier_explore_env = VNLAExplorationBatch(self.nav_actions, self.env_actions, obs=None, batch_size=self.batch_size)
+        self.frontier_explore_env = explore_env
         self.value_teacher.add_scans(env.scans)
 
         # track loss for training.
@@ -106,9 +106,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         self.value_losses.append(iter_value_loss_avg)
 
         # training mode
-        if global_iter_idx: 
-            self.SW.add_scalar('training minibatch loss per iter', iter_loss_avg, global_iter_idx)
-            self.SW.add_scalar('training minibatch value loss per iter', iter_value_loss_avg, global_iter_idx)
+        # if global_iter_idx:
+        #     self.SW.add_scalar('training minibatch loss per iter', iter_loss_avg, global_iter_idx)
+        #     self.SW.add_scalar('training minibatch value loss per iter', iter_value_loss_avg, global_iter_idx)
 
     def _compute_loss_rollout(self, global_iter_idx=None, traj_len=1.0):
         '''computed once at the end of every sampled mini-batch from history buffer'''
@@ -125,10 +125,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         iter_value_loss_avg = self.rollout_value_loss.item() / traj_len
         self.value_losses.append(iter_value_loss_avg)
 
+        # Doesn't ever get called (deprecated)
         # training mode
-        if global_iter_idx: 
-            self.SW.add_scalar('{} rollout loss per iter'.format('eval' if self.is_eval else 'training'), iter_loss_avg, global_iter_idx)
-            self.SW.add_scalar('{} rollout value loss per iter'.format('eval' if self.is_eval else 'training'), iter_value_loss_avg, global_iter_idx)
+        # if global_iter_idx: 
+        #     self.SW.add_scalar('{} rollout loss per iter'.format('eval' if self.is_eval else 'training'), iter_loss_avg, global_iter_idx)
+        #     self.SW.add_scalar('{} rollout value loss per iter'.format('eval' if self.is_eval else 'training'), iter_value_loss_avg, global_iter_idx)
 
     def pred_training_batch(self, training_batch, global_iter_idx, output_res=False):
         '''
@@ -299,9 +300,10 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         # time keeping
         time_report = defaultdict(int)
+        nodes_time_report = defaultdict(lambda : defaultdict(list))
         rollout_start_time = time.time()
-        start_time = time.time()
-
+        initial_setup_time = time.time()
+        
         # Training vs Validation settings
         if self.is_eval:
             # Evaluation
@@ -321,7 +323,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             compute_rollout_loss = not expert_rollin_bool
             # Use oracle traj len to train
             use_expected_traj_len = False
-        # report settings   
+        # report settings
         print("{} mode, train from history buffer = {}, {} roll-in, compute rollout loss = {}"\
             .format(
                 ('eval' if self.is_eval else 'training'), 
@@ -330,15 +332,18 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 (compute_rollout_loss)))
 
         # Reset environment
+        start_time = time.time()
         obs = self.env.reset(use_expected_traj_len)
         batch_size = len(obs)
-        print ("batch_size = {}".format(batch_size))
+        # print ("batch_size = {}".format(batch_size))
+        time_report['initial_setup_env_reset'] += time.time() - start_time
 
         # History buffer requires that the same instr_id doesn't appear more than once in a batch
         assert len(set([ob['instr_id'] for ob in obs])) == len([ob['instr_id'] for ob in obs])
 
         # Start roll-out book keeping
         # one trajectory per ob
+        start_time = time.time()
         traj = [{
             # indexing
             'scan': ob['scan'],
@@ -358,34 +363,48 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             'beta': None if self.is_eval else self.beta,
             'expert_rollin_bool': 0 if self.is_eval else expert_rollin_bool,
         } for ob in obs]
+        time_report['initial_setup_initialize_traj_bookkeeping'] += time.time() - start_time
 
         # Index initial command
+        start_time = time.time()
         # Stays the same in No Ask Agents
         seq, seq_mask, seq_lengths = self.make_instruction_batch(obs)
+        time_report['initial_setup_make_instructions'] += time.time() - start_time
 
         # Encode initial command
+        start_time = time.time()
         # ctx will not update in No Ask Agents
         # tensor shape (100, 8, 512)
         ctx, _ = self.model.encode(seq, seq_lengths)
+        time_report['initial_setup_model_encode'] += time.time() - start_time
 
         # Initialize rotation actions
+        start_time = time.time()
         # tensor shape (batch_size, max_macro_action_seq_len)
         a_t = torch.ones(batch_size, self.max_macro_action_seq_len, dtype=torch.long, device=self.device) * \
             self.nav_actions.index('<start>')
+        time_report['initial_setup_initialize_actions'] += time.time() - start_time
 
         # Initialize dummy ask action
+        start_time = time.time()
         # this tensor is always don't ask in No Ask Agents
         # shape (batch_size,)
         ques_t = torch.ones(batch_size, dtype=torch.long, device=self.device) * \
             self.ask_actions.index('dont_ask')
+        time_report['initial_setup_initialize_questions'] += time.time() - start_time
 
         # Get initial image features at starting position
+        start_time = time.time()
         # shape (batch_size, feature size=2048)
         f_t = self.get_feature_variable(obs)
+        time_report['initial_setup_get_features'] += time.time() - start_time
 
         # Initialize trajectory 'end' markers
+        start_time = time.time()
         # Whether agent has deided to <stop>
         ended = np.array([False] * batch_size)
+        ended_by_q_value = np.array([False] * batch_size)
+        time_report['initial_setup_initialize_ends'] += time.time() - start_time
 
         # Initialize nav loss to be accumulated across batch
         if compute_rollout_loss:
@@ -401,8 +420,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Initialize ^T time budget, different for each data point
         # Precomputed per trajectory when Env() was initialized
         episode_len = max(ob['traj_len'] for ob in obs)
-        print ("maximum episode length in batch = {}".format(episode_len))
+        # print ("maximum episode length in batch = {}".format(episode_len))
 
+        start_time = time.time()
         if use_hist_buffer:
             # Initialize experience batch at <start> when t=0
             # A new experience batch will be saved at every following time step
@@ -432,10 +452,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
             # Add experience, remove earliest experiences if buffer is full
             self.history_buffer.add_experience(experience_batch_t)
-            print("Added new experience, history buffer size = {}".format(self.history_buffer.curr_buffer_size()))
+            # print("Added new experience, history buffer size = {}".format(self.history_buffer.curr_buffer_size()))
+        time_report['initial_setup_write_to_hist_buffer'] += time.time() - start_time
 
         # Initialize local buffer at <start>, append per timestep
         # Keep past j frames i.e.{} for continuous LSTM decoding
+        start_time = time.time()
         local_buffer = [{
             'a_t': a_t,
             'f_t': f_t,
@@ -444,16 +466,17 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # 'ctx': ctx,
             # 'seq_mask': seq_mask,
         }]
+        time_report['initial_setup_write_to_local_buffer'] += time.time() - start_time
 
         # time keeping
-        time_report['initial_setup'] += time.time() - start_time
+        time_report['initial_setup'] += time.time() - initial_setup_time
 
         # Loop through time budget ^T
         # 1 time step = 1 rotation + 1 step forward
         timestep = 1
         while timestep <= episode_len:
 
-            print ("time step = {}".format(timestep))
+            # print ("time step = {}".format(timestep))
 
             # Modify obs in-place to indicate if any ob has 'ended'
             start_time = time.time()
@@ -463,8 +486,18 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # ---------------------------- Review code here
 
             start_time = time.time()
-            self.frontier_explore_env.reset_explorers(obs)
-            time_report['reset_frontier_explore_env'] += time.time() - start_time
+            # Debug TODO -- remove `node_time_report =`
+            node_time_report = self.frontier_explore_env.reset_explorers(obs)
+            time_delta = time.time() - start_time
+            if timestep == 1:
+                time_report['reset_frontier_explore_env_timestep_1'] += time_delta
+            else:
+                time_report['reset_frontier_explore_env_timestep_x'] += time_delta
+            # Debug TODO
+            # print ("timestep = {}, delta = {}".format(timestep, time_delta))
+            # for scan in node_time_report:
+            #     for n in node_time_report[scan]:
+            #         nodes_time_report[scan][n] += node_time_report[scan][n]
 
             # Oracle provide instructions for the simulators to explore(turn) around
             # 3 lists of tuples, each of len batch_size.
@@ -474,12 +507,14 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
             # Simulators explore around, map panoramic view index to actions
             # and reachable viewpoint Indices
+            start_time = time.time()
+            # list (batch_size,). each viewIndex int
+            curr_viewIndex = [ob['viewIndex'] for ob in obs]# TODO
             # list (batch_size, 36, varies). Each [(0,1,0), (0,-1,0), (0,0,1)...]
             # list (batch_size, 36). each viewpointId string
             # arr shape(36, batch_size), each mask boolean.
-            start_time = time.time()
             viewix_env_actions_map, viewix_next_vertex_map, view_index_mask, explore_time_report = \
-                self.frontier_explore_env.explore_sphere(explore_instructions, self.num_viewIndex, timestep)
+                self.frontier_explore_env.explore_sphere(explore_instructions, curr_viewIndex, self.num_viewIndex, timestep)
             # Debug
             for i in range(len(viewix_env_actions_map)):
                 for j in range(len(viewix_env_actions_map[i])):
@@ -491,14 +526,16 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 time_report[key] += explore_time_report[key]
 
             # Oracle compute q-value targets
-            # arr shape (batch_size, self.num_viewIndex=36)
+            
             start_time = time.time()
-            q_values_target_arr = self.value_teacher.compute_frontier_costs(obs, viewix_next_vertex_map)
+            # arr shape (batch_size, self.num_viewIndex=36)
+            # arr shape (batch_size, )
+            q_values_target_arr, end_target = self.value_teacher.compute_frontier_costs(obs, viewix_next_vertex_map, timestep)
             # tensor shape (batch_size, self.num_viewIndex=36)
             q_values_target = torch.tensor(q_values_target_arr, dtype=torch.float, device=self.device)
-            # check if within success radius of 2
-            # arr shape (batch_size, )
-            end_target = np.array([np.any(q_vec <= self.success_radius) for q_vec in q_values_target_arr])
+            # # check if within success radius of 2`
+            # end_target = np.array([np.any(q_vec <= self.success_radius) for q_vec in q_values_target_arr])
+
             time_report['make_q_targets'] += time.time() - start_time
             
             # Oracle map env level actions back to action indices as LSTM input
@@ -582,16 +619,23 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                     # Get proposed macro-action that result in current viewIndex(rotation)
                     # tensor shape (batch_size, self.max_macro_action_seq_len)
-                    a_proposed = viewix_actions_map[view_ix]  
+                    get_a_proposed_start_time = time.time()
+                    a_proposed = viewix_actions_map[view_ix]
+                    time_report['decode_frontier_get_action'] += time.time() - get_a_proposed_start_time
 
                     # Get image feature at current viewIndex(rotation)
                     # tensor shape (batch_size, feature_size)
+                    get_f_proposed_start_time = time.time()
+                    # TODO figure out if it's stacking, tenor or env.env.features that takes time.
                     f_proposed = torch.stack([torch.tensor(self.env.env.features[ob['scan'] + '_' + ob['viewpoint']][view_ix, :], dtype=torch.float, device=self.device) for ob in obs])
+                    time_report['decode_frontier_get_feature'] += time.time() - get_f_proposed_start_time
                     
                     # Get mask at that viewIndex(rotation)
                     # i.e. not all rotation angles can connect to other vertices on graph
                     # tensor shape (batch_size,)
+                    get_viewix_mask_start_time = time.time()
                     view_ix_mask = torch.tensor(view_index_mask[view_ix], dtype=torch.bool, device=self.device)
+                    time_report['decode_frontier_get_viewix_mask'] += time.time() - get_viewix_mask_start_time
                     # torch scalar
                     tot_pred += batch_size - torch.sum(view_ix_mask)
 
@@ -600,7 +644,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                     # Run decoder forward pass
                     # decoder_h_curr, _, q_values_rollout_estimate[view_ix], cov_curr
+                    frontier_decode_time = time.time()
                     _, _, q_values_rollout_estimate[view_ix], _ = self.model.decode_nav(a_proposed, ques_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
+                    time_report['decode_frontier_decoder_forward'] += time.time() - frontier_decode_time
 
                 # Reshape q-value estimates tensor back to 
                 # shape (batch_size, self.num_viewIndex=36) 
@@ -628,7 +674,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # Compute end markers
                 # (end after upcoming rotation and step-forward)
                 # array shape (batch_size,)  # TODO check here.
-                end_estimated = (torch.min(q_values_rollout_estimate, dim=1)[0] <= self.success_radius).cpu().data.numpy()
+                end_estimated = (torch.min(q_values_rollout_estimate, dim=1)[0] <= self.agent_end_criteria).cpu().data.numpy()
                 assert end_estimated.shape[0] == batch_size
 
                 time_report['select_agent_macro_action'] += time.time() - agent_select_start_time
@@ -733,12 +779,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # Write experience to history buffer
                 start_time = time.time()
                 self.history_buffer.add_experience(experience_batch_t)
-                print("Added new experience, history buffer size = {}".format(self.history_buffer.curr_buffer_size()))
+                # print("Added new experience, history buffer size = {}".format(self.history_buffer.curr_buffer_size()))
                 time_report['save_to_history_buffer'] += time.time() - start_time  
 
             # Append tensors for the whole batch for this time step
             start_time = time.time()
-            # Sanity check local buffer size
+            # Remove earliest form buffer if full
             if len(local_buffer) >= self.num_recent_frames:
                 local_buffer.pop(0)
             local_buffer.append({
@@ -764,9 +810,13 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                     # Mark if trajectory has ended
                     if expert_rollin_bool:
+                        if end_target[i]:
+                            ended_by_q_value[i] = True
                         if end_target[i] or timestep >= ob['traj_len']:
                             ended[i] = True
                     else:
+                        if end_estimated[i]:
+                            ended_by_q_value[i] = True
                         if end_estimated[i] or timestep >= ob['traj_len']:
                             ended[i] = True
 
@@ -790,5 +840,13 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 self._compute_loss_rollout(global_iter_idx, traj_len=episode_len*1.0)
             time_report['report_rollout_value_loss'] += time.time() - start_time
 
+        # Track how many trajectories are ended by applying q-value threshold
+        print ("{} ended {} trajectories in batch.".format('expert' if expert_rollin_bool else 'agent', np.sum(ended_by_q_value)))
+
+        # Debug
+        # if expert_rollin_bool:
+        #     assert np.sum(ended_by_q_value) == batch_size
+        #     assert all(ended_by_q_value)
+
         time_report['total_rollout_time'] += time.time() - rollout_start_time
-        return traj, time_report
+        return traj, time_report, nodes_time_report  # Debug TODO -- nodes_time_report

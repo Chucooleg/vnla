@@ -251,7 +251,7 @@ class ValueEstimationAgent(NavigationAgent):
 
         return torch.from_numpy(features).to(self.device)
 
-    def _setup(self, env, feedback):
+    def _setup(self, env, explore_env, feedback):
         # Leave for subclasses to:
         # - setup nav, ask, recover feedback
         # - setup nav, ask, recover losses
@@ -259,21 +259,21 @@ class ValueEstimationAgent(NavigationAgent):
         # - add scans to teachers/advisors
         raise NotImplementedError('Subclasses are expected to implement _setup')
 
-    def test(self, env, feedback, use_dropout=False, allow_cheat=False):
+    def test(self, env, feedback, explore_env, use_dropout=False, allow_cheat=False):
         ''' Evaluate once on each instruction in the current environment '''
 
         self.is_eval = True
         # messy legacy setup in train.py()
         self.compute_rollout_loss = use_dropout
 
-        self._setup(env, feedback)
+        self._setup(env, explore_env, feedback)
         if use_dropout:
             self.model.train()
         else:
             self.model.eval()
         return self.base_test()
 
-    def train(self, env, optimizer, n_iters, feedback, idx):
+    def train(self, env, optimizer, n_iters, feedback, idx, explore_env):
         '''
         Train for a given number `n_iters` of iterations. 
         `n_iters` is set to hparams.log_every (default 1000) or remaining.
@@ -285,7 +285,7 @@ class ValueEstimationAgent(NavigationAgent):
 
         # Set up self.env, feedback(teacher/argmax/learned)
         # Initialize losses, add scans to teachers/advisors
-        self._setup(env, feedback)
+        self._setup(env, explore_env, feedback)
 
         # do not use dropout
         self.model.train()
@@ -295,6 +295,8 @@ class ValueEstimationAgent(NavigationAgent):
 
         # time report
         time_report = defaultdict(int)
+        # Debug TODO remove
+        nodes_time_report = defaultdict(lambda : defaultdict(list))
 
         # List of 10*batch_size number of trajectory dictionaries
         last_traj = []
@@ -309,8 +311,14 @@ class ValueEstimationAgent(NavigationAgent):
             # Rollout the agent
             # History is added to buffer within this rollout() call
             # See subclass implementation
-            traj, iter_time_report_rollout = self.rollout(global_iter_idx)
-            self.SW.add_scalar('history_buffer_size', len(self.history_buffer), global_iter_idx)
+            # Debug TODO remove nodes_time_report_rollout
+            traj, iter_time_report_rollout, nodes_time_report_rollout = self.rollout(global_iter_idx)
+            # self.SW.add_scalar('history_buffer_size', len(self.history_buffer), global_iter_idx)
+
+            # Debug TODO remove
+            for scan in nodes_time_report_rollout:
+                for n in nodes_time_report_rollout[scan]:
+                    nodes_time_report[scan][n] += nodes_time_report_rollout[scan][n] 
 
             # Keep time for the rollout processes
             for key in iter_time_report_rollout.keys():
@@ -357,7 +365,8 @@ class ValueEstimationAgent(NavigationAgent):
             if global_iter_idx >= self.start_beta_decay and global_iter_idx % self.decay_beta_every == 0:
                 self.beta *= (1 - self.beta_decay_rate)
                 print('New expert roll-in probability %f' % self.beta)
-            self.SW.add_scalar('beta per iter', self.beta, global_iter_idx)
+            # self.SW.add_scalar('beta per iter', self.beta, global_iter_idx)
 
         time_report['per_training_interval'] += time.time() - interval_training_iter_start_time
-        return last_traj, time_report        
+        # Debug TODO remove `nodes_time_report`
+        return last_traj, time_report, nodes_time_report

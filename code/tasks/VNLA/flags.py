@@ -7,12 +7,12 @@ def make_parser():
     parser = argparse.ArgumentParser()
 
     # override main python call in train_*.sh
-    # (not in master config, deprecated.)
+    # (not in master config.)
     parser.add_argument('-debug_mode', type=int, 
         help='debug mode on/off, 1 or 0.')
 
     # override main python call in train_*.sh
-    # (not in master config, deprecated.)
+    # (not in master config.)
     parser.add_argument('-config_file', type=str, 
         help='configuration file')
     parser.add_argument('-load_path', type=str,
@@ -20,7 +20,9 @@ def make_parser():
     parser.add_argument('-exp_name', type=str,
         help='name of the experiment')   
     parser.add_argument('-job_name', type=str,
-        help='name of the job')  
+        help='name of the job')
+    parser.add_argument('-data_suffix', type=str,
+        help='name of the custom data e.g. ask_nav_train_[data_suffix].json')  
 
     # Vocab (not in master config)
     parser.add_argument('-external_main_vocab', type=str,
@@ -62,6 +64,8 @@ def make_parser():
     parser.add_argument('--unmoved_threshold', type=int)      
     parser.add_argument('-success_radius', type=float,
         help='success radius')
+    parser.add_argument('-agent_end_criteria', type=float,
+        help='threshold of q value estimate for agent to end episode')
 
     # Learned asking parameters
     parser.add_argument('-query_ratio', type=float,

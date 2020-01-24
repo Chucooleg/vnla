@@ -275,12 +275,15 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
         next_viewpoint_index_str: single str indicating viewpoint index. 
                                   e.g. '1e6b606b44df4a6086c0f97e826d4d15'
         '''
+        # current point to next point
         cost_stepping = self.distances[ob['scan']][ob['viewpoint']][next_viewpoint_index_str]
-        cost_togo, _ = self._find_nearest_point(ob['scan'], ob['viewpoint'], ob['goal_viewpoints'])
-        assert cost_stepping > 0 and cost_togo >= 0
-        return cost_togo + cost_stepping
+        # next point to the closest goal
+        cost_togo, _ = self._find_nearest_point(ob['scan'], next_viewpoint_index_str, ob['goal_viewpoints'])
 
-    def compute_frontier_costs(self, obs, viewix_next_vertex_map):
+        assert cost_stepping > 0 and cost_togo >= 0
+        return cost_togo , cost_stepping
+
+    def compute_frontier_costs(self, obs, viewix_next_vertex_map, timestep=None):
         '''
         For each ob, compute:
         cost = cost-to-go + cost-stepping for all reachable vertices
@@ -288,20 +291,44 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
         assert len(obs) == len(viewix_next_vertex_map)
         # arr shape (batch_size, 36)
         q_values_target = np.ones((len(obs), len(viewix_next_vertex_map[0]))) * 1e9
+        # arr shape (batch_size, )
+        end_target = np.array([False for _ in range(len(obs))])
+
         # Loop through batch
         for i, ob in enumerate(obs):
             # NOTE ended ob won't be added to hist buffer for training
             if not ob['ended']:
                 costs = []
+                cost_togos = []
                 for proposed_vertex in viewix_next_vertex_map[i]:
                     if proposed_vertex == '':
                         costs.append(1e9)
+                        cost_togos.append(1e9)
                     else:
                         # add up cost-togo + cost-stepping
-                        costs.append(self.compute_frontier_cost_single(ob, proposed_vertex))
+                        cost_togo , cost_stepping = self.compute_frontier_cost_single(ob, proposed_vertex)
+
+                        # # Debug only -- edge case. should be fine to ignore
+                        # if ob['instr_id'] == '156450_0':
+                        #     print ("timestep = {}".format(timestep))
+                        #     print ("location for 156450_0 current = {}".format(ob['viewpoint']))
+                        #     print ("location for 156450_0 proposed= {}".format(proposed_vertex))
+                        #     print ("cost-to-go for 156450_0 = {}".format(cost_togo))
+                        #     print ("debug") 
+                        # if cost_togo == 0:
+                        #     print ("found cost_togo = 0")                     
+
+                        costs.append(cost_togo + cost_stepping)
+                        # keep tab cost-togo to determine ending later
+                        cost_togos.append(cost_togo)
+                assert len(cost_togos) == len(viewix_next_vertex_map[0])  # 36
                 assert len(costs) == len(viewix_next_vertex_map[0])  # 36
                 q_values_target[i, :] = costs
-        return q_values_target
+                # get min costs for each row
+                # if the min index of costs also has a cost-togo = 0, then mark end for this row in end_target
+                end_target[i] = cost_togos[costs.index(min(costs))] == 0
+
+        return q_values_target, end_target
 
     def _map_env_action_to_agent_action(self, action):
         '''

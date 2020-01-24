@@ -19,7 +19,7 @@ from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_sc
 from scipy import stats
 
 from utils import read_vocab, write_vocab, build_vocab, Tokenizer, padding_idx, timeSince
-from env import VNLABatch
+from env import VNLABatch, VNLAExplorationBatch
 from model import AttentionSeq2SeqFramesModel, AttentionSeq2SeqContinuousModel
 from action_imitation_no_ask_agent import ActionImitationNoAskAgent
 from action_imitation_verbal_ask_agent import ActionImitationVerbalAskAgent
@@ -35,7 +35,7 @@ def set_path():
     '''set paths for data, saving, logging'''
 
     # Set general output dir
-    hparams.exp_dir = os.getenv('OUTPUT_DIR')
+    hparams.exp_dir = os.getenv('PT_OUTPUT_DIR')
     
     # Set model prefix
     hparams.bootstrap = 1 if hasattr(hparams, 'bootstrap') and hparams.bootstrap else 0
@@ -47,16 +47,18 @@ def set_path():
     if hparams.plot_to_philly:
         hparams.tensorboard_dir = os.environ.get('PHILLY_LOG_DIRECTORY', '.')
     else:
-        hparams.tensorboard_dir = os.path.join(hparams.exp_dir, "tensorboard")
-        if not os.path.exists(hparams.tensorboard_dir):
-            os.makedirs(hparams.tensorboard_dir)
-            os.makedirs(os.path.join(hparams.tensorboard_dir, 'main'))
-            os.makedirs(os.path.join(hparams.tensorboard_dir, 'agent'))
+        hparams.tensorboard_dir = os.environ.get('PT_OUTPUT_DIR', '.')
+        # hparams.tensorboard_dir = os.path.join(hparams.exp_dir, "tensorboard")
+        # if not os.path.exists(hparams.tensorboard_dir):
+        #     os.makedirs(hparams.tensorboard_dir)
+        #     os.makedirs(os.path.join(hparams.tensorboard_dir, 'main'))
+        #     os.makedirs(os.path.join(hparams.tensorboard_dir, 'agent'))
+    print ("tensorboard dir from hparams = {}".format(hparams.tensorboard_dir))
 
     # Set model load path
     hparams.load_path = hparams.load_path if hasattr(hparams, 'load_path') and \
         hparams.load_path is not None else \
-        os.path.join(hparams.exp_dir, '%s_last.ckpt' % hparams.model_prefix)    
+        os.path.join(hparams.exp_dir, '%s_last.ckpt' % hparams.model_prefix)
 
     # Set history buffer load path
     hparams.history_buffer_path = hparams.history_buffer_path if (hasattr(hparams, 'history_buffer_path') \
@@ -155,7 +157,7 @@ def compute_ask_stats(traj):
 
 
 def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
-    best_metrics, eval_mode):
+    best_metrics, eval_mode, explore_env=None):
     '''
     Main training loop. Loop through hparams.n_iters.
     - calls agent.train() which includes backprop
@@ -164,7 +166,8 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     '''
     start = time.time()
 
-    SW = SummaryWriter(os.path.join(hparams.tensorboard_dir, 'main'), flush_secs=30)
+    SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
+    # SW = SummaryWriter(os.path.join(hparams.tensorboard_dir, '' if hparams.plot_to_philly else 'main'), flush_secs=30)
 
     if not eval_mode:
         print('Training with with lr = %f' % optimizer.param_groups[0]['lr'])
@@ -195,11 +198,21 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             # Train for `interval` number of iterations
             # Calls rollout and backprop 
             # this returned traj only includes trajectories from the last 10 batches (to compute sample stats only)
-            traj, time_report = agent.train(train_env, optimizer, interval, train_feedback, idx)
+            traj, time_report, nodes_time_report = agent.train(
+                env=train_env, 
+                optimizer=optimizer, 
+                n_iters=interval, 
+                feedback=train_feedback, 
+                idx=idx,
+                explore_env=explore_env)  # Debug TODO nodes_time_report
+            SW.add_scalar('expert rollin - beta', agent.beta, iter)
 
+            # Debug TODO
+            print ("debug nodes_time_report here")
+        
             # Report time for rollout and backprop
             for time_key, time_val in sorted(list(time_report.items()), key=lambda x: x[1], reverse=True):
-                print ("Train {} time = {}".format(time_key, time_val))    
+                print ("Train {} time = {}".format(time_key, time_val)) 
 
             # Report per `interval` agent rollout losses
             # Main training loss -- summed all loss types
@@ -239,7 +252,12 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
 
             # Get validation losses under the same conditions as training
             # rollout again -- time-consuming
-            agent.test(env, train_feedback, use_dropout=True, allow_cheat=True)
+            agent.test(
+                env=env, 
+                feedback=train_feedback, 
+                explore_env=explore_env, 
+                use_dropout=True, 
+                allow_cheat=True)
 
             # Report per dataset agent rollout losses
             # Main validation loss -- summed all loss types
@@ -259,7 +277,11 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             
             # Get validation distance from goal under test evaluation conditions
             # rollout again -- time-consuming
-            traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False)
+            traj = agent.test(env=env, 
+            feedback=test_feedback, 
+            explore_env=explore_env, 
+            use_dropout=False, 
+            allow_cheat=False)
 
             # Write the validation results out to json file
             # Compute in both train and test modes
@@ -284,6 +306,8 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                 if metric in ['success_rate', 'oracle_rate', 'room_success_rate', 
                     'nav_error', 'length', 'steps']:
                     metrics[metric][env_name] = (val, len(traj))
+                    SW.add_scalar("{} - {}".format(env_name, metric), val, iter)
+
                 if metric in ['success_rate', 'oracle_rate', 'room_success_rate']:
                     loss_str += ', %s: %.3f' % (metric, val) 
 
@@ -461,9 +485,6 @@ def train_val(device, seed=None):
     else:
         raise ValueError('model definition is not clear. check navigation_objective argument in hparams config')
 
-    # Debug
-    print ("before optimizer")
-
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
         weight_decay=hparams.weight_decay)
     
@@ -471,7 +492,6 @@ def train_val(device, seed=None):
     best_metrics = { 'val_seen'  : -1,
                      'val_unseen': -1,
                      'combined'  : -1 }
-
 
     # Load model parameters from a checkpoint (if any)
     if ckpt is not None:
@@ -502,6 +522,8 @@ def train_val(device, seed=None):
         else:
             raise ValueError
 
+        explore_env = None
+
     elif hparams.navigation_objective == 'value_estimation':
 
         if hparams.uncertainty_handling == 'no_ask' and hparams.recovery_strategy == 'no_recovery':
@@ -526,6 +548,8 @@ def train_val(device, seed=None):
         else:
             raise ValueError
 
+        explore_env = VNLAExplorationBatch(agent.nav_actions, agent.env_actions, obs=None, batch_size=hparams.batch_size)
+
         # Load history buffer
         if os.path.exists(hparams.load_path):
             print('Load history buffer from %s' % hparams.history_buffer_path)
@@ -536,7 +560,7 @@ def train_val(device, seed=None):
 
     # Train
     return train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
-          best_metrics, eval_mode)
+          best_metrics, eval_mode, explore_env)
 
 
 if __name__ == "__main__":
