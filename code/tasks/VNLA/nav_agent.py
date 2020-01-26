@@ -72,7 +72,7 @@ class NavigationAgent(BaseAgent):
         self.device = device
         self.random = random
         self.random.seed(hparams.seed)
-        self.random_state = np.random.RandomState(999)
+        # self.random_state = np.random.RandomState(hparams.seed)
  
     def make_instruction_batch(self, obs):
         ''' Make variables for a batch of input instructions. '''
@@ -91,6 +91,11 @@ class NavigationAgent(BaseAgent):
         mask = (seq_tensor == padding_idx)
 
         return seq_tensor, mask, seq_lengths
+
+    # def get_feature_tensor(self, obs):
+    #     ''' Make a tensor for a batch of precomputed image features. '''
+    #     # each ob['feature'] is already a torch tensor of shape (feature_size, ), type torch.float, and living on agent.device.
+    #     return torch.stack([ob['feature'] for ob in obs])
 
     def get_feature_variable(self, obs):
         ''' Make a variable for a batch of precomputed image features. '''

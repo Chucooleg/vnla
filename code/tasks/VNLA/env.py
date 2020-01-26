@@ -22,8 +22,6 @@ try:
     import MatterSim
 except: 
     # local conda env only
-    # sys.path.append('../../build/')  
-    # print('cwd: %s' % os.getcwd())
     sys.path.append('/home/hoyeung/Documents/vnla/code/build')  
     import MatterSim
 
@@ -124,17 +122,12 @@ class VNLAExplorationBatch():
 
     def reset_explorers(self, obs):
         '''set x_curr and psi_curr for each simulator in beginning of episodes'''
-        # time keeping
-        node_time_report = defaultdict(lambda : defaultdict(list))  # DEbug TODO
         for i, ob in enumerate(obs):
-            start_time = time.time()  # DEbug TODO
             self.sims[i].newEpisode(ob['scan'], ob['viewpoint'], ob['heading'], ob['elevation'])
-            node_time_report[ob['scan']][ob['viewpoint']].append(time.time() - start_time)  # DEbug TODO
         # list length=batch_size, each element is a list of 35 rotation tuples.
         # e.g. [[(0,1,0), (0,-1,1), ...], [(0,1,0), (0,-1,1), ...], ....]
         # [[None]] * self.batch_size
         self._rotation_history = [[] for _ in range(self.batch_size)]
-        return node_time_report  # DEbug TODO remove return
 
     def _getStates(self):
         '''
@@ -198,7 +191,6 @@ class VNLAExplorationBatch():
                     returns [(0, 1, 0), (0, 1, 0), (0, 0, -1), (0, 0, -1)]
             '''
             # seq = np.array(l)
-            # head, ele = np.sum(seq, axis=0)[1:]
             sum_tups = lambda a,b: (a[0]+b[0], a[1]+b[1], a[2]+b[2])
             _, head, ele = reduce(sum_tups, l)
             
@@ -214,13 +206,7 @@ class VNLAExplorationBatch():
                 h = -h
             
             res_seq = [(0, h, 0)] * h_mul + [(0, 0, e)] * e_mul
-
-            try:
-                assert len(res_seq) <= 8
-            except:
-                print ("check compact rotation sequence length.")
-                import pdb; pdb.set_trace()
-
+            assert len(res_seq) <= 8
             return res_seq
 
         return list(map(compress_single, rotation_history))
@@ -265,7 +251,6 @@ class VNLAExplorationBatch():
 
         res_seq = [(0, h, 0)] * h_mul + [(0, 0, e)] * e_mul
         assert len(res_seq) <= 8
-
         return res_seq
 
     def _map_to_efficient_rotation(self, start_viewIndex, viewix_batch):
@@ -300,12 +285,10 @@ class VNLAExplorationBatch():
             # or (0,0,-1)
             if isinstance(rotations[0], tuple):
                 for index, heading, elevation in rotations:
-                    # sim.makeAction(index, heading, elevation)
                     sim.makeAction(index, heading, elevation)
                     self._rotation_history[i].append((index, heading, elevation))
             else:
                 index, heading, elevation = rotations
-                # sim.makeAction(index, heading, elevation)
                 sim.makeAction(index, heading, elevation)
                 self._rotation_history[i].append((index, heading, elevation))        
 
@@ -406,7 +389,6 @@ class VNLAExplorationBatch():
             start_time = time.time()
             # list length batch_size, each element is a single list of tuples. [(0,1,0), (0,-1,1), ...]
             efficient_rotations_batch = self._map_to_efficient_rotation(start_viewIndex, viewix_batch)
-            # efficient_rotations_batch = self._map_to_efficient_rotation_by_compression(self._rotation_history)
             time_report['explore_map_to_efficient_rotation'] += time.time() - start_time
             
         assert len(efficient_rotations_batch) == len(viewix_batch) == len(next_vertex_batch) == self.batch_size
@@ -651,8 +633,6 @@ class VNLABatch():
 
         self.traj_len_ref = 'paths' if hparams.navigation_objective == 'value_estimation' \
             else 'trajectories'
-        # self.sort_data_by_len = True if hparams.navigation_objective == 'value_estimation' \
-        #     else False
 
         # time budget ^T
         self.traj_len_estimates = defaultdict(list)
@@ -722,11 +702,6 @@ class VNLABatch():
 
         self.reset_epoch()
 
-        # # sort data by length to learn from easier trajectories first
-        # if self.sort_data_by_len:
-        #     min_traj_len = lambda d: min([len(p) for p in d['paths']])
-        #     self.data = sorted(self.data, lambda x: min_traj_len(x))
-
         if self.split is not None:
             print('VNLABatch loaded with %d instructions, using split: %s' % (
                 len(self.data), self.split))
@@ -755,41 +730,7 @@ class VNLABatch():
             assert len(batch) == self.batch_size
         else:
             self.ix += self.batch_size
-        self.batch = batch     
-
-        # '''put the next batch of data into self.batch from self.data'''
-        # if self.ix == 0:
-        #     self.random.shuffle(self.data)
-        # batch = self.data[self.ix:self.ix+self.batch_size]
-        # # if the batch runs out of data pt
-        # if len(batch) < self.batch_size:
-        #     self.random.shuffle(self.data)
-        #     self.ix = self.batch_size - len(batch)
-        #     batch += self.data[:self.ix]
-        # else:
-        #     self.ix += self.batch_size
-        # self.batch = batch       
-
-        # '''put the next batch of data into self.batch from self.data'''
-        # if self.ix == 0 and not self.sort_data_by_len:
-        #     self.random.shuffle(self.data)
-        # batch = self.data[self.ix:self.ix+self.batch_size]
-        # # if current epoch runs out of data pt for the next batch
-        # if len(batch) < self.batch_size:
-        #     if self.sort_data_by_len:
-        #         # if data should be sorted, do not shuffle
-        #         self.ix = self.batch_size - len(batch)
-        #         batch += self.data[:self.ix] 
-        #     else:
-        #         # otherwise, shuffle but data can repeat in the same batch
-        #         self.random.shuffle(self.data)
-        #         self.ix = self.batch_size - len(batch)
-        #         batch += self.data[:self.ix]
-        #     # no ix tracking solution
-        #     # batch += self.random.choice(self.data[:self.ix], self.batch_size - len(batch))      
-        # else:
-        #     self.ix += self.batch_size
-        # self.batch = batch
+        self.batch = batch
 
     def reset_epoch(self):
         '''start a new epoch. 
@@ -824,9 +765,6 @@ class VNLABatch():
             obs[-1]['max_queries'] = self.max_queries_constraints[i]
             # ^T computed when we load a new mini batch
             obs[-1]['traj_len'] = self.traj_lens[i]
-            # # not sure if this is used anywhere
-            # if 'instr_encoding' in item:
-            #     obs[-1]['instr_encoding'] = item['instr_encoding']
         return obs
 
     def _calculate_max_queries(self, traj_len):

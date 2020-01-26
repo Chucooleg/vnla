@@ -9,4 +9,5 @@
 
 # philly
 export PT_DATA_DIR=/mnt/matterport3d/
-export PT_OUTPUT_DIR_ALL=/mnt/experiment-results-philly/asknav/output_philly/
+export PT_OUTPUT_DIR=/mnt/experiment-results-philly/
+# export PT_OUTPUT_DIR_ALL=/mnt/experiment-results-philly/asknav/output_philly/

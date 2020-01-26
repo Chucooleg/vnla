@@ -20,7 +20,7 @@ import torch.nn.functional as F
 
 from utils import padding_idx
 from nav_agent import NavigationAgent
-from history_buffer import HistoryBuffer
+# from history_buffer import HistoryBuffer
 from oracle import make_oracle
 from env import EnvBatch
 
@@ -58,7 +58,7 @@ class ValueEstimationAgent(NavigationAgent):
         self.env_action_tup_size = 3
 
         # Initialize History Buffer
-        self.history_buffer = HistoryBuffer(hparams)
+        # self.history_buffer = HistoryBuffer(hparams)
         self.min_history_to_learn = hparams.min_history_to_learn
 
         # Set expert rollin prob, decayed in training
@@ -131,30 +131,6 @@ class ValueEstimationAgent(NavigationAgent):
 
         return variable
 
-    # def get_tr_end_target_by_t(self, tr_key_pairs, tr_timesteps):
-    #     '''
-    #     Extract variable from history buffer by (instr_id, global_iter_idx), timestep and variable name. 
-
-    #     Arguments:
-    #         tr_key_pairs: list of len(batch_size) tuples, each (instr_id, global_iter_idx)
-    #         tr_timesteps: list of len(batch_size) integers, each indicate sampled timestep
-
-    #     Returns: 
-    #         (batch_size, self.max_macro_action_seq_len)
-    #     '''
-    #     # Create container to hold training data
-    #     end_target_dim = self.max_macro_action_seq_len
-    #     # shape (batch_size, self.max_macro_action_seq_len)
-    #     end_target = torch.empty(len(tr_key_pairs), end_target_dim, dtype=torch.float, device=self.device)
-
-    #     # Fill container with data extracted from history buffer
-    #     for i, (key_pair, timestep) in enumerate(zip(tr_key_pairs, tr_timesteps)):
-    #         # list/arr of int indices -- can have >1 reachable goal points
-    #         end_target_ixs = self.history_buffer[key_pair]['end_target_indices'][timestep]
-    #         # fill the mask
-    #         end_target[i, end_target_ixs] = 1
-    #     return end_target
-
     def get_tr_view_indexed_action_by_t(self, tr_key_pairs, tr_timesteps, view_ix):
         '''
         Extract macro-action sequence associated with a viewIndex(rotation) from history buffer by 
@@ -202,28 +178,6 @@ class ValueEstimationAgent(NavigationAgent):
 
         return mask
 
-    # def get_tr_view_indexed_full_mask_by_t(self, tr_key_pairs, tr_timesteps, num_viewIndex):
-    #     '''
-    #     Extract variable associated with a viewIndex(rotation) from history buffer by 
-    #     (instr_id, global_iter_idx), timestep and variable name.
-
-    #     Arguments:
-    #         tr_key_pairs: list of len(batch_size) tuples, each (instr_id, global_iter_idx)
-    #         tr_timesteps: list of len(batch_size) integers, each indicate sampled timestep
-
-    #     Returns: 
-    #         (batch_size, agent.num_viewIndex)
-    #     '''
-    #     # Create container to hold training data
-    #     # shape (batch_size, agent.num_viewIndex)
-    #     mask = torch.zeros(len(tr_key_pairs, num_viewIndex), dtype=torch.uint8, device=self.device)
-
-    #     # Fill container with data extracted from history buffer
-    #     for i, (key_pair, timestep) in enumerate(zip(tr_key_pairs, tr_timesteps)):
-    #         indices = self.history_buffer[key_pair]['view_index_mask_indices'][timestep]
-    #         mask[i, indices] = 1
-    #     return mask
-        
     def get_tr_view_indexed_features_by_t(self, tr_key_pairs, tr_timesteps, view_ix):
         '''
         Extract image features associated with a viewIndex(rotation) from history buffer by 
@@ -246,6 +200,31 @@ class ValueEstimationAgent(NavigationAgent):
         for i, (key_pair, timestep) in enumerate(zip(tr_key_pairs, tr_timesteps)):
             viewpoint_idx = self.history_buffer[key_pair]['viewpointIndex'][timestep]
             scan_id = self.history_buffer[key_pair]['scan']
+            long_id = scan_id + '_' + viewpoint_idx
+            features[i,:] = self.env.env.features[long_id][view_ix, :]
+
+        return torch.from_numpy(features).to(self.device)
+
+    def get_rollout_view_indexed_features(self, obs, view_ix):
+        '''
+        Extract image features associated with a viewIndex(rotation), obs scan and viewpointIndex.
+
+        Arguments:
+            obs : a list of observations returned from env._get_obs()
+            view_ix: integer [0-35] used to index panoramic images in the Matterport 3D simulator. 
+
+        Returns: 
+            (batch_size, feature size)        
+        '''
+        # Create container to hold training data
+        feature_dim = obs[0]['feature'].shape[0]
+        # shape (batch_size, feature size)
+        features = np.empty((len(obs), feature_dim), dtype=np.float32) 
+
+        # Fill container with data extracted from history buffer
+        for i, ob in enumerate(obs):
+            scan_id = ob['scan']
+            viewpoint_idx = ob['viewpoint']
             long_id = scan_id + '_' + viewpoint_idx
             features[i,:] = self.env.env.features[long_id][view_ix, :]
 
@@ -291,12 +270,10 @@ class ValueEstimationAgent(NavigationAgent):
         self.model.train()
 
         # Check expert roll-in prob
-        assert self.beta > 0.0 # always > 0.0 in exponential decay
+        assert self.beta >= 0.0 # always >= 0.0 in exponential decay
 
         # time report
         time_report = defaultdict(int)
-        # Debug TODO remove
-        nodes_time_report = defaultdict(lambda : defaultdict(list))
 
         # List of 10*batch_size number of trajectory dictionaries
         last_traj = []
@@ -311,14 +288,7 @@ class ValueEstimationAgent(NavigationAgent):
             # Rollout the agent
             # History is added to buffer within this rollout() call
             # See subclass implementation
-            # Debug TODO remove nodes_time_report_rollout
-            traj, iter_time_report_rollout, nodes_time_report_rollout = self.rollout(global_iter_idx)
-            # self.SW.add_scalar('history_buffer_size', len(self.history_buffer), global_iter_idx)
-
-            # Debug TODO remove
-            for scan in nodes_time_report_rollout:
-                for n in nodes_time_report_rollout[scan]:
-                    nodes_time_report[scan][n] += nodes_time_report_rollout[scan][n] 
+            traj, iter_time_report_rollout = self.rollout(global_iter_idx)
 
             # Keep time for the rollout processes
             for key in iter_time_report_rollout.keys():
@@ -365,8 +335,6 @@ class ValueEstimationAgent(NavigationAgent):
             if global_iter_idx >= self.start_beta_decay and global_iter_idx % self.decay_beta_every == 0:
                 self.beta *= (1 - self.beta_decay_rate)
                 print('New expert roll-in probability %f' % self.beta)
-            # self.SW.add_scalar('beta per iter', self.beta, global_iter_idx)
 
         time_report['per_training_interval'] += time.time() - interval_training_iter_start_time
-        # Debug TODO remove `nodes_time_report`
-        return last_traj, time_report, nodes_time_report
+        return last_traj, time_report

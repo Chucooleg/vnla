@@ -181,10 +181,14 @@ class HistoryBuffer(object):
 
         # Sample (global_idx, instr_id) key pairs
         # shape (number of unique key pairs, 2)
-        instr_key_pairs_list = list(self._instr_iter_keys)
+        instr_key_pairs_list = sorted(list(self._instr_iter_keys))
         # shape (batch_size, 2)
         sampling_indices = np.random.randint(len(instr_key_pairs_list), size=batch_size)
         sampled_iter_instr_key_pair = [instr_key_pairs_list[idx] for idx in sampling_indices]
+
+        # Debug
+        # print ('training sampled training keys length', len(sampling_indices))
+        # print ('training sampled instr_key_pairs_list', sorted(sampling_indices))
 
         # Further sample the time step
         traj_lens = [len(self._indexed_data[key]['action']) for key in sampled_iter_instr_key_pair]

@@ -6,6 +6,9 @@ import argparse
 def make_parser():
     parser = argparse.ArgumentParser()
 
+    parser.add_argument('-local_run', type=int, 
+        help='local run on/off, 1 or 0.')
+
     # override main python call in train_*.sh
     # (not in master config.)
     parser.add_argument('-debug_mode', type=int, 

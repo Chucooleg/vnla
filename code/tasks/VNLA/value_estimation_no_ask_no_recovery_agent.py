@@ -79,10 +79,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         self.loss_types = ['value_losses']
         self.value_losses = []
 
-        # track loss for rollout. None of these losses are backproped
-        # self.rollout_losses = []
-        # self.rollout_value_losses = []
-
     def _populate_agent_state_to_obs(self, obs, ended):
         """modify obs in-place (but env is not modified)
         for nav oracle to compute nav target 
@@ -105,11 +101,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         iter_value_loss_avg = self.value_loss.item() / traj_len
         self.value_losses.append(iter_value_loss_avg)
 
-        # training mode
-        # if global_iter_idx:
-        #     self.SW.add_scalar('training minibatch loss per iter', iter_loss_avg, global_iter_idx)
-        #     self.SW.add_scalar('training minibatch value loss per iter', iter_value_loss_avg, global_iter_idx)
-
     def _compute_loss_rollout(self, global_iter_idx=None, traj_len=1.0):
         '''computed once at the end of every sampled mini-batch from history buffer'''
 
@@ -124,12 +115,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         iter_value_loss_avg = self.rollout_value_loss.item() / traj_len
         self.value_losses.append(iter_value_loss_avg)
-
-        # Doesn't ever get called (deprecated)
-        # training mode
-        # if global_iter_idx: 
-        #     self.SW.add_scalar('{} rollout loss per iter'.format('eval' if self.is_eval else 'training'), iter_loss_avg, global_iter_idx)
-        #     self.SW.add_scalar('{} rollout value loss per iter'.format('eval' if self.is_eval else 'training'), iter_value_loss_avg, global_iter_idx)
 
     def pred_training_batch(self, training_batch, global_iter_idx, output_res=False):
         '''
@@ -247,14 +232,10 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # torch scalar
             tot_pred += batch_size - torch.sum(view_ix_mask)
 
-            # Use existing decoder_h, cov computed from recent history
-            # TODO what do we do with the gradient? detach()?
-
             # If implementing Ask Agent
             # ques_asked = ...
 
             # Run decoder forward pass
-            # decoder_h_curr, _, q_values_tr_estimate[view_ix], cov_curr
             _, _, q_values_tr_estimate[view_ix], _ = self.model.decode_nav(a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
 
         # Reshape q_values_tr_estimate for loss computation
@@ -269,9 +250,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Get q_values_target from history buffer
         # tensor shape (batch_size, self.num_viewIndex)
         q_values_target = self.get_tr_variable_by_t(tr_key_pairs, tr_timesteps, 'q_values_target')
-        # # Get loss mask from history buffer -- same HB source as view_ix_mask
-        # # tensor shape (batch_size, self.num_viewIndex)
-        # loss_mask = self.get_tr_view_indexed_full_mask_by_t(tr_key_pairs, tr_timesteps, self.num_viewIndex)
         # Compute scalar loss
         self.value_loss = self.value_criterion(q_values_tr_estimate, q_values_target) / tot_pred
         time_report['compute_training_value_loss'] += time.time() - start_time
@@ -300,7 +278,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         # time keeping
         time_report = defaultdict(int)
-        nodes_time_report = defaultdict(lambda : defaultdict(list))
         rollout_start_time = time.time()
         initial_setup_time = time.time()
         
@@ -335,7 +312,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         start_time = time.time()
         obs = self.env.reset(use_expected_traj_len)
         batch_size = len(obs)
-        # print ("batch_size = {}".format(batch_size))
         time_report['initial_setup_env_reset'] += time.time() - start_time
 
         # History buffer requires that the same instr_id doesn't appear more than once in a batch
@@ -483,21 +459,15 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             self._populate_agent_state_to_obs(obs, ended)
             time_report['pop_state_to_obs'] += time.time() - start_time
 
-            # ---------------------------- Review code here
+            # ---------------------------- Explore Frontier ----------------------------
 
             start_time = time.time()
-            # Debug TODO -- remove `node_time_report =`
-            node_time_report = self.frontier_explore_env.reset_explorers(obs)
+            self.frontier_explore_env.reset_explorers(obs)
             time_delta = time.time() - start_time
             if timestep == 1:
                 time_report['reset_frontier_explore_env_timestep_1'] += time_delta
             else:
                 time_report['reset_frontier_explore_env_timestep_x'] += time_delta
-            # Debug TODO
-            # print ("timestep = {}, delta = {}".format(timestep, time_delta))
-            # for scan in node_time_report:
-            #     for n in node_time_report[scan]:
-            #         nodes_time_report[scan][n] += node_time_report[scan][n]
 
             # Oracle provide instructions for the simulators to explore(turn) around
             # 3 lists of tuples, each of len batch_size.
@@ -509,13 +479,13 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # and reachable viewpoint Indices
             start_time = time.time()
             # list (batch_size,). each viewIndex int
-            curr_viewIndex = [ob['viewIndex'] for ob in obs]# TODO
+            curr_viewIndex = [ob['viewIndex'] for ob in obs]
             # list (batch_size, 36, varies). Each [(0,1,0), (0,-1,0), (0,0,1)...]
             # list (batch_size, 36). each viewpointId string
             # arr shape(36, batch_size), each mask boolean.
             viewix_env_actions_map, viewix_next_vertex_map, view_index_mask, explore_time_report = \
                 self.frontier_explore_env.explore_sphere(explore_instructions, curr_viewIndex, self.num_viewIndex, timestep)
-            # Debug
+            # Make sure that all env action sequences have valid length
             for i in range(len(viewix_env_actions_map)):
                 for j in range(len(viewix_env_actions_map[i])):
                     assert len(viewix_env_actions_map[i][j]) <= self.max_macro_action_seq_len
@@ -526,15 +496,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 time_report[key] += explore_time_report[key]
 
             # Oracle compute q-value targets
-            
             start_time = time.time()
             # arr shape (batch_size, self.num_viewIndex=36)
             # arr shape (batch_size, )
             q_values_target_arr, end_target = self.value_teacher.compute_frontier_costs(obs, viewix_next_vertex_map, timestep)
             # tensor shape (batch_size, self.num_viewIndex=36)
             q_values_target = torch.tensor(q_values_target_arr, dtype=torch.float, device=self.device)
-            # # check if within success radius of 2`
-            # end_target = np.array([np.any(q_vec <= self.success_radius) for q_vec in q_values_target_arr])
 
             time_report['make_q_targets'] += time.time() - start_time
             
@@ -626,8 +593,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # Get image feature at current viewIndex(rotation)
                     # tensor shape (batch_size, feature_size)
                     get_f_proposed_start_time = time.time()
-                    # TODO figure out if it's stacking, tenor or env.env.features that takes time.
-                    f_proposed = torch.stack([torch.tensor(self.env.env.features[ob['scan'] + '_' + ob['viewpoint']][view_ix, :], dtype=torch.float, device=self.device) for ob in obs])
+                    f_proposed = self.get_rollout_view_indexed_features(obs, view_ix)
+                    # f_proposed = torch.stack([torch.tensor(self.env.env.features[ob['scan'] + '_' + ob['viewpoint']][view_ix, :], dtype=torch.float, device=self.device) for ob in obs])
                     time_report['decode_frontier_get_feature'] += time.time() - get_f_proposed_start_time
                     
                     # Get mask at that viewIndex(rotation)
@@ -643,7 +610,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # ques_asked = ...
 
                     # Run decoder forward pass
-                    # decoder_h_curr, _, q_values_rollout_estimate[view_ix], cov_curr
                     frontier_decode_time = time.time()
                     _, _, q_values_rollout_estimate[view_ix], _ = self.model.decode_nav(a_proposed, ques_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
                     time_report['decode_frontier_decoder_forward'] += time.time() - frontier_decode_time
@@ -673,7 +639,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                 # Compute end markers
                 # (end after upcoming rotation and step-forward)
-                # array shape (batch_size,)  # TODO check here.
+                # array shape (batch_size,)
                 end_estimated = (torch.min(q_values_rollout_estimate, dim=1)[0] <= self.agent_end_criteria).cpu().data.numpy()
                 assert end_estimated.shape[0] == batch_size
 
@@ -849,4 +815,4 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         #     assert all(ended_by_q_value)
 
         time_report['total_rollout_time'] += time.time() - rollout_start_time
-        return traj, time_report, nodes_time_report  # Debug TODO -- nodes_time_report
+        return traj, time_report

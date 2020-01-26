@@ -24,18 +24,23 @@ from model import AttentionSeq2SeqFramesModel, AttentionSeq2SeqContinuousModel
 from action_imitation_no_ask_agent import ActionImitationNoAskAgent
 from action_imitation_verbal_ask_agent import ActionImitationVerbalAskAgent
 from value_estimation_no_ask_no_recovery_agent import ValueEstimationNoAskNoRecoveryAgent
-from tensorboardX import SummaryWriter
+from history_buffer import HistoryBuffer
 
 from eval import Evaluation
 from oracle import *
 from flags import make_parser
+
+from tensorboardX import SummaryWriter
+from tensorboard.compat import tf
+# this hack is required to enable `pt monitor` *while the job is running*.
+delattr(tf.io.gfile.LocalFileSystem, 'append')
 
 
 def set_path():
     '''set paths for data, saving, logging'''
 
     # Set general output dir
-    hparams.exp_dir = os.getenv('PT_OUTPUT_DIR')
+    hparams.exp_dir = os.getenv('PT_EXP_DIR')
     
     # Set model prefix
     hparams.bootstrap = 1 if hasattr(hparams, 'bootstrap') and hparams.bootstrap else 0
@@ -44,15 +49,14 @@ def set_path():
         hparams.model_prefix = '{}_bootstrap'.format(hparams.model_prefix)
 
     # Set tensorboard log dir
-    if hparams.plot_to_philly:
-        hparams.tensorboard_dir = os.environ.get('PHILLY_LOG_DIRECTORY', '.')
+    if hparams.local_run:
+        hparams.tensorboard_dir = hparams.exp_dir
     else:
-        hparams.tensorboard_dir = os.environ.get('PT_OUTPUT_DIR', '.')
-        # hparams.tensorboard_dir = os.path.join(hparams.exp_dir, "tensorboard")
-        # if not os.path.exists(hparams.tensorboard_dir):
-        #     os.makedirs(hparams.tensorboard_dir)
-        #     os.makedirs(os.path.join(hparams.tensorboard_dir, 'main'))
-        #     os.makedirs(os.path.join(hparams.tensorboard_dir, 'agent'))
+        if hparams.plot_to_philly:
+            hparams.tensorboard_dir = os.environ.get('PHILLY_LOG_DIRECTORY', '.')
+        else:
+            hparams.tensorboard_dir = os.environ.get('PT_OUTPUT_DIR', '.')
+
     print ("tensorboard dir from hparams = {}".format(hparams.tensorboard_dir))
 
     # Set model load path
@@ -61,17 +65,17 @@ def set_path():
         os.path.join(hparams.exp_dir, '%s_last.ckpt' % hparams.model_prefix)
 
     # Set history buffer load path
-    hparams.history_buffer_path = hparams.history_buffer_path if (hasattr(hparams, 'history_buffer_path') \
-        and hparams.history_buffer_path is not None) else os.path.join(hparams.exp_dir, 'history_buffer')
-    if not os.path.exists(hparams.history_buffer_path):
-        os.makedirs(hparams.history_buffer_path)
+    # hparams.history_buffer_path = hparams.history_buffer_path if (hasattr(hparams, 'history_buffer_path') \
+    #     and hparams.history_buffer_path is not None) else os.path.join(hparams.exp_dir, 'history_buffer')
+    # if not os.path.exists(hparams.history_buffer_path):
+    #     os.makedirs(hparams.history_buffer_path)
 
     # Set data load path
     DATA_DIR = os.getenv('PT_DATA_DIR')
     hparams.data_path = os.path.join(DATA_DIR, hparams.data_dir)  #e.g. $PT_DATA_DIR/asknav/
     hparams.img_features = os.path.join(DATA_DIR, 'img_features/ResNet-152-imagenet.tsv')
 
-def save(path, model, optimizer, iter, best_metrics, train_env):
+def save(path, model, optimizer, iter, best_metrics, train_env, history_buffer):
     '''save model checkpt'''
 
     ckpt = {
@@ -81,7 +85,8 @@ def save(path, model, optimizer, iter, best_metrics, train_env):
             'iter'            : iter,
             'best_metrics'    : best_metrics,
             'data_idx'        : train_env.ix,
-            'vocab'           : train_env.tokenizer.vocab
+            'vocab'           : train_env.tokenizer.vocab,
+            'history_buffer'  : history_buffer
         }
     torch.save(ckpt, path)
 
@@ -167,7 +172,6 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     start = time.time()
 
     SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
-    # SW = SummaryWriter(os.path.join(hparams.tensorboard_dir, '' if hparams.plot_to_philly else 'main'), flush_secs=30)
 
     if not eval_mode:
         print('Training with with lr = %f' % optimizer.param_groups[0]['lr'])
@@ -197,18 +201,16 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
         else:
             # Train for `interval` number of iterations
             # Calls rollout and backprop 
-            # this returned traj only includes trajectories from the last 10 batches (to compute sample stats only)
-            traj, time_report, nodes_time_report = agent.train(
+            # this returned traj only includes trajectories from the last 10 batches 
+            # (to compute sample stats only)
+            traj, time_report = agent.train(
                 env=train_env, 
                 optimizer=optimizer, 
                 n_iters=interval, 
                 feedback=train_feedback, 
                 idx=idx,
-                explore_env=explore_env)  # Debug TODO nodes_time_report
+                explore_env=explore_env)
             SW.add_scalar('expert rollin - beta', agent.beta, iter)
-
-            # Debug TODO
-            print ("debug nodes_time_report here")
         
             # Report time for rollout and backprop
             for time_key, time_val in sorted(list(time_report.items()), key=lambda x: x[1], reverse=True):
@@ -362,7 +364,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             for env_name in should_save_ckpt:
                 save_path = os.path.join(hparams.exp_dir,
                     '%s_%s.ckpt' % (hparams.model_prefix, env_name))
-                save(save_path, model, optimizer, iter, best_metrics, train_env)
+                save(save_path, model, optimizer, iter, best_metrics, train_env, agent.history_buffer)
                 print("Saved %s model to %s" % (env_name, save_path))
 
             # Save latest history buffer
@@ -390,6 +392,10 @@ def setup(seed=None):
         hparams.seed = seed
     torch.manual_seed(hparams.seed)
     torch.cuda.manual_seed(hparams.seed)
+    np.random.seed(hparams.seed)
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     # Check for vocabs
     train_vocab_path = os.path.join(hparams.data_path, 'train_vocab.txt')
@@ -498,7 +504,7 @@ def train_val(device, seed=None):
         model.load_state_dict(ckpt['model_state_dict'])
         optimizer.load_state_dict(ckpt['optim_state_dict'])
         best_metrics = ckpt['best_metrics']
-        train_env.ix = ckpt['data_idx']   
+        train_env.ix = ckpt['data_idx']
 
     print('')
     pprint(vars(hparams), width=1)
@@ -523,6 +529,7 @@ def train_val(device, seed=None):
             raise ValueError
 
         explore_env = None
+        agent.history_buffer = None
 
     elif hparams.navigation_objective == 'value_estimation':
 
@@ -548,19 +555,22 @@ def train_val(device, seed=None):
         else:
             raise ValueError
 
+        # Initialize helper simulators for agent
         explore_env = VNLAExplorationBatch(agent.nav_actions, agent.env_actions, obs=None, batch_size=hparams.batch_size)
 
-        # Load history buffer
-        if os.path.exists(hparams.load_path):
-            print('Load history buffer from %s' % hparams.history_buffer_path)
-            agent.history_buffer.load_buffer(hparams.history_buffer_path)
+        # Initialize / Load history buffer for agent
+        if ckpt is not None:
+            agent.history_buffer = ckpt['history_buffer'] 
+        else:
+            agent.history_buffer = HistoryBuffer(hparams)
+
+        # TODO load agent.beta!
 
     else:
         raise ValueError('agent definition is not clear. check navigation_objective')
 
     # Train
-    return train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
-          best_metrics, eval_mode, explore_env)
+    return train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter, best_metrics, eval_mode, explore_env)
 
 
 if __name__ == "__main__":
@@ -588,7 +598,7 @@ if __name__ == "__main__":
         seeds = [123, 435, 6757, 867, 983]
         metrics = defaultdict(lambda: defaultdict(list))
         for seed in seeds:
-            this_metrics = train_val(seed=seed)
+            this_metrics = train_val(device, seed=seed)
             for metric in this_metrics:
                 for k, v in this_metrics[metric].items():
                     if 'rate' in metric:
@@ -599,7 +609,7 @@ if __name__ == "__main__":
                 print('%s %s: %.2f %.2f' % (metric, k, np.average(v), stats.sem(v) * 1.95))
     else:
         # Train
-        train_val(device)        
+        train_val(device)
 
 
 # TURN OFF WHEN NOT USING VS code debugger------------------------------------------------------------------------------

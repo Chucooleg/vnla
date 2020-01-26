@@ -19,8 +19,6 @@ try:
     import MatterSim
 except: 
     # local conda env only
-    # sys.path.append('../../build/')  
-    # print('cwd: %s' % os.getcwd())
     sys.path.append('/home/hoyeung/Documents/vnla/code/build')  
     import MatterSim
 
@@ -307,17 +305,6 @@ class FrontierShortestPathsOracle(ShortestPathOracle):
                     else:
                         # add up cost-togo + cost-stepping
                         cost_togo , cost_stepping = self.compute_frontier_cost_single(ob, proposed_vertex)
-
-                        # # Debug only -- edge case. should be fine to ignore
-                        # if ob['instr_id'] == '156450_0':
-                        #     print ("timestep = {}".format(timestep))
-                        #     print ("location for 156450_0 current = {}".format(ob['viewpoint']))
-                        #     print ("location for 156450_0 proposed= {}".format(proposed_vertex))
-                        #     print ("cost-to-go for 156450_0 = {}".format(cost_togo))
-                        #     print ("debug") 
-                        # if cost_togo == 0:
-                        #     print ("found cost_togo = 0")                     
-
                         costs.append(cost_togo + cost_stepping)
                         # keep tab cost-togo to determine ending later
                         cost_togos.append(cost_togo)
