@@ -25,15 +25,15 @@ from action_imitation_no_ask_agent import ActionImitationNoAskAgent
 from action_imitation_verbal_ask_agent import ActionImitationVerbalAskAgent
 from value_estimation_no_ask_no_recovery_agent import ValueEstimationNoAskNoRecoveryAgent
 from history_buffer import HistoryBuffer
+from tensorboardX import SummaryWriter
 
 from eval import Evaluation
 from oracle import *
 from flags import make_parser
 
-from tensorboardX import SummaryWriter
-from tensorboard.compat import tf
-# this hack is required to enable `pt monitor` *while the job is running*.
-delattr(tf.io.gfile.LocalFileSystem, 'append')
+# from tensorboard.compat import tf
+# # this hack is required to enable `pt monitor` *while the job is running*.
+# delattr(tf.io.gfile.LocalFileSystem, 'append')
 
 
 def set_path():
@@ -55,9 +55,8 @@ def set_path():
         if hparams.plot_to_philly:
             hparams.tensorboard_dir = os.environ.get('PHILLY_LOG_DIRECTORY', '.')
         else:
-            hparams.tensorboard_dir = os.environ.get('PT_OUTPUT_DIR', '.')
-
-    print ("tensorboard dir from hparams = {}".format(hparams.tensorboard_dir))
+            hparams.tensorboard_dir =os.environ.get('PT_TENSORBOARD_DIR', '.')
+    print ("tensorboard dir = {}".format(hparams.tensorboard_dir))
 
     # Set model load path
     hparams.load_path = hparams.load_path if hasattr(hparams, 'load_path') and \
@@ -75,7 +74,7 @@ def set_path():
     hparams.data_path = os.path.join(DATA_DIR, hparams.data_dir)  #e.g. $PT_DATA_DIR/asknav/
     hparams.img_features = os.path.join(DATA_DIR, 'img_features/ResNet-152-imagenet.tsv')
 
-def save(path, model, optimizer, iter, best_metrics, train_env, history_buffer):
+def save(path, model, optimizer, iter, best_metrics, train_env, history_buffer, beta):
     '''save model checkpt'''
 
     ckpt = {
@@ -86,7 +85,8 @@ def save(path, model, optimizer, iter, best_metrics, train_env, history_buffer):
             'best_metrics'    : best_metrics,
             'data_idx'        : train_env.ix,
             'vocab'           : train_env.tokenizer.vocab,
-            'history_buffer'  : history_buffer
+            'history_buffer'  : history_buffer,
+            'beta'            : beta
         }
     torch.save(ckpt, path)
 
@@ -364,7 +364,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             for env_name in should_save_ckpt:
                 save_path = os.path.join(hparams.exp_dir,
                     '%s_%s.ckpt' % (hparams.model_prefix, env_name))
-                save(save_path, model, optimizer, iter, best_metrics, train_env, agent.history_buffer)
+                save(save_path, model, optimizer, iter, best_metrics, train_env, agent.history_buffer, agent.beta)
                 print("Saved %s model to %s" % (env_name, save_path))
 
             # Save latest history buffer
@@ -530,6 +530,7 @@ def train_val(device, seed=None):
 
         explore_env = None
         agent.history_buffer = None
+        agent.beta = None
 
     elif hparams.navigation_objective == 'value_estimation':
 
@@ -560,11 +561,15 @@ def train_val(device, seed=None):
 
         # Initialize / Load history buffer for agent
         if ckpt is not None:
-            agent.history_buffer = ckpt['history_buffer'] 
+            agent.history_buffer = ckpt['history_buffer']
         else:
             agent.history_buffer = HistoryBuffer(hparams)
 
-        # TODO load agent.beta!
+        # Initialize / Load expert rollin probability beta for agent
+        if ckpt is not None:
+            agent.beta = ckpt['beta']
+        else:
+            agent.beta = float(hparams.start_beta) if hasattr(hparams, "start_beta") else 1.0
 
     else:
         raise ValueError('agent definition is not clear. check navigation_objective')
@@ -663,6 +668,4 @@ def vs_code_debug(args_temp):
     else:
         # Train
         train_val(device)
-
-# patch branch
 # ------------------------------------------------------------------------------

@@ -62,7 +62,7 @@ class ValueEstimationAgent(NavigationAgent):
         self.min_history_to_learn = hparams.min_history_to_learn
 
         # Set expert rollin prob, decayed in training
-        self.beta = float(hparams.start_beta) if hasattr(hparams, "start_beta") else 1.0
+        # self.beta = float(hparams.start_beta) if hasattr(hparams, "start_beta") else 1.0
         self.start_beta_decay = hparams.start_beta_decay
         self.decay_beta_every = hparams.decay_beta_every
         self.beta_decay_rate = hparams.beta_decay_rate

@@ -315,7 +315,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         time_report['initial_setup_env_reset'] += time.time() - start_time
 
         # History buffer requires that the same instr_id doesn't appear more than once in a batch
-        assert len(set([ob['instr_id'] for ob in obs])) == len([ob['instr_id'] for ob in obs])
+        if use_hist_buffer:
+            assert len(set([ob['instr_id'] for ob in obs])) == len([ob['instr_id'] for ob in obs])
 
         # Start roll-out book keeping
         # one trajectory per ob

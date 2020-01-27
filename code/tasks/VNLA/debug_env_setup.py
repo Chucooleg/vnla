@@ -3,8 +3,8 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "20200124_debug_aggrevate"
-job_name = "debug_faster_feature_reading"
+exp_name = "20200126_debug_aggrevate"
+job_name = "debug_beta_reload"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh
@@ -30,16 +30,16 @@ args['exp_name'] = exp_name
 args['job_name'] = job_name
 
 # extras here!
-# args['start_beta'] = 1.0
 # args['n_iters'] = 1000
 # data must be larger than batch_size
 args['batch_size'] = 100
-args['start_beta_decay'] = 100
-args['decay_beta_every'] = 100
+args['start_beta'] = 0.9 # 1.0
+args['start_beta_decay'] = 2 # 100
+args['decay_beta_every'] = 2 # 100
 args['min_history_to_learn'] = 1000
 
-args['save_every'] = 50
-args['log_every'] = 50
+args['save_every'] = 5 # 50
+args['log_every'] = 5  # 50
 args['plot_to_philly'] = 0
 
 args['dropout_ratio'] = 0.0
