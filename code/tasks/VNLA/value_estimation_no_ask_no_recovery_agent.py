@@ -385,7 +385,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         # Initialize nav loss to be accumulated across batch
         if compute_rollout_loss:
-            self.rollout_value_loss = 0        
+            self.rollout_value_loss = 0
+            self.rollout_value_ref_loss = 0    
 
         # Initialize rotation actions for env (i.e. batch of simulators)
         # each element is a list of max_macro_action_seq_len tuples
@@ -654,7 +655,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 start_time = time.time()
                 # scalar
                 self.rollout_value_loss += self.value_criterion(q_values_rollout_estimate, q_values_target) / tot_pred
-                assert self.rollout_value_loss < 10000
+                self.rollout_value_ref_loss += self.value_ref_criterion(q_values_rollout_estimate, q_values_target) / tot_pred
                 time_report['compute_rollout_value_loss_with_critierion'] += time.time() - start_time
 
             # Translate chosen macro-rotations to env actions
@@ -799,9 +800,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Compute rollout loss to track validation performance
         if compute_rollout_loss:
             start_time = time.time()
-            print ("{} rollout value loss = {}".format(
-                'eval' if self.is_eval else 'training', 
+            print ("{} rollout value {} loss = {}".format(
+                'eval' if self.is_eval else 'training', self.loss_function_str,
                 self.rollout_value_loss/timestep))
+            print ("{} rollout reference value {} loss = {}".format(
+                'eval' if self.is_eval else 'training', self.loss_function_ref_str,
+                self.rollout_value_ref_loss/timestep))
             # if eval under training conditions to report validation loss
             if self.is_eval:
                 self._compute_loss_rollout(global_iter_idx, traj_len=episode_len*1.0)

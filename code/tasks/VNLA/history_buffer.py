@@ -176,7 +176,7 @@ class HistoryBuffer(object):
     def sample_minibatch(self, batch_size):
         '''Sample a training batch for training'''
 
-        assert len(self._indexed_data) >= batch_size, \
+        assert self._curr_buffer_size >= batch_size, \
             '''Buffer doesn't have enough history to sample a batch'''
 
         # Sample (global_idx, instr_id) key pairs

@@ -1,0 +1,502 @@
+description: VNLA aggrevate experiments 10-20 seeds retry 1078 - same train/val and new 3160 with beta fix
+# experiment named vnla_time_comparisons
+
+target:
+  # which virtual cluster you belong to (msrlabs, etc.). Everyone has access to "msrlabs".
+  vc: msrlabs
+  # physical cluster to use (cam, gcr, rr1, rr2) or Azure clusters (eu1, eu2, etc.)
+  cluster: eu1
+
+environment:
+  image: philly/jobs/test/pytorch:pytorch1.2.0-py36-mattersim
+  registry: phillyregistry.azurecr.io
+
+  setup:
+    - pip install scikit-learn --user
+    - python -m pip install networkx==2.3 --user
+    - CUDA_VISIBLE_DEVICES=0
+    # - pip install tensorboard --user
+    # - CUDA_VISIBLE_DEVICES=0,1,2,3
+    # - pip install ipdb --user
+
+storage:
+  input1:
+    storage_account_name: msrairesidentssa4
+    container_name: matterport3d
+    mount_dir: /mnt/matterport3d
+    # local_dir: /home/hoyeung/blob_matterport3d/
+  output:
+    storage_account_name: msrairesidentssa4
+    container_name: experiment-results
+    mount_dir: /mnt/experiment-results-philly/
+    # local_dir: /home/hoyeung/blob_experiments/
+
+code:
+  # local directory of the code. this will be uploaded to the server.
+  # $CONFIG_DIR is expanded to the directory of this config file
+  local_dir: $CONFIG_DIR/
+
+# data:
+#   data upload is not required for this example
+
+# seed list
+# 10 [42, 677, 848, 163, 620, 511, 102, 158, 2, 204]
+# 20 + [471, 154, 220, 748, 623, 47, 882, 136, 315, 48]
+
+# list of jobs to run, we run 2 jobs in this example
+jobs:
+  # name must be unique across the jobs
+- name: data_1078_seed_42
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_1078_seed_42" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 42
+- name: data_1078_seed_677
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_1078_seed_677" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 677
+- name: data_1078_seed_848
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_1078_seed_848" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 848
+- name: data_1078_seed_163
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_1078_seed_163" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 163
+- name: data_1078_seed_620
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_1078_seed_620" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 620
+- name: data_1078_seed_511
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_1078_seed_511" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 511
+- name: data_1078_seed_102
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_1078_seed_102" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 102
+- name: data_1078_seed_158
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_1078_seed_158" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 158
+- name: data_1078_seed_2
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_1078_seed_2" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 2
+- name: data_1078_seed_204
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_1078_seed_204" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 204
+- name: data_3160_seed_42
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_3160_seed_42" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_ten_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 42
+- name: data_3160_seed_677
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_3160_seed_677" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_ten_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 677
+- name: data_3160_seed_848
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_3160_seed_848" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_ten_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 848
+- name: data_3160_seed_163
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_3160_seed_163" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_ten_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 163
+- name: data_3160_seed_620
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_3160_seed_620" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_ten_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 620
+- name: data_3160_seed_511
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_3160_seed_511" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_ten_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 511
+- name: data_3160_seed_102
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_3160_seed_102" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_ten_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 102
+- name: data_3160_seed_158
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_3160_seed_158" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_ten_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 158
+- name: data_3160_seed_2
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_3160_seed_2" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_ten_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 2
+- name: data_3160_seed_204
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200126_philly_aggrevate_seeds" "data_3160_seed_204" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_ten_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 204
+
+
+
+
+
+
+
+# - name: data_1078_seed_42_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_1078_seed_42_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 42
+# - name: data_1078_seed_677_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_1078_seed_677_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 677
+# - name: data_1078_seed_848_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_1078_seed_848_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 848
+# - name: data_1078_seed_163_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_1078_seed_163_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 163
+# - name: data_1078_seed_620_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_1078_seed_620_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 620
+# - name: data_1078_seed_511_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_1078_seed_511_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 511
+# - name: data_1078_seed_102_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_1078_seed_102_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 102
+# - name: data_1078_seed_158_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_1078_seed_158_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 158
+# - name: data_1078_seed_2_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_1078_seed_2_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 2
+# - name: data_1078_seed_204_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_1078_seed_204_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 204
+# - name: data_7954_seed_42_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_7954_seed_42_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 42
+# - name: data_7954_seed_677_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_7954_seed_677_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 677
+# - name: data_7954_seed_848_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_7954_seed_848_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 848
+# - name: data_7954_seed_163_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_7954_seed_163_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 163
+# - name: data_7954_seed_620_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_7954_seed_620_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 620
+# - name: data_7954_seed_511_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_7954_seed_511_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 511
+# - name: data_7954_seed_102_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_7954_seed_102_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 102
+# - name: data_7954_seed_158_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_7954_seed_158_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 158
+# - name: data_7954_seed_2_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_7954_seed_2_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 2
+# - name: data_7954_seed_204_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds_2" "data_7954_seed_204_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 204
+
+
+
+
+
+
+
+# - name: data_94798_seed_42_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_42_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 42
+# - name: data_94798_seed_677_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_677_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 677
+# - name: data_94798_seed_848_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_848_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 848
+# - name: data_94798_seed_163_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_163_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 163
+# - name: data_94798_seed_620_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_620_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 620
+# - name: data_94798_seed_511_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_511_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 511
+# - name: data_94798_seed_102_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_102_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 102
+# - name: data_94798_seed_158_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_158_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 158
+# - name: data_94798_seed_2_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_2_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 2
+# - name: data_94798_seed_204_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_204_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 204
+# - name: data_94798_seed_471_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_471_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 471
+# - name: data_94798_seed_154_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_154_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 154
+# - name: data_94798_seed_220_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_220_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 220
+# - name: data_94798_seed_748_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_748_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 748
+# - name: data_94798_seed_623_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_623_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 623
+# - name: data_94798_seed_47_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_47_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 47
+# - name: data_94798_seed_882_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_882_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 882
+# - name: data_94798_seed_136_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_136_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 136
+# - name: data_94798_seed_315_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_315_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 315
+# - name: data_94798_seed_48_long
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200125_philly_aggrevate_seeds" "data_94798_seed_48_long" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 100000 -seed 48
+
+
+
+
+
+
+
+
+
+
+
+
+# - name: data_100_seed_42_1
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_100_seed_42_1" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 42
+# - name: data_100_seed_42_2
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_100_seed_42_2" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_houses_single_goal_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 42
+# - name: data_1078_seed_42
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_1078_seed_42" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 42
+# - name: data_1078_seed_677
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_1078_seed_677" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 677
+# - name: data_1078_seed_848
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_1078_seed_848" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 848
+# - name: data_1078_seed_163
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_1078_seed_163" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 163
+# - name: data_1078_seed_620
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_1078_seed_620" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 620
+# - name: data_1078_seed_511
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_1078_seed_511" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 511
+# - name: data_1078_seed_102
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_1078_seed_102" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 102
+# - name: data_1078_seed_158
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_1078_seed_158" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 158
+# - name: data_1078_seed_2
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_1078_seed_2" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 2
+# - name: data_1078_seed_204
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_1078_seed_204" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_three_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 204
+# - name: data_7954_seed_42
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_7954_seed_42" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 42
+# - name: data_7954_seed_677
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_7954_seed_677" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 677
+# - name: data_7954_seed_848
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_7954_seed_848" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 848
+# - name: data_7954_seed_163
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_7954_seed_163" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 163
+# - name: data_7954_seed_620
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_7954_seed_620" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 620
+# - name: data_7954_seed_511
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_7954_seed_511" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 511
+# - name: data_7954_seed_102
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_7954_seed_102" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 102
+# - name: data_7954_seed_158
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_7954_seed_158" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 158
+# - name: data_7954_seed_2
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_7954_seed_2" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 2
+# - name: data_7954_seed_204
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_7954_seed_204" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_short -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 204
+# - name: data_14413_seed_42
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_14413_seed_42" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_anylength -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 42
+# - name: data_14413_seed_677
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_14413_seed_677" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_anylength -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 677
+# - name: data_14413_seed_848
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_14413_seed_848" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_anylength -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 848
+# - name: data_14413_seed_163
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_14413_seed_163" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_anylength -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 163
+# - name: data_14413_seed_620
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_14413_seed_620" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix small_thirty_goals_anylength -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 620
+# - name: data_94798_seed_42
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_42" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 42
+# - name: data_94798_seed_677
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_677" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 677
+# - name: data_94798_seed_848
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_848" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 848
+# - name: data_94798_seed_163
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_163" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 163
+# - name: data_94798_seed_620
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_620" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 620
+# - name: data_94798_seed_511
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_511" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 511
+# - name: data_94798_seed_102
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_102" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 102
+# - name: data_94798_seed_158
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_158" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 158
+# - name: data_94798_seed_2
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_2" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 2
+# - name: data_94798_seed_204
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_204" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 204
+# - name: data_94798_seed_471
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_471" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 471
+# - name: data_94798_seed_154
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_154" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 154
+# - name: data_94798_seed_220
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_220" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 220
+# - name: data_94798_seed_748
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_748" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 748
+# - name: data_94798_seed_623
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_623" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 623
+# - name: data_94798_seed_47
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_47" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 47
+# - name: data_94798_seed_882
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_882" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 882
+# - name: data_94798_seed_136
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_136" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 136
+# - name: data_94798_seed_315
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_315" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 315
+# - name: data_94798_seed_48
+#   sku: G1
+#   command:
+#   - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200124_philly_aggrevate_seeds" "data_94798_seed_48" "configs/experiment.json" -batch_size 100 -start_beta_decay 100 -decay_beta_every 100 -min_history_to_learn 1000 -save_every 1000 -log_every 1000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -agent_end_criteria 2.5 -n_iters 50000 -seed 48

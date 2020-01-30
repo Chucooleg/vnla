@@ -90,7 +90,7 @@ def make_parser():
 
     # Aggrevate parameters
     parser.add_argument('-start_beta', type=float,
-        help='aggrevate: expert rollin probability beta to start with, between 0.0 and 1.0')    
+        help='aggrevate: expert rollin probability beta to start with, between 0.0 and 1.0')
     parser.add_argument('-start_beta_decay', type=int,
         help='aggrevate: minimum number of iterations before beta decay')
     parser.add_argument('-beta_decay_rate', type=float,
@@ -110,13 +110,17 @@ def make_parser():
     parser.add_argument('-n_iters', type=int,
         help='number of training iterations (batches)')
     parser.add_argument('-batch_size', type=int,
-        help='batch size (both training and evaluation)')      
+        help='rollout batch size, used to compute val loss as well.')
+    parser.add_argument('-train_batch_size', type=int,
+        help='training batch size, iid examples sampled from history buffer.')    
     parser.add_argument('-save_every', type=int,
         help='number of iterations between model savings')
     parser.add_argument('-log_every', type=int,
         help='number of iterations between information loggings') 
 
     # Optimizer parameters
+    parser.add_argument('-loss_function', type=str,
+        help='loss function. `l1` or `l2`')
     parser.add_argument('-lr', type=float,
         help='learning rate')
     parser.add_argument('-weight_decay', type=float,

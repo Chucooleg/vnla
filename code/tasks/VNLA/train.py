@@ -55,7 +55,7 @@ def set_path():
         if hparams.plot_to_philly:
             hparams.tensorboard_dir = os.environ.get('PHILLY_LOG_DIRECTORY', '.')
         else:
-            hparams.tensorboard_dir =os.environ.get('PT_TENSORBOARD_DIR', '.')
+            hparams.tensorboard_dir = os.environ.get('PT_TENSORBOARD_DIR', '.')
     print ("tensorboard dir = {}".format(hparams.tensorboard_dir))
 
     # Set model load path

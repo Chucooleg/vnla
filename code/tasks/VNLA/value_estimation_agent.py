@@ -38,12 +38,22 @@ class ValueEstimationAgent(NavigationAgent):
         super(ValueEstimationAgent, self).__init__(model, hparams, device)
 
         self.batch_size = hparams.batch_size
+        self.tr_batch_size = hparams.train_batch_size
 
-        # Bootstrap DQN paper used Huber Loss
-        # https://en.wikipedia.org/wiki/Huber_loss
-        # if delta == 1 in Huber Loss
-        # https://pytorch.org/docs/stable/nn.html?highlight=smooth%20l1#torch.nn.SmoothL1Loss
-        self.value_criterion = nn.SmoothL1Loss(reduction='sum')
+        if hparams.loss_function == 'l1':
+            # Bootstrap DQN paper used Huber Loss
+            # https://en.wikipedia.org/wiki/Huber_loss
+            # if delta == 1 in Huber Loss
+            # https://pytorch.org/docs/stable/nn.html?highlight=smooth%20l1#torch.nn.SmoothL1Loss
+            self.loss_function_str = "l1"
+            self.loss_function_ref_str = "l2"
+            self.value_criterion = nn.SmoothL1Loss(reduction='sum')
+            self.value_ref_criterion = nn.MSELoss(reduction='sum')
+        elif hparams.loss_function == 'l2':
+            self.loss_function_str = "l2"
+            self.loss_function_ref_str = "l1"
+            self.value_criterion = nn.MSELoss(reduction='sum')
+            self.value_ref_criterion = nn.SmoothL1Loss(reduction='sum')
 
         # Oracle
         self.value_teacher = make_oracle('frontier_shortest', self.nav_actions, self.env_actions)
@@ -303,7 +313,7 @@ class ValueEstimationAgent(NavigationAgent):
                 
                 # Sample a minibatch from the history buffer
                 start_time = time.time()
-                sampled_training_batch = self.history_buffer.sample_minibatch(self.batch_size)
+                sampled_training_batch = self.history_buffer.sample_minibatch(self.tr_batch_size)
                 time_report['sample_minibatch'] += time.time() - start_time
 
                 # Make predictions on training batch
@@ -333,7 +343,7 @@ class ValueEstimationAgent(NavigationAgent):
 
             # Exponential decay expert-rollin probability beta
             if global_iter_idx >= self.start_beta_decay and global_iter_idx % self.decay_beta_every == 0:
-                self.beta *= (1 - self.beta_decay_rate)
+                self.beta *= self.beta_decay_rate
                 print('New expert roll-in probability %f' % self.beta)
 
         time_report['per_training_interval'] += time.time() - interval_training_iter_start_time
