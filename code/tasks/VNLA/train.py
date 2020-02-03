@@ -63,16 +63,11 @@ def set_path():
         hparams.load_path is not None else \
         os.path.join(hparams.exp_dir, '%s_last.ckpt' % hparams.model_prefix)
 
-    # Set history buffer load path
-    # hparams.history_buffer_path = hparams.history_buffer_path if (hasattr(hparams, 'history_buffer_path') \
-    #     and hparams.history_buffer_path is not None) else os.path.join(hparams.exp_dir, 'history_buffer')
-    # if not os.path.exists(hparams.history_buffer_path):
-    #     os.makedirs(hparams.history_buffer_path)
-
     # Set data load path
     DATA_DIR = os.getenv('PT_DATA_DIR')
     hparams.data_path = os.path.join(DATA_DIR, hparams.data_dir)  #e.g. $PT_DATA_DIR/asknav/
-    hparams.img_features = os.path.join(DATA_DIR, 'img_features/ResNet-152-imagenet.tsv')
+    hparams.img_features = os.path.join(DATA_DIR, hparams.img_features)
+    # hparams.img_features = os.path.join(DATA_DIR, 'img_features/ResNet-152-imagenet.tsv')
 
 def save(path, model, optimizer, iter, best_metrics, train_env, history_buffer, beta):
     '''save model checkpt'''
@@ -159,7 +154,6 @@ def compute_ask_stats(traj):
             for k in teacher_reason_counter.keys() if k not in ['pass', 'exceed']])
 
     return ask_loss_str    
-
 
 def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     best_metrics, eval_mode, explore_env=None):
@@ -367,16 +361,9 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                 save(save_path, model, optimizer, iter, best_metrics, train_env, agent.history_buffer, agent.beta)
                 print("Saved %s model to %s" % (env_name, save_path))
 
-            # Save latest history buffer
-            # save_buffer_start_time = time.time()
-            # if (iter == end_iter or iter % hparams.save_every == 0) and \
-            #     hparams.navigation_objective == 'value_estimation':
-            #     agent.history_buffer.save_buffer(hparams.history_buffer_path)
-            # print("Saving history buffer time = {}".format(time.time() - save_buffer_start_time))
-
             # log time again after saving
-            print('%s (%d %d%%) %s' % (timeSince(start, float(iter)/end_iter),
-                iter, float(iter)/end_iter*100, loss_str)) 
+            print('%s (%d %d%%)' % (timeSince(start, float(iter)/end_iter),
+                iter, float(iter)/end_iter*100)) 
 
         # progress per training job on philly
         print("PROGRESS: {}%".format(float(iter)/end_iter*100))

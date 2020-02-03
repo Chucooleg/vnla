@@ -1,0 +1,28 @@
+{
+    "local_run"             : 0,
+
+    "seed"                  : 1,
+    "img_features"          : "img_features/ResNet-152-imagenet.tsv",
+    "scans_path"            : "semantics/asknav_tr_scans.txt",
+    "room_types_path"       : "semantics/asknav_tr_room_types.txt",
+
+    "img_feature_size"      : 2048,
+
+    "n_unseen_scans"        : 4,
+    "n_epochs"              : 1000,
+    "batch_size"            : 100,
+    "save_every"            : 10,
+
+    "lr"                    : 1e-4,
+    "weight_decay"          : 5e-4,
+    "start_lr_decay"        : 5,
+    "lr_decay_rate"         : 1,
+    "decay_lr_every"        : 1,
+
+    "hidden_layers"         : [1024, 512],
+    "dropout_ratio"         : 0.5,
+
+    "plot_to_philly"        : 0,
+
+    "eval_only"             : 0
+}

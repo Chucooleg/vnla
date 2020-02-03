@@ -17,6 +17,29 @@ from action_imitation_no_ask_agent import ActionImitationNoAskAgent
 from value_estimation_no_ask_no_recovery_agent import ValueEstimationNoAskNoRecoveryAgent
 
 
+class FFSemanticClassifier(nn.Module):
+
+    def __init__(self, hparams, room_types, device):
+        super(FFSemanticClassifier, self).__init__()
+
+        self.fc_layers = nn.ModuleList()
+        self.drop = nn.Dropout(p=hparams.dropout_ratio)
+        fc_in_size = hparams.img_feature_size
+        for fc_out_size in hparams.hidden_layers:
+            fc_layer = nn.Linear(fc_in_size, fc_out_size)
+            self.fc_layers.append(fc_layer)
+            fc_in_size = fc_out_size
+
+        self.final_layer = nn.Linear(fc_out_size, len(room_types))
+
+    def forward(self, x):
+        for fc_layer in self.fc_layers:
+            x = self.drop(F.relu(fc_layer(x)))
+        # logits (batch_size, 30)
+        x = self.final_layer(x)
+        return x
+
+
 class EncoderLSTM(nn.Module):
 
     def __init__(self, vocab_size, embedding_size, hidden_size, padding_idx,

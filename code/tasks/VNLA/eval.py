@@ -142,8 +142,3 @@ class Evaluation(object):
             score_summary['room_success_rate'] = float(sum(self.scores['room_successes'])) / \
                 len(self.scores['room_successes'])
         return score_summary, self.scores, is_success
-
-
-
-
-

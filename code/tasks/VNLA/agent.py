@@ -12,7 +12,6 @@ from torch import optim
 from torch.autograd import Variable
 import torch.nn.functional as F
 
-from tensorboardX import SummaryWriter
 from utils import padding_idx
 
 
@@ -25,8 +24,6 @@ class BaseAgent(object):
         random.seed(1)
         self.results = {}
         self.results_path = None
-        # self.SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
-        # self.SW = SummaryWriter(os.path.join(hparams.tensorboard_dir, , '' if hparams.plot_to_philly else 'agent'), flush_secs=30)
 
     def write_results(self):
         output = []

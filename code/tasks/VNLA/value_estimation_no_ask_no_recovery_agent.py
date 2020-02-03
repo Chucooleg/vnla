@@ -40,7 +40,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Used to initialize exploration environment, may not be necessary
         self.img_features = hparams.img_features
         self.agent_end_criteria = hparams.agent_end_criteria
-        self.debug_mode = hparams.debug_mode
 
     @staticmethod
     def n_input_nav_actions():
