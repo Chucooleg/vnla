@@ -4,8 +4,8 @@ from train_semantics import vs_code_debug
 
 # from train_experiments.sh
 exp_name = "20200201_debug_semantics"
-job_name = "debug_pre_tunning_42_2"
-config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment_semantic_classifier.json"
+job_name = "debug_pre_tunning_42_3"
+config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiments_semantic_classifier.json"
 
 # from scripts/define_vars.sh
 # always local
@@ -29,6 +29,8 @@ args['config_file'] = config_file
 args['exp_name'] = exp_name
 args['job_name'] = job_name
 
+args['image_extent'] = 'vertical'
+
 # extras here!
 args['n_unseen_scans'] = 1
 args['n_epochs'] = 100
@@ -42,7 +44,7 @@ args['plot_to_philly'] = 0
 
 args['dropout_ratio'] = 0.5
 args['seed'] = 42
-args['hidden_layers'] = [1024, 512]
+args['layers'] = 2
 
 args['scans_path'] = "semantics/asknav_tr_scans.txt"
 

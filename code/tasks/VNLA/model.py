@@ -19,16 +19,29 @@ from value_estimation_no_ask_no_recovery_agent import ValueEstimationNoAskNoReco
 
 class FFSemanticClassifier(nn.Module):
 
-    def __init__(self, hparams, room_types, device):
+    def __init__(self, hparams, room_types):
         super(FFSemanticClassifier, self).__init__()
 
         self.fc_layers = nn.ModuleList()
         self.drop = nn.Dropout(p=hparams.dropout_ratio)
-        fc_in_size = hparams.img_feature_size
-        for fc_out_size in hparams.hidden_layers:
+
+        if hparams.image_extent == 'single':
+            fc_in_size = hparams.img_feature_size
+        elif hparams.image_extent == 'vertical':
+            fc_in_size = hparams.img_feature_size * 3
+        elif hparams.image_extent == 'full':
+            fc_in_size = hparams.img_feature_size * 36
+        else:
+            raise ValueError("check argument for hparams.image_extent.")
+
+        fc_out_size = fc_in_size
+        ct = 1
+        while fc_in_size/2 > len(room_types) and ct < hparams.layers:
+            fc_out_size = int(fc_in_size/2)
             fc_layer = nn.Linear(fc_in_size, fc_out_size)
             self.fc_layers.append(fc_layer)
             fc_in_size = fc_out_size
+            ct += 1
 
         self.final_layer = nn.Linear(fc_out_size, len(room_types))
 

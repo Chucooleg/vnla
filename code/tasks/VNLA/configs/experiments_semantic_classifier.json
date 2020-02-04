@@ -6,6 +6,7 @@
     "scans_path"            : "semantics/asknav_tr_scans.txt",
     "room_types_path"       : "semantics/asknav_tr_room_types.txt",
 
+    "image_extent"          : "single", 
     "img_feature_size"      : 2048,
 
     "n_unseen_scans"        : 4,
@@ -19,7 +20,7 @@
     "lr_decay_rate"         : 1,
     "decay_lr_every"        : 1,
 
-    "hidden_layers"         : [1024, 512],
+    "layers"                : 1,
     "dropout_ratio"         : 0.5,
 
     "plot_to_philly"        : 0,

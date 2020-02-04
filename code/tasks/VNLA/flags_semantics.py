@@ -26,8 +26,22 @@ def make_parser():
         help='path to pretrained image embeddings')
     parser.add_argument('-img_feature_size', type=int,
         help='image embedding size')
+    parser.add_argument('-img_extent', type=str,
+        help='how much each prediction covers the panoramic sphere. "single" for single frame, "vertical" for full vertical 3 frames, "full" for all 36 frames in the sphere.')        
     parser.add_argument('-n_unseen_scans', type=int,
         help='number of scans to reserve for unseen validation')
+        
+    parser.add_argument('-scans_path', type=str,
+        help='path to text file that stores all original asknav training scans')   
+    parser.add_argument('-room_types_path', type=str,
+        help='path to text file that stores room types in original asknav training scans')
+
+    parser.add_argument('-tr_idx_save_path', type=str,
+        help='path to text file that stores training long_id, viewix and label')   
+    parser.add_argument('-val_seen_idx_save_path', type=str,
+        help='path to text file that stores val seen long_id, viewix and label')
+    parser.add_argument('-val_unseen_idx_save_path', type=str,
+        help='path to text file that stores val unseen long_id, viewix and label')
 
     # Training Loop parameters
     parser.add_argument('-n_epochs', type=int,
@@ -50,8 +64,8 @@ def make_parser():
         help='number of iterations between learning rate decays')
 
     # classifier parameters
-    parser.add_argument('-hidden_layers', type=list,
-        help='list of hidden layer sizes for classifier, can be empty.')
+    parser.add_argument('-layers', type=int,
+        help='number of layers for classifier, min 1.')
     parser.add_argument('-dropout_ratio', type=float,
         help='dropout ratio float.')
 

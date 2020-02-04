@@ -30,7 +30,8 @@ def set_path():
     hparams.exp_dir = os.getenv('PT_EXP_DIR')
 
     # Set model prefix
-    hparams.model_prefix = "semantic_classifier_layers_{}_lr_{}".format(len(hparams.hidden_layers), hparams.lr)
+    assert hparams.layers >= 1
+    hparams.model_prefix = "semantic_classifier_layers_{}_lr_{}".format(hparams.layers, hparams.lr)
 
     # Set tensorboard log dir
     if hparams.local_run:
@@ -57,9 +58,12 @@ def set_path():
     hparams.room_types_path = os.path.join(DATA_DIR, hparams.room_types_path)
 
     # Where to save training and validation indices
-    hparams.tr_idx_save_path = os.path.join(hparams.exp_dir, 'train_indices.txt')
-    hparams.val_seen_idx_save_path = os.path.join(hparams.exp_dir, 'val_seen_indices.txt')
-    hparams.val_unseen_idx_save_path = os.path.join(hparams.exp_dir, 'val_unseen_indices.txt')
+    hparams.tr_idx_save_path = os.path.join(DATA_DIR, hparams.tr_idx_save_path) if hasattr(hparams, 'tr_idx_save_path') else \
+        os.path.join(hparams.exp_dir, 'train_indices.txt')
+    hparams.val_seen_idx_save_path = os.path.join(DATA_DIR, hparams.val_seen_idx_save_path) if hasattr(hparams, 'val_seen_idx_save_path') else \
+        os.path.join(hparams.exp_dir, 'val_seen_indices.txt')
+    hparams.val_unseen_idx_save_path = os.path.join(DATA_DIR, hparams.val_unseen_idx_save_path) if hasattr(hparams, 'val_unseen_idx_save_path') else \
+        os.path.join(hparams.exp_dir, 'val_unseen_indices.txt')
 
 def setup(seed=None):
     '''
@@ -101,7 +105,7 @@ def load(path, device):
     set_path()
     return ckpt
 
-def retrieve_rm_labels_and_feature_ids(scans, room_types):
+def retrieve_rm_labels_and_feature_ids(scans):
     rm_labels = []
     feature_ids = []
     for scan in scans:
@@ -111,11 +115,11 @@ def retrieve_rm_labels_and_feature_ids(scans, room_types):
             room_label_str = scan_panos_to_region[n]
             long_id = scan + '_' + n
             for viewix in range(36):
-                rm_labels.append(room_types.index(room_label_str))
+                rm_labels.append(room_label_str)
                 feature_ids.append((long_id, viewix))
     return rm_labels, feature_ids
 
-def read_rm_labels_and_feature_ids(idx_save_path):
+def read_rm_labels_and_feature_ids(idx_save_path, room_types, image_extent):
     feature_ids = []
     room_labels = []
     with open(idx_save_path, 'r') as fh:
@@ -123,9 +127,12 @@ def read_rm_labels_and_feature_ids(idx_save_path):
         lines = lines[:-1]
         for line in lines:
             long_id, viewix, room_label = line.split('\t')
-            room_labels.append(int(room_label))
-            feature_ids.append((long_id, int(viewix)))
-            
+            if image_extent != 'single':
+                room_labels.append(room_types.index(room_label))
+                feature_ids.append((long_id, eval(viewix)))
+            else:
+                room_labels.append(room_types.index(room_label))
+                feature_ids.append((long_id, int(viewix)))
     return feature_ids, room_labels
 
 def train_val(device, seed=None):
@@ -173,18 +180,19 @@ def train_val(device, seed=None):
     # image_h, image_w, vfov, all_img_features = utils.load_img_features(hparams.img_features)
     image_h, image_w, vfov, all_img_features = utils.load_img_features_as_tensors(hparams.img_features)
 
-    # Get define training and val Datasets
-    random.shuffle(scans) 
-
     # ---------- Split scans and create Datasets
     if os.path.exists(hparams.tr_idx_save_path) and os.path.exists(hparams.val_seen_idx_save_path) and \
         os.path.exists(hparams.val_unseen_idx_save_path):
         
-        tr_seen_feature_ids, tr_seen_rm_labels = read_rm_labels_and_feature_ids(hparams.tr_idx_save_path)
-        val_seen_feature_ids, val_seen_rm_labels = read_rm_labels_and_feature_ids(hparams.val_seen_idx_save_path)
-        val_unseen_feature_ids, val_unseen_rm_labels = read_rm_labels_and_feature_ids(hparams.val_unseen_idx_save_path)
+        print ("index and label save path exists, loading from these text files...")
+        print ("{}\n{}\n{}".format(hparams.tr_idx_save_path, hparams.val_seen_idx_save_path, hparams.val_unseen_idx_save_path))
+        tr_seen_feature_ids, tr_seen_rm_labels = read_rm_labels_and_feature_ids(hparams.tr_idx_save_path, room_types, hparams.image_extent)
+        val_seen_feature_ids, val_seen_rm_labels = read_rm_labels_and_feature_ids(hparams.val_seen_idx_save_path, room_types, hparams.image_extent)
+        val_unseen_feature_ids, val_unseen_rm_labels = read_rm_labels_and_feature_ids(hparams.val_unseen_idx_save_path, room_types, hparams.image_extent)
 
-    else:
+    elif hparams.image_extent == 'single':
+
+        random.shuffle(scans)
 
         # Split into seen and unseen scans
         val_unseen_scans = np.random.choice(scans, size=hparams.n_unseen_scans, replace=False)
@@ -192,8 +200,8 @@ def train_val(device, seed=None):
         seen_scans = [scan for scan in scans if scan not in val_unseen_scans]
 
         # Expand into datapts -- feature_ids and labels 
-        seen_rm_labels, seen_feature_ids = retrieve_rm_labels_and_feature_ids(seen_scans, room_types)
-        val_unseen_rm_labels, val_unseen_feature_ids = retrieve_rm_labels_and_feature_ids(val_unseen_scans, room_types)
+        seen_rm_labels, seen_feature_ids = retrieve_rm_labels_and_feature_ids(seen_scans)
+        val_unseen_rm_labels, val_unseen_feature_ids = retrieve_rm_labels_and_feature_ids(val_unseen_scans)
 
         # Sample val seen idx from seen datapts
         val_seen_idx = np.random.choice(len(seen_feature_ids), size=len(val_unseen_feature_ids), replace=False)
@@ -224,6 +232,14 @@ def train_val(device, seed=None):
             for i, feat_id in enumerate(val_unseen_feature_ids):
                 fh.write("{}\t{}\t{}\n".format(feat_id[0], feat_id[1], val_unseen_rm_labels[i]))
 
+        # convert room labels from string to integer indices
+        tr_seen_rm_labels = [room_types.index(lab) for lab in tr_seen_rm_labels]
+        val_seen_rm_labels = [room_types.index(lab) for lab in val_seen_rm_labels]
+        val_unseen_rm_labels = [room_types.index(lab) for lab in val_unseen_rm_labels]
+
+    else:
+        raise ValueError('Check arguments for hparams.image_extent. If using more than one frame from panorama to make classification, must read from predefined indices & label files.')
+
     # Make torch datasets
     tr_dataset = PanoramaDataset(tr_seen_rm_labels, tr_seen_feature_ids, all_img_features)
     val_seen_dataset = PanoramaDataset(val_seen_rm_labels, val_seen_feature_ids, all_img_features)
@@ -234,7 +250,7 @@ def train_val(device, seed=None):
     assert len(room_types) == 30
 
     # Build model
-    model = FFSemanticClassifier(hparams, room_types, device).to(device)
+    model = FFSemanticClassifier(hparams, room_types).to(device)
 
     # Specify optimizer
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
@@ -276,7 +292,8 @@ def train(tr_dataset, val_seen_dataset, val_unseen_dataset, room_types, model, o
     if not eval_only:
         print('Training with with lr = %f' % optimizer.param_groups[0]['lr'])
 
-    n_workers = max(1, multiprocessing.cpu_count() - 2) if not hparams.local_run else 2
+    # n_workers = max(1, multiprocessing.cpu_count() - 2) if not hparams.local_run else 2
+    n_workers = 2
     tr_data_loader = DataLoader(tr_dataset, batch_size=hparams.batch_size, shuffle=True, num_workers=n_workers)
     val_seen_data_loader = DataLoader(val_seen_dataset, batch_size=hparams.batch_size, shuffle=True, num_workers=n_workers)
     val_unseen_data_loader = DataLoader(val_unseen_dataset, batch_size=hparams.batch_size, shuffle=True, num_workers=n_workers)
@@ -462,7 +479,7 @@ def train(tr_dataset, val_seen_dataset, val_unseen_dataset, room_types, model, o
 
     return None
 
-if __name__ == 'main':
+if __name__ == '__main__':
 
     parser = make_parser()
     args = parser.parse_args()
