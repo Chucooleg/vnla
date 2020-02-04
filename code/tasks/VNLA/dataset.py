@@ -4,12 +4,11 @@ from torch.utils.data import Dataset
 class PanoramaDataset(Dataset):
     """Indoor panoramic view dataset"""
 
-    def __init__(self, rm_labels, feature_ids, all_img_features, image_extent):
+    def __init__(self, rm_labels, feature_ids, all_img_features):
         self.rm_labels = torch.tensor(rm_labels)
         self.feature_ids = feature_ids
         # already pytroch tensors
         self.all_img_features = all_img_features
-        self.image_extent = image_extent
 
     def __len__(self):
         return len(self.feature_ids)
@@ -23,6 +22,7 @@ class PanoramaDataset(Dataset):
 
         if isinstance(viewix, tuple):
             feature = torch.cat([self.all_img_features[long_id][vix, :] for vix in viewix])
+            viewix = viewix[1]  # only take the eye-level viewix
         elif isinstance(viewix, int):
             feature = self.all_img_features[long_id][viewix, :]
         else:

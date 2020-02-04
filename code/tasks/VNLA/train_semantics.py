@@ -399,6 +399,7 @@ def train(tr_dataset, val_seen_dataset, val_unseen_dataset, room_types, model, o
                         logits_list = logits_data.tolist()
                         rooms_list = rooms.data.tolist()
                         viewixs_list = viewixs.tolist()
+                        
                         for j, feat_id in enumerate(zip(long_ids, viewixs_list)):
                             results.append({
                                 'feature_id': feat_id,

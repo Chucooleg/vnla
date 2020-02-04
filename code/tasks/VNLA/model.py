@@ -45,6 +45,7 @@ class FFSemanticClassifier(nn.Module):
 
         self.final_layer = nn.Linear(fc_out_size, len(room_types))
 
+
     def forward(self, x):
         for fc_layer in self.fc_layers:
             x = self.drop(F.relu(fc_layer(x)))

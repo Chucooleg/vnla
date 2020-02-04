@@ -26,7 +26,7 @@ def make_parser():
         help='path to pretrained image embeddings')
     parser.add_argument('-img_feature_size', type=int,
         help='image embedding size')
-    parser.add_argument('-img_extent', type=str,
+    parser.add_argument('-image_extent', type=str,
         help='how much each prediction covers the panoramic sphere. "single" for single frame, "vertical" for full vertical 3 frames, "full" for all 36 frames in the sphere.')        
     parser.add_argument('-n_unseen_scans', type=int,
         help='number of scans to reserve for unseen validation')
