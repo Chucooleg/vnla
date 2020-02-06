@@ -495,6 +495,9 @@ class VerbalAskAgent(AskAgent):
             self.nav_actions.index('<start>')
         q_t = torch.ones(batch_size, dtype=torch.long, device=self.device) * \
             self.ask_actions.index('<start>')
+        
+        # Initialize image features
+        f_t = torch.zeros(batch_size, self.img_feature_size, dtype=torch.float, device=self.device)
 
         # Whether agent decides to stop
         ended = np.array([False] * batch_size)
@@ -535,7 +538,8 @@ class VerbalAskAgent(AskAgent):
             ask_logit_mask[list(zip(*ask_mask_indices))] = 1
 
             # Image features
-            f_t = self._feature_variable(obs)
+            if not self.blind_fold:
+                f_t = self._feature_variable(obs)
 
             # Budget features
             b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)
