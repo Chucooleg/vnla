@@ -1,0 +1,182 @@
+description: VNLA debug semantic dagger debug
+# experiment named vnla_time_comparisons
+
+target:
+  # which virtual cluster you belong to (msrlabs, etc.). Everyone has access to "msrlabs".
+  vc: msrlabs
+  # physical cluster to use (cam, gcr, rr1, rr2) or Azure clusters (eu1, eu2, etc.)
+  cluster: eu2
+
+environment:
+  image: philly/jobs/test/pytorch:pytorch1.2.0-py36-mattersim
+  registry: phillyregistry.azurecr.io
+
+  setup:
+    - pip install scikit-learn --user
+    - python -m pip install networkx==2.3 --user
+    - CUDA_VISIBLE_DEVICES=0
+    # - CUDA_VISIBILE_DEVICES=0,1,2,3
+    # - pip install ipdb --user
+
+storage:
+  input1:
+    storage_account_name: msrairesidentssa4
+    container_name: matterport3d
+    mount_dir: /mnt/matterport3d
+    # local_dir: /home/hoyeung/blob_matterport3d/
+  output:
+    storage_account_name: msrairesidentssa4
+    container_name: experiment-results
+    mount_dir: /mnt/experiment-results-philly
+    # local_dir: /home/hoyeung/Documents/vnla/code/tasks/VNLA/output
+
+code:
+  # local directory of the code. this will be uploaded to the server.
+  # $CONFIG_DIR is expanded to the directory of this config file
+  local_dir: $CONFIG_DIR/
+
+
+# data:
+#   data upload is not required for this example
+
+# list of jobs to run, we run 2 jobs in this example
+jobs:
+    # name must be unique across the jobs
+  - name: dup_dagger_no_ask_semantic_0_seed_42_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dup_dagger_no_ask_semantic_0_seed_42_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 42 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 0 -room_cheat 0
+
+  - name: dup_dagger_no_ask_semantic_1_seed_42_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dup_dagger_no_ask_semantic_1_seed_42_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 42 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 1 -room_cheat 1
+
+  - name: dagger_no_ask_semantic_0_seed_42_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_0_seed_42_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 42 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 0 -room_cheat 0
+    
+
+  - name: dagger_no_ask_semantic_1_seed_42_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_1_seed_42_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 42 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 1 -room_cheat 1
+    
+
+  - name: dagger_no_ask_semantic_0_seed_677_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_0_seed_677_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 677 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 0 -room_cheat 0
+    
+
+  - name: dagger_no_ask_semantic_1_seed_677_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_1_seed_677_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 677 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 1 -room_cheat 1
+    
+
+  - name: dagger_no_ask_semantic_0_seed_848_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_0_seed_848_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 848 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 0 -room_cheat 0
+    
+
+  - name: dagger_no_ask_semantic_1_seed_848_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_1_seed_848_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 848 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 1 -room_cheat 1
+    
+
+  - name: dagger_no_ask_semantic_0_seed_163_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_0_seed_163_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 163 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 0 -room_cheat 0
+    
+
+  - name: dagger_no_ask_semantic_1_seed_163_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_1_seed_163_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 163 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 1 -room_cheat 1
+    
+
+  - name: dagger_no_ask_semantic_0_seed_620_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_0_seed_620_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 620 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 0 -room_cheat 0
+    
+
+  - name: dagger_no_ask_semantic_1_seed_620_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_1_seed_620_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 620 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 1 -room_cheat 1
+    
+
+  - name: dagger_no_ask_semantic_0_seed_511_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_0_seed_511_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 511 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 0 -room_cheat 0
+    
+
+  - name: dagger_no_ask_semantic_1_seed_511_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_1_seed_511_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 511 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 1 -room_cheat 1
+    
+
+  - name: dagger_no_ask_semantic_0_seed_102_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_0_seed_102_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 102 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 0 -room_cheat 0
+    
+
+  - name: dagger_no_ask_semantic_1_seed_102_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_1_seed_102_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 102 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 1 -room_cheat 1
+    
+
+  - name: dagger_no_ask_semantic_0_seed_158_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_0_seed_158_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 158 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 0 -room_cheat 0
+    
+
+  - name: dagger_no_ask_semantic_1_seed_158_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_1_seed_158_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 158 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 1 -room_cheat 1
+    
+
+  - name: dagger_no_ask_semantic_0_seed_2_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_0_seed_2_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 2 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 0 -room_cheat 0
+    
+
+  - name: dagger_no_ask_semantic_1_seed_2_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_1_seed_2_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 2 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 1 -room_cheat 1
+    
+
+  - name: dagger_no_ask_semantic_0_seed_204_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_0_seed_204_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 204 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 0 -room_cheat 0
+    
+
+  - name: dagger_no_ask_semantic_1_seed_204_batch_size_100_lr_0.0001
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "dagger_no_ask_semantic_1_seed_204_batch_size_100_lr_0.0001" "configs/verbal_hard.json" -seed 204 -batch_size 100 -lr 0.0001 -no_ask 1 -with_semantics 1 -room_cheat 1
+
+
+#   - name: debug_semantic_dagger
+#     sku: G1
+#     command:
+#     - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "debug_semantic_dagger" "configs/verbal_hard.json" -seed 42 -no_ask 1 -with_semantics 1 -room_cheat 1
+#   - name: debug_plain_dagger
+#     sku: G1
+#     command:
+#     - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200205_philly_debug_semantic_dagger" "debug_plain_dagger" "configs/verbal_hard.json" -seed 42 -no_ask 1 -with_semantics 0 -room_cheat 0

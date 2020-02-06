@@ -10,6 +10,7 @@ import random
 import sys
 import copy
 import numpy as np
+from collections import defaultdict
 
 import torch
 
@@ -442,6 +443,28 @@ class StepByStepSubgoalOracle(object):
         verbal_instruction = self._map_actions_to_instruction(action_seq)
         return action_seq, verbal_instruction
 
+# semantics update
+class CurrentRoomTypeOracle(object):
+
+    def __init__(self, room_types):
+        self.room_types = room_types
+        self.pano_to_regions_all_scans = defaultdict(dict)
+        # read in a full set of panos_to_regions
+
+    def _lookup(self, ob):
+        if not ob['scan'] in self.pano_to_regions_all_scans.keys():
+            self.pano_to_regions_all_scans[ob['scan']] = utils.load_panos_to_region(ob['scan'], '')
+        # e.g. 'h' for hallway
+        rm_label_str = self.pano_to_regions_all_scans[ob['scan']][ob['viewpoint']]
+        return self.room_types.index(rm_label_str)
+
+    def __call__(self, obs):
+        '''return shape (batch_size, len(room_types)). each row a 1-hot vector'''
+        rm_label_indices = list(map(self._lookup, obs))
+        # convert to 1-hot vector per row
+        rm_label_1_hots = np.zeros(shape=(len(obs), len(self.room_types)))
+        rm_label_1_hots[np.arange(len(obs)), rm_label_indices] = 1
+        return rm_label_1_hots
 
 def make_oracle(oracle_type, *args, **kwargs):
     if oracle_type == 'shortest':
@@ -455,6 +478,10 @@ def make_oracle(oracle_type, *args, **kwargs):
         return MultistepShortestPathOracle(*args, **kwargs)
     if oracle_type == 'verbal':
         return StepByStepSubgoalOracle(*args, **kwargs)
+
+    # semantics update
+    if oracle_type == 'curr_room_type':
+        return CurrentRoomTypeOracle(*args, **kwargs)
 
     return None
 

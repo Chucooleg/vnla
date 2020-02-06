@@ -12,6 +12,8 @@ def make_parser():
         help='path to load a pretrained model')
    parser.add_argument('-exp_name', type=str,
         help='name of the experiment')
+   parser.add_argument('-job_name', type=str,
+        help='name of the job')
    parser.add_argument('-seed', type=int,
         help='random seed')
    parser.add_argument('-data_dir', type=str,
@@ -117,18 +119,20 @@ def make_parser():
    parser.add_argument('-rule_b_d', type=int,
         help='Use rules (b) to (d) only for help-requesting teacher')
 
-   # Bootstrapping settings
-   parser.add_argument('-bootstrap', type=int, default=1,
-        help='bootstrap on (1) or off (0)')
-   parser.add_argument('-n_ensemble', type=int, default=10,
-        help='number of bootstrap heads')
-   parser.add_argument('-bernoulli_probability', type=float, default=1.0,
-        help='bernoulli probability that a datapt is exposed to backprop a head')
-   parser.add_argument('-bootstrap_majority_vote', type=int, default=1,
-        help='majority vote among heads (1) or sampling heads (0)')
-   parser.add_argument('-gradient_clipping', type=int, default=1,
-        help='gradient clipping on (1) or off (0)')
-   parser.add_argument('-clip_grad', type=float, default=5,
-        help='clip grad for gradient clipping')
+   # Semantics
+   parser.add_argument('-with_semantics', type=int,
+        help='semantics on (1) or off (0)')
+   parser.add_argument('-room_types_path', type=str,
+        help='DATA_DIR/<path> that points to a text file with room types. ')
+   parser.add_argument('-room_cheat', type=int,
+        help='cheat with room label oracle on (1) or off (0)')
+
+   # blind fold
+   parser.add_argument('-blind_fold', type=int,
+        help='blind fold agent on (1) or off (0)')  
+
+   # tensorboard
+   parser.add_argument('-plot_to_philly', type=int,
+        help='plot to philly platform 1/0. default 0')
 
    return parser

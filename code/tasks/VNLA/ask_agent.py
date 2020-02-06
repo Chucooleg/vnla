@@ -41,8 +41,8 @@ class AskAgent(BaseAgent):
     ask_actions = ['dont_ask', 'ask', '<start>', '<ignore>']
     feedback_options = ['teacher', 'argmax', 'sample']
 
-    def __init__(self, model, hparams, device, should_make_advisor=True):
-        super(AskAgent, self).__init__()
+    def __init__(self, model, hparams, room_types, device, should_make_advisor=True):
+        super(AskAgent, self).__init__(hparams.seed)
         self.model = model
         self.episode_len = hparams.max_episode_length
         self.nav_criterion = nn.CrossEntropyLoss(
@@ -71,30 +71,22 @@ class AskAgent(BaseAgent):
 
         self.coverage_size = hparams.coverage_size if hasattr(hparams, 'coverage_size') else None
 
-        # Bootstrap - set num heads and bernoulli prob
-        self.bootstrap = hasattr(hparams, 'bootstrap') and hparams.bootstrap
-        self.n_ensemble = 10       
-        self.bernoulli_probability = 0.5
-        self.bootstrap_majority_vote = True # False means sampling one head
-        self.random_state = np.random.RandomState(999)
-        
-        if self.bootstrap:
-            if hasattr(hparams, 'n_ensemble'):
-                self.n_ensemble =  int(hparams.n_ensemble)
-            if hasattr(hparams, 'bernoulli_probability'):
-                self.bernoulli_probability =  hparams.bernoulli_probability
-            # assert(self.n_ensemble > 1), "ensemble must have more than one head"
-            assert(self.bernoulli_probability > 0.0), "boostrap bernoulli prob must be greater than 0.0"
-            if hasattr(hparams, 'bootstrap_majority_vote'):
-                self.bootstrap_majority_vote =  hparams.bootstrap_majority_vote
+        # semantics update
+        self.with_semantics = hasattr(hparams, 'with_semantics') \
+                                 and hparams.with_semantics
+        if self.with_semantics:
+            self.room_types = room_types
+            if hparams.room_cheat:
+                self.room_classifier = make_oracle('curr_room_type', room_types)
+            else:
+                raise ValueError('learned room classifier not implemented yet.')
 
-        # Optional Gradient Clipping
-        self.gradient_clipping = hasattr(hparams, 'gradient_clipping') and hparams.gradient_clipping
-        if self.gradient_clipping:
-            self.clip_grad = float(hparams.clip_grad)
+        # blind fold
+        self.blind_fold = hasattr(hparams, 'blind_fold') \
+                                 and hparams.blind_fold
+        self.img_feature_size = hparams.img_feature_size
 
-        self.SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
-        # self.SW = SummaryWriter(os.environ.get('PHILLY_LOG_DIRECTORY', '.'), flush_secs=30) # view from browser
+        # self.SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
 
     @staticmethod
     def n_input_nav_actions():
@@ -180,41 +172,6 @@ class AskAgent(BaseAgent):
             ob['agent_path'] = traj[i]['agent_path']
             ob['ended'] = ended[i]
             ob['time_step'] = time_step
-
-    def _populate_agent_state_to_obs_single_to_multihead(self, obs, *args):
-        """take single obs from last time step, return tentative obs for all heads. called after the first decoding pass
-        """
-        nav_softmax_heads, queries_unused, traj, ended, time_step, n_ensemble = args
-        assert len(nav_softmax_heads) == n_ensemble
-        # nav_softmax_heads is a list of tensors
-        nav_dist_heads = [nav_softmax.data.tolist() for nav_softmax in nav_softmax_heads]
-        # obs_multihead has len=n_ensemble, each len=batch_size
-        obs_multihead = [[{} for i in range(len(obs))] for k in range(n_ensemble)]
-        for k in range(n_ensemble):
-            # these are the fields we want to add for each obs
-            # obs_multihead[k] = [{"nav_dist": None, "queries_unused":None, "agent_path":None, "ended":None, "time_step":None} for i in range(len(obs))]
-            for i, ob in enumerate(obs):
-                obs_multihead[k][i] = copy.copy(ob)
-                obs_multihead[k][i]['nav_dist'] = nav_dist_heads[k][i]
-                obs_multihead[k][i]['queries_unused'] = copy.copy(queries_unused[i]) # maybe modified with asking
-                obs_multihead[k][i]['agent_path'] = traj[i]['agent_path']
-                obs_multihead[k][i]['ended'] = ended[i]
-                obs_multihead[k][i]['time_step'] = time_step
-        return obs_multihead
-
-    def _populate_agent_state_to_obs_multi_to_multihead(self, obs_multihead, *args):
-        """take obs for all heads, return final obs for all heads. called after the second decoding pass
-        """
-        # nav_softmax_heads, queries_unused_heads, traj, ended, time_step, n_ensemble = args
-        nav_softmax_heads, queries_unused_heads, _, _, _, n_ensemble = args
-        # nav_softmax_heads is a list of tensors
-        nav_dist_heads = [nav_softmax.data.tolist() for nav_softmax in nav_softmax_heads]
-        for k in range(n_ensemble):
-            for i, ob in enumerate(obs_multihead[k]):
-                obs_multihead[k][i]['nav_dist'] = nav_dist_heads[k][i]
-                obs_multihead[k][i]['queries_unused'] = queries_unused_heads[k][i]
-                # agent_path, ended and time_step stays the same so we don't update
-        return obs_multihead
 
     def _should_ask(self, ended, q):
         return not ended and q == self.ask_actions.index('ask')
@@ -404,18 +361,18 @@ class AskAgent(BaseAgent):
         self.loss = self.nav_loss + self.ask_loss
         iter_loss_avg = self.loss.item() / self.episode_len
         self.losses.append(iter_loss_avg)
-        if iter_idx: self.SW.add_scalar('train loss per iter', iter_loss_avg, iter_idx)
+        # if iter_idx: self.SW.add_scalar('train loss per iter', iter_loss_avg, iter_idx)
 
         iter_nav_loss_avg = self.nav_loss.item() / self.episode_len
         self.nav_losses.append(iter_nav_loss_avg)
-        if iter_idx: self.SW.add_scalar('train nav loss per iter', iter_nav_loss_avg, iter_idx)
+        # if iter_idx: self.SW.add_scalar('train nav loss per iter', iter_nav_loss_avg, iter_idx)
 
         if self.random_ask or self.ask_first or self.teacher_ask or self.no_ask:
             iter_ask_loss_avg = 0
         else:
             iter_ask_loss_avg = self.ask_loss.item() / self.episode_len
         self.ask_losses.append(iter_ask_loss_avg)
-        if iter_idx: self.SW.add_scalar('train nav loss per iter', iter_ask_loss_avg, iter_idx)
+        # if iter_idx: self.SW.add_scalar('train nav loss per iter', iter_ask_loss_avg, iter_idx)
 
     def _setup(self, env, feedback):
         self.nav_feedback = feedback['nav']
@@ -493,17 +450,6 @@ class AskAgent(BaseAgent):
 
             start_time = time.time() 
             self.loss.backward()
-            backward_time = time.time() - start_time
-
-            # divide up gradients in encoder if we are bootstrapping
-            if self.bootstrap:
-                for param in self.model.encoder.parameters():
-                    if param.grad is not None:
-                        param.grad.data *= 1.0/float(self.n_ensemble)
-            
-            # optional gradient clipping
-            if self.gradient_clipping:
-                nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_grad)
 
             # existing
             optimizer.step()

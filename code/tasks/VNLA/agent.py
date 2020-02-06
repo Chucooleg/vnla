@@ -16,8 +16,8 @@ from utils import padding_idx
 
 class BaseAgent(object):
 
-    def __init__(self):
-        random.seed(1)
+    def __init__(self, seed):
+        random.seed(seed)
         self.results = {}
         self.losses = []
         self.results_path = None

@@ -20,7 +20,7 @@ from scipy import stats
 
 from utils import read_vocab,write_vocab,build_vocab,Tokenizer,padding_idx,timeSince
 from env import VNLABatch
-from model import AttentionSeq2SeqModel, AttentionSeq2SeqModelMultiHead
+from model import AttentionSeq2SeqModel
 from ask_agent import AskAgent
 from verbal_ask_agent import VerbalAskAgent
 from tensorboardX import SummaryWriter
@@ -32,32 +32,35 @@ from flags import make_parser
 
 def set_path():
 
-    JOB_NAME = os.getenv('JOB_NAME')
-    OUTPUT_DIR = os.path.join(os.getenv('PT_OUTPUT_DIR'),  JOB_NAME) if JOB_NAME else os.getenv('PT_OUTPUT_DIR')
-    if JOB_NAME and not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
+    # Set general output dir
+    hparams.exp_dir = os.getenv('PT_EXP_DIR')
 
-    bootstrap_bool = "on" if hasattr(hparams, 'bootstrap') and hparams.bootstrap else "off"
+    hparams.model_prefix = '%s_nav_%s_ask_%s' % (hparams.exp_name,
+        hparams.nav_feedback, hparams.ask_feedback)
 
-    hparams.model_prefix = '%s_nav_%s_ask_%s_bootstrap_%s' % (hparams.exp_name,
-        hparams.nav_feedback, hparams.ask_feedback, bootstrap_bool)
+    # Set tensorboard log dir
+    if hparams.local_run:
+        hparams.tensorboard_dir = hparams.exp_dir
+    else:
+        if hparams.plot_to_philly:
+            hparams.tensorboard_dir = os.environ.get('PHILLY_LOG_DIRECTORY', '.')
+        else:
+            hparams.tensorboard_dir = os.environ.get('PT_TENSORBOARD_DIR', '.')
+    print ("tensorboard dir = {}".format(hparams.tensorboard_dir))
 
-    hparams.exp_dir = os.path.join(OUTPUT_DIR, hparams.model_prefix)
-    if not os.path.exists(hparams.exp_dir):
-        os.makedirs(hparams.exp_dir)
-
-    hparams.tensorboard_dir = os.path.join(hparams.exp_dir, "tensorboard")
-    if not os.path.exists(hparams.tensorboard_dir):
-        os.makedirs(hparams.tensorboard_dir)   
-
+    # Set model load path
     hparams.load_path = hparams.load_path if hasattr(hparams, 'load_path') and \
         hparams.load_path is not None else \
         os.path.join(hparams.exp_dir, '%s_last.ckpt' % hparams.model_prefix)
 
+    # Set data load path
     DATA_DIR = os.getenv('PT_DATA_DIR')
-    hparams.data_path = os.path.join(DATA_DIR, hparams.data_dir)
-    hparams.img_features = os.path.join(DATA_DIR, 'img_features/ResNet-152-imagenet.tsv')
+    hparams.data_path = os.path.join(DATA_DIR, hparams.data_dir)  #e.g. $PT_DATA_DIR/asknav/
+    hparams.img_features = os.path.join(DATA_DIR, hparams.img_features)
+    # hparams.img_features = os.path.join(DATA_DIR, 'img_features/ResNet-152-imagenet.tsv')
 
+    # semantics update!
+    hparams.room_types_path = os.path.join(DATA_DIR, hparams.room_types_path)
 
 def save(path, model, optimizer, iter, best_metrics, train_env):
     ckpt = {
@@ -196,7 +199,11 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str += ', nav loss: %.4f' % val_nav_loss_avg
             val_ask_loss_avg = np.average(agent.ask_losses)
             loss_str += ', ask loss: %.4f' % val_ask_loss_avg
-            
+
+            SW.add_scalar('{} loss per {} iters'.format(env_name, hparams.log_every), val_loss_avg, iter)
+            SW.add_scalar('{} nav loss per {} iters'.format(env_name, hparams.log_every), val_nav_loss_avg, iter)
+            SW.add_scalar('{} ask loss per {} iters'.format(env_name, hparams.log_every), val_ask_loss_avg, iter)
+
             # Get validation distance from goal under test evaluation conditions
             traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False)
 
@@ -217,6 +224,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                     metrics[metric][env_name] = (val, len(traj))
                 if metric in ['success_rate', 'oracle_rate', 'room_success_rate']:
                     loss_str += ', %s: %.3f' % (metric, val)
+                    SW.add_scalar('{} {} steps per {} iters'.format(env_name, metric, hparams.log_every), val, iter)
 
             loss_str += '\n *** OTHER METRICS: '
             loss_str += '%s: %.2f' % ('nav_error', score_summary['nav_error'])
@@ -224,6 +232,11 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str += ', %s: %.2f' % ('length', score_summary['length'])
             loss_str += ', %s: %.2f' % ('steps', score_summary['steps'])
             loss_str += compute_ask_stats(traj)
+
+            SW.add_scalar('{} nav_error per {} iters'.format(env_name, hparams.log_every), score_summary['nav_error'], iter)
+            SW.add_scalar('{} oracle_error per {} iters'.format(env_name, hparams.log_every), score_summary['oracle_error'], iter)
+            SW.add_scalar('{} length per {} iters'.format(env_name, hparams.log_every), score_summary['length'], iter)
+            SW.add_scalar('{} steps per {} iters'.format(env_name, hparams.log_every), score_summary['steps'], iter)
 
             if not eval_mode and metrics[sr][env_name][0] > best_metrics[env_name]:
                 should_save_ckpt.append(env_name)
@@ -279,6 +292,10 @@ def setup(seed=None):
         hparams.seed = seed
     torch.manual_seed(hparams.seed)
     torch.cuda.manual_seed(hparams.seed)
+    np.random.seed(hparams.seed)
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     # Check for vocabs
     train_vocab_path = os.path.join(hparams.data_path, 'train_vocab.txt')
@@ -340,10 +357,7 @@ def train_val(device, seed=None):
         Evaluation(hparams, [split], hparams.data_path)) for split in val_splits}
 
     # Build models
-    if hasattr(hparams, 'bootstrap') and hparams.bootstrap:
-        model = AttentionSeq2SeqModelMultiHead(len(vocab), hparams, device)#.to(device)
-    else:
-        model = AttentionSeq2SeqModel(len(vocab), hparams, device)#.to(device)
+    model = AttentionSeq2SeqModel(len(vocab), hparams, device)
 
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
         weight_decay=hparams.weight_decay)
@@ -366,16 +380,22 @@ def train_val(device, seed=None):
     print('')
     print(model)
 
+    # semantics update!
+    with open(hparams.room_types_path, "r") as f:
+        room_types = f.read().split('\n')[:-1]
+    print ('train room types \n', room_types)
+
     # Initialize agent
     if 'verbal' in hparams.advisor:
-        agent = VerbalAskAgent(model, hparams, device)
+        # semantics update!
+        agent = VerbalAskAgent(model, hparams, room_types, device)
     elif hparams.advisor == 'direct':
-        agent = AskAgent(model, hparams, device)
+        # semantics update!
+        agent = AskAgent(model, hparams, room_types, device)
 
     # Train
     return train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
           best_metrics, eval_mode)
-
 
 
 if __name__ == "__main__":
@@ -418,3 +438,55 @@ if __name__ == "__main__":
         # Train
         train_val(device)
 
+# TURN OFF WHEN NOT USING VS code debugger------------------------------------------------------------------------------
+hparams = None
+args = None
+
+def vs_code_debug(args_temp):
+
+    global hparams
+    global args
+
+    parser = make_parser()
+    args = parser.parse_args()
+
+    # Read configuration from a json file
+    with open(args_temp["config_file"]) as f:
+        hparams = Namespace(**json.load(f)) 
+
+    # Overwrite hparams by args
+    for flag in vars(args):
+        value = getattr(args, flag)
+        if value is not None:
+            setattr(hparams, flag, value)   
+
+    # Overwrite hparams by args_temp
+    for flag in args_temp:
+        value = args_temp[flag]
+        setattr(hparams, flag, value)
+
+    set_path()
+    print ("set_path() is done")
+
+    device = torch.device('cuda')
+
+    print ("CUDA device count = {}".format(torch.cuda.device_count()))
+
+    if hasattr(hparams, 'multi_seed_eval') and hparams.multi_seed_eval:
+        hparams.eval_only = 1
+        seeds = [123, 435, 6757, 867, 983]
+        metrics = defaultdict(lambda: defaultdict(list))
+        for seed in seeds:
+            this_metrics = train_val(seed=seed)
+            for metric in this_metrics:
+                for k, v in this_metrics[metric].items():
+                    if 'rate' in metric:
+                        v *= 100
+                    metrics[metric][k].append(v)
+        for metric in metrics:
+            for k, v in metrics[metric].items():
+                print('%s %s: %.2f %.2f' % (metric, k, np.average(v), stats.sem(v) * 1.95))
+    else:
+        # Train
+        train_val(device)
+# ------------------------------------------------------------------------------

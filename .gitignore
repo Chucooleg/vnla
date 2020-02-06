@@ -12,3 +12,10 @@ code/tasks/VNLA/.ipynb_checkpoints/
 code/tasks/VNLA/dummy*
 code/build_py35/*
 code/build_py36/*
+stdout.txt
+events*
+archive*.py
+*_archive.py
+*for_eval.json
+*_archive.sh
+memory_sim_track.py

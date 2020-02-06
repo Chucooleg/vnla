@@ -38,10 +38,10 @@
     "success_radius"       : 2.0,
     "coverage_size"      : 10,
     "n_subgoal_steps"    : 4,
-    "bootstrap"          : true,
-    "n_ensemble"         : 10,
-    "bernoulli_probability" : 1.0,
-    "bootstrap_majority_vote" : false,
-    "gradient_clipping"  : true,
-    "clip_grad"          : 5
+    "local_run"          : 0,
+    "with_semantics"     : 0,
+    "room_types_path"    : "semantics/asknav_tr_room_types.txt",
+    "room_cheat"         : 0,
+    "blind_fold"         : 1,
+    "plot_to_philly"     : 0
 }
