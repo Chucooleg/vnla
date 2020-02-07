@@ -207,6 +207,8 @@ class VerbalAskAgent(AskAgent):
             # Image features
             if not self.blind_fold:
                 f_t = self._feature_variable(obs)
+            else:
+                assert torch.sum(f_t.nonzero()).item() == 0
 
             # Budget features
             b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)

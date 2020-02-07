@@ -4,7 +4,7 @@ from train import vs_code_debug
 
 # from train_experiments.sh
 exp_name = "20200206_debug_dagger_semantics"
-job_name = "debug_blind_fold_no_semantics"
+job_name = "debug_blind_fold_no_semantics_2"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/verbal_hard.json"
 
 # from scripts/define_vars.sh
@@ -46,9 +46,9 @@ args['seed'] = 42
 
 args['no_ask'] = 1
 
-args['with_semantics'] = 0
-args['room_cheat'] = 0
+args['with_semantics'] = 1
+args['room_cheat'] = 1
 
-args['blind_fold'] = 0
+args['blind_fold'] = 1
 
 vs_code_debug(args)
