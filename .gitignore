@@ -19,3 +19,5 @@ archive*.py
 *for_eval.json
 *_archive.sh
 memory_sim_track.py
+.ptconfig
+mtrand.pyx
