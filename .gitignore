@@ -23,3 +23,5 @@ restats.khnah
 memory_sim_track.py
 *_eval.json
 *_archive.sh
+.ptconfig
+.mtrand.pyx
