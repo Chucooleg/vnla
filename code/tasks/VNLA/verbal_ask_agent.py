@@ -548,7 +548,7 @@ class VerbalAskAgent(AskAgent):
 
             # Update semantics!
             # numpy array shape (batch_size, len(room_types))
-            rooms = self.room_classifier(obs)
+            rooms, _ = self.room_classifier(obs)
             # TODO any errors?
             r_t = torch.from_numpy(rooms).float().to(self.device)
 
