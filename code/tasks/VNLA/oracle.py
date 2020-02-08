@@ -464,7 +464,57 @@ class CurrentRoomTypeOracle(object):
         # convert to 1-hot vector per row
         rm_label_1_hots = np.zeros(shape=(len(obs), len(self.room_types)))
         rm_label_1_hots[np.arange(len(obs)), rm_label_indices] = 1
-        return rm_label_1_hots
+        return rm_label_1_hots, rm_label_indices
+
+# semantics update
+class NextRoomTypeOracle(object):
+
+    def __init__(self, room_types):
+        self.room_types = room_types
+        self.pano_to_regions_all_scans = defaultdict(dict)
+        self.sims = {} # {'scan': sim}
+
+    def _make_new_sim(self, scan):
+        sim = MatterSim.Simulator()
+        sim.setRenderingEnabled(False)
+        sim.setDiscretizedViewingAngles(True)
+        sim.setCameraResolution(640, 480)
+        sim.setCameraVFOV(math.radians(60))
+        sim.setNavGraphPath(os.path.join(os.getenv('PT_DATA_DIR'), 'connectivity'))
+        sim.init()
+        self.sims[scan] = sim
+
+    def _lookup(self, ob):
+        '''look up the rm label for the closest, direct facing vertex if any.'''
+
+        # build scan-vertex-rm map, initiate sim for new scan
+        if not ob['scan'] in self.pano_to_regions_all_scans.keys():
+            self.pano_to_regions_all_scans[ob['scan']] = utils.load_panos_to_region(ob['scan'], '')
+            self._make_new_sim(ob['scan'])
+
+        # place sim in place
+        self.sims[ob['scan']].newEpisode(ob['scan'], ob['viewpoint'], ob['heading'], ob['elevation'])
+        state = self.sims[ob['scan']].getState()
+        
+        if len(state.navigableLocations) > 1:
+            closest_vertex = state.navigableLocations[1]
+            # as long as next vertex is within 30 deg horizontally. any elevation is fine
+            if closest_vertex.rel_heading < math.pi/12.0 and closest_vertex.rel_heading > -math.pi/12.0:
+                next_vertex_rm_label_str = self.pano_to_regions_all_scans[ob['scan']][closest_vertex.viewpointId]
+                return self.room_types.index(next_vertex_rm_label_str)
+        return None
+
+    def __call__(self, obs):
+        '''return shape (batch_size, len(room_types)). each row a 1-hot or all 0 vector'''       
+        rm_label_indices = list(map(self._lookup, obs))
+        assert len(rm_label_indices) == len(obs)
+        # convert to 1-hot vector per row
+        rm_label_1_hots = np.zeros(shape=(len(obs), len(self.room_types)))
+        for i, ob in enumerate(obs):
+            if rm_label_indices[i] is not None:
+                rm_label_1_hots[i, rm_label_indices[i]] = 1
+        return rm_label_1_hots, rm_label_indices             
+
 
 def make_oracle(oracle_type, *args, **kwargs):
     if oracle_type == 'shortest':
@@ -482,6 +532,8 @@ def make_oracle(oracle_type, *args, **kwargs):
     # semantics update
     if oracle_type == 'curr_room_type':
         return CurrentRoomTypeOracle(*args, **kwargs)
+    if oracle_type == 'next_room_type':
+        return NextRoomTypeOracle(*args, **kwargs)
 
     return None
 

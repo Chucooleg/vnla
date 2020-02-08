@@ -72,12 +72,13 @@ class AskAgent(BaseAgent):
         self.coverage_size = hparams.coverage_size if hasattr(hparams, 'coverage_size') else None
 
         # semantics update
-        self.with_semantics = hasattr(hparams, 'with_semantics') \
-                                 and hparams.with_semantics
-        if self.with_semantics:
+        self.semantics_only = hasattr(hparams, 'semantics_only') \
+                                 and hparams.semantics_only
+        if self.semantics_only:
             self.room_types = room_types
             if hparams.room_cheat:
-                self.room_classifier = make_oracle('curr_room_type', room_types)
+                self.curr_room_classifier = make_oracle('curr_room_type', room_types)
+                self.next_room_classifier = make_oracle('next_room_type', room_types)
             else:
                 raise ValueError('learned room classifier not implemented yet.')
 
