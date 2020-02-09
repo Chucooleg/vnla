@@ -131,6 +131,10 @@ def make_parser():
    parser.add_argument('-blind_fold', type=int,
         help='blind fold agent on (1) or off (0)')  
 
+   # data suffix
+   parser.add_argument('-data_suffix', type=int,
+        help='data suffix on (1) or off (0)')  
+
    # tensorboard
    parser.add_argument('-plot_to_philly', type=int,
         help='plot to philly platform 1/0. default 0')

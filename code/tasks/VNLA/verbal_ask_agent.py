@@ -208,20 +208,26 @@ class VerbalAskAgent(AskAgent):
 
             # Update semantics!
             # numpy array shape (batch_size, len(room_types))
+            if time_step > 0:
+                last_r_t = curr_r_t
             curr_rooms, curr_rooms_idx = self.curr_room_classifier(obs)
-            curr_r_t = torch.from_numpy(curr_rooms).float().to(self.device)
+            curr_r_t = torch.tensor(curr_rooms_idx, dtype=torch.long, device=self.device)
+            # curr_r_t = torch.from_numpy(curr_rooms).long().to(self.device)
+            if time_step == 0:
+                last_r_t = curr_r_t
 
             # Update semantics!
             # numpy array shape (batch_size, len(room_types))
             next_rooms, next_rooms_idx = self.next_room_classifier(obs)
-            next_r_t = torch.from_numpy(next_rooms).float().to(self.device)
+            next_r_t = torch.tensor(next_rooms_idx, dtype=torch.long, device=self.device)
+            # next_r_t = torch.from_numpy(next_rooms).long().to(self.device)
 
             time_keep['initial_setup_pertimestep'] += time.time() - start_time
 
             # Run first forward pass to compute ask logit
             start_time = time.time() 
             _, _, nav_logit, nav_softmax, ask_logit, ask_softmax, _ = self.model.decode(
-                a_t, q_t, next_r_t, curr_r_t, decoder_h, ctx, seq_mask, nav_logit_mask,
+                a_t, q_t, last_r_t, next_r_t, curr_r_t, decoder_h, ctx, seq_mask, nav_logit_mask,
                 ask_logit_mask, budget=b_t, cov=cov)
             time_keep['decode_tentative'] += time.time() - start_time
 
@@ -305,7 +311,7 @@ class VerbalAskAgent(AskAgent):
             q_t = torch.tensor(q_t_list, dtype=torch.long, device=self.device)
             # b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)
             decoder_h, _, nav_logit, nav_softmax, cov = self.model.decode_nav(
-                a_t, q_t, next_r_t, curr_r_t, decoder_h, ctx, seq_mask, nav_logit_mask, cov=cov)
+                a_t, q_t, last_r_t, next_r_t, curr_r_t, decoder_h, ctx, seq_mask, nav_logit_mask, cov=cov)
             time_keep['decode_final'] += time.time() - start_time
 
             # logging only

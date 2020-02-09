@@ -99,8 +99,12 @@ class VNLABatch():
         self.no_room = hasattr(hparams, 'no_room') and hparams.no_room
 
         if self.split is not None:
-            self.load_data(load_datasets([split], hparams.data_path,
-                prefix='noroom' if self.no_room else 'asknav'))
+            print ("Using env split = {}".format(self.split))
+            self.load_data(load_datasets(
+                splits=[split], 
+                path=hparams.data_path, 
+                prefix='noroom' if self.no_room else 'asknav', 
+                suffix=hparams.data_suffix if hasattr(hparams, 'data_suffix') else ''))
 
         # Estimate time budget using the upper 95% confidence bound
         if traj_len_estimates is None:
@@ -153,6 +157,7 @@ class VNLABatch():
     def _next_minibatch(self):
         if self.ix == 0:
             self.random.shuffle(self.data)
+            print ("Shuffle, setting data ix at 0.")
         batch = self.data[self.ix:self.ix+self.batch_size]
         if len(batch) < self.batch_size:
             self.random.shuffle(self.data)

@@ -462,7 +462,7 @@ class CurrentRoomTypeOracle(object):
         '''return shape (batch_size, len(room_types)). each row a 1-hot vector'''
         rm_label_indices = list(map(self._lookup, obs))
         # convert to 1-hot vector per row
-        rm_label_1_hots = np.zeros(shape=(len(obs), len(self.room_types)))
+        rm_label_1_hots = np.zeros(shape=(len(obs), len(self.room_types) + 1))
         rm_label_1_hots[np.arange(len(obs)), rm_label_indices] = 1
         return rm_label_1_hots, rm_label_indices
 
@@ -496,20 +496,23 @@ class NextRoomTypeOracle(object):
         self.sims[ob['scan']].newEpisode(ob['scan'], ob['viewpoint'], ob['heading'], ob['elevation'])
         state = self.sims[ob['scan']].getState()
         
+        # return index 0-29
         if len(state.navigableLocations) > 1:
             closest_vertex = state.navigableLocations[1]
             # as long as next vertex is within 30 deg horizontally. any elevation is fine
             if closest_vertex.rel_heading < math.pi/12.0 and closest_vertex.rel_heading > -math.pi/12.0:
                 next_vertex_rm_label_str = self.pano_to_regions_all_scans[ob['scan']][closest_vertex.viewpointId]
                 return self.room_types.index(next_vertex_rm_label_str)
-        return None
+
+        # return index 30 for None room_type
+        return len(self.room_types)
 
     def __call__(self, obs):
         '''return shape (batch_size, len(room_types)). each row a 1-hot or all 0 vector'''       
         rm_label_indices = list(map(self._lookup, obs))
         assert len(rm_label_indices) == len(obs)
         # convert to 1-hot vector per row
-        rm_label_1_hots = np.zeros(shape=(len(obs), len(self.room_types)))
+        rm_label_1_hots = np.zeros(shape=(len(obs), len(self.room_types) + 1))
         for i, ob in enumerate(obs):
             if rm_label_indices[i] is not None:
                 rm_label_1_hots[i, rm_label_indices[i]] = 1

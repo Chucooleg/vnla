@@ -3,8 +3,8 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "20200207_debug_dagger_semantics"
-job_name = "debug_dagger_semantics_only_dryrun"
+exp_name = "20200208_debug_dagger_semantics"
+job_name = "debug_dagger_semantics_only_no shuffle_at_ix_0"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/verbal_hard.json"
 
 # from scripts/define_vars.sh
@@ -50,5 +50,7 @@ args['semantics_only'] = 1
 args['room_cheat'] = 1
 
 args['blind_fold'] = 0
+
+args['data_suffix'] = "small_three_houses_single_goal_short"
 
 vs_code_debug(args)

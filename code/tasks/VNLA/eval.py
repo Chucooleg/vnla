@@ -22,8 +22,11 @@ class Evaluation(object):
 
         self.no_room = hasattr(hparams, 'no_room') and hparams.no_room
         if splits:
-            self.load_data(load_datasets(splits, data_path,
-                prefix='noroom' if self.no_room else 'asknav'))
+            self.load_data(load_datasets(
+                splits=splits, 
+                path=data_path,
+                prefix='noroom' if self.no_room else 'asknav',
+                suffix=hparams.data_suffix if hasattr(hparams, 'data_suffix') else ''))
 
         self.region_label_to_name = load_region_label_to_name()
         self.panos_to_region = {}

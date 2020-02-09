@@ -60,13 +60,15 @@ def load_region_map(scan):
             region_map[view] = region
     return region_map
 
-def load_datasets(splits, path, prefix=''):
+def load_datasets(splits, path, prefix='', suffix=''):
     data = []
     for split in splits:
-        with open(os.path.join(path, prefix + '_%s.json' % split)) as f:
+        data_path = os.path.join(path, prefix + '_%s_%s.json' % (split, suffix))
+        print ("loading json data from {}".format(data_path))
+        with open(data_path) as f:
+            # $PT_DATA_DIR/asknav/ + asknav + train + small_single_example + .json
             data += json.load(f)
     return data
-
 
 class Tokenizer(object):
     SENTENCE_SPLIT_REGEX = re.compile(r'(\W+)') # Split on any non-alphanumeric character
@@ -130,11 +132,16 @@ class Tokenizer(object):
         return encoding
 
 def build_vocab(path, splits, min_count, max_length, start_vocab=base_vocab,
-    split_by_spaces=False, prefix=''):
+    split_by_spaces=False, prefix='', suffix=''):
 
     count = Counter()
     t = Tokenizer(None, max_length, split_by_spaces=split_by_spaces)
-    data = load_datasets(splits, path, prefix=prefix)
+    data = load_datasets(
+        splits=splits, 
+        path=path, 
+        prefix=prefix,
+        suffix=suffix)
+
     for item in data:
         for instr in item['instructions']:
             if split_by_spaces:

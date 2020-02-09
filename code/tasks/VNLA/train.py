@@ -296,7 +296,7 @@ def setup(seed=None):
 
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-
+    
     # Check for vocabs
     train_vocab_path = os.path.join(hparams.data_path, 'train_vocab.txt')
     if not os.path.exists(train_vocab_path):
@@ -307,8 +307,9 @@ def setup(seed=None):
                     max_length=hparams.max_input_length,
                     split_by_spaces=hparams.split_by_spaces,
                     prefix='noroom' if hasattr(hparams, 'no_room') and
-                           hparams.no_room else 'asknav'),
-            train_vocab_path)
+                           hparams.no_room else 'asknav',
+                    suffix=hparams.data_suffix if hasattr(hparams, 'data_suffix') else ''),
+            train_vocab_path)  
 
 def train_val(device, seed=None):
     ''' Train on the training set, and validate on seen and unseen splits. '''

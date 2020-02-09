@@ -286,11 +286,13 @@ class AskAttnSemanticsOnlyDecoderLSTM(nn.Module):
 
         # semantics update!
         with open(hparams.room_types_path, "r") as f:
-            room_type_list = f.read().split('\n')[:-1]
+            room_type_list = f.read().split('\n')
+        self.room_embedding = nn.Embedding(len(room_type_list),
+            hparams.rm_embed_size)
 
         # semantics update!
         # No image features
-        lstm_input_size = hparams.nav_embed_size + hparams.ask_embed_size + len(room_type_list) + len(room_type_list)
+        lstm_input_size = hparams.nav_embed_size + hparams.ask_embed_size + (hparams.rm_embed_size * 3)
 
         self.budget_embedding = nn.Embedding(hparams.max_ask_budget, hparams.budget_embed_size)
 
@@ -308,7 +310,7 @@ class AskAttnSemanticsOnlyDecoderLSTM(nn.Module):
         self.nav_predictor = nn.Linear(hparams.hidden_size, agent_class.n_output_nav_actions())
 
         ask_predictor_input_size = hparams.hidden_size * 2 + \
-            agent_class.n_output_nav_actions() + len(room_type_list) * 2 + \
+            agent_class.n_output_nav_actions() + (hparams.rm_embed_size * 3) + \
             hparams.budget_embed_size
 
         ask_predictor_layers = []
@@ -332,13 +334,16 @@ class AskAttnSemanticsOnlyDecoderLSTM(nn.Module):
         self.backprop_ask_features = hparams.backprop_ask_features
 
     # semantics update signature!
-    def _lstm_and_attend(self, nav_action, ask_action, next_room_type, curr_room_type, h, ctx, ctx_mask, cov=None):
+    def _lstm_and_attend(self, nav_action, ask_action, last_room_type, next_room_type, curr_room_type, h, ctx, ctx_mask, cov=None):
 
         nav_embeds = self.nav_embedding(nav_action)
         ask_embeds = self.ask_embedding(ask_action)
+        last_rm_embeds = self.room_embedding(last_room_type)
+        next_rm_embeds = self.room_embedding(next_room_type)
+        curr_rm_embeds = self.room_embedding(curr_room_type)
 
         # semantics update!
-        lstm_inputs = [nav_embeds, ask_embeds, next_room_type, curr_room_type]
+        lstm_inputs = [nav_embeds, ask_embeds, last_rm_embeds, next_rm_embeds, curr_rm_embeds]
 
         concat_lstm_input = torch.cat(lstm_inputs, dim=1)
         drop = self.drop(concat_lstm_input)
@@ -352,15 +357,14 @@ class AskAttnSemanticsOnlyDecoderLSTM(nn.Module):
         # Attention
         h_tilde, alpha, new_cov = self.attention_layer(output_drop, ctx, ctx_mask, cov=cov)
 
-        return h_tilde, alpha, output_drop, new_h, new_cov
+        return h_tilde, alpha, output_drop, new_h, new_cov, last_rm_embeds, next_rm_embeds, curr_rm_embeds
 
     # semantics update signature!
-    def forward_tentative(self, nav_action, ask_action, next_room_type, curr_room_type, h, ctx, ctx_mask, 
-    nav_logit_mask, ask_logit_mask, budget=None, cov=None):
+    def forward_tentative(self, nav_action, ask_action, last_room_type, next_room_type, curr_room_type, h, ctx, ctx_mask, nav_logit_mask, ask_logit_mask, budget=None, cov=None):
 
         # semantics update signature!
-        h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
-            nav_action, ask_action, next_room_type, curr_room_type, h, ctx, ctx_mask, cov=cov)
+        h_tilde, alpha, output_drop, new_h, new_cov, last_rm_embeds, next_rm_embeds, curr_rm_embeds = self._lstm_and_attend(
+            nav_action, ask_action, last_room_type, next_room_type, curr_room_type, h, ctx, ctx_mask, cov=cov)
 
         # Predict nav action.
         nav_logit = self.nav_predictor(h_tilde)
@@ -371,7 +375,7 @@ class AskAttnSemanticsOnlyDecoderLSTM(nn.Module):
 
         assert budget is not None
         budget_embeds = self.budget_embedding(budget)
-        ask_predictor_inputs = [h_tilde, output_drop, next_room_type, curr_room_type, nav_softmax, budget_embeds]
+        ask_predictor_inputs = [h_tilde, output_drop, last_rm_embeds, next_rm_embeds, curr_rm_embeds, nav_softmax, budget_embeds]
 
         # Predict ask action.
         concat_ask_predictor_input = torch.cat(ask_predictor_inputs, dim=1)
@@ -386,12 +390,12 @@ class AskAttnSemanticsOnlyDecoderLSTM(nn.Module):
         return new_h, alpha, nav_logit, nav_softmax, ask_logit, ask_softmax, new_cov
 
     # semantics update signature!
-    def forward_nav(self, nav_action, ask_action, next_room_type, curr_room_type, h, ctx, ctx_mask,
+    def forward_nav(self, nav_action, ask_action, last_room_type, next_room_type, curr_room_type, h, ctx, ctx_mask,
                     nav_logit_mask, cov=None):
 
         # semantics update signature!
-        h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
-            nav_action, ask_action, next_room_type, curr_room_type, h, ctx, ctx_mask, cov=cov)
+        h_tilde, alpha, output_drop, new_h, new_cov, _, _, _ = self._lstm_and_attend(
+            nav_action, ask_action, last_room_type, next_room_type, curr_room_type, h, ctx, ctx_mask, cov=cov)
 
         # Predict nav action.
         nav_logit = self.nav_predictor(h_tilde)
@@ -401,16 +405,15 @@ class AskAttnSemanticsOnlyDecoderLSTM(nn.Module):
         return new_h, alpha, nav_logit, nav_softmax, new_cov
 
     # semantics update signature!
-    def forward(self, tentative_bool, nav_action, ask_action, next_room_type, curr_room_type, h, ctx, ctx_mask,
-                nav_logit_mask, ask_logit_mask=None, budget=None, cov=None):
+    def forward(self, tentative_bool, nav_action, ask_action, last_room_type, next_room_type, curr_room_type, h, ctx, ctx_mask, nav_logit_mask, ask_logit_mask=None, budget=None, cov=None):
 
         if tentative_bool:
             assert ask_logit_mask is not None, "tentative nav prediction must have non-None ask_logit_mask"
             # semantics update signature!
-            return self.forward_tentative(nav_action, ask_action, next_room_type, curr_room_type, h, ctx, ctx_mask, nav_logit_mask, ask_logit_mask, budget, cov)
+            return self.forward_tentative(nav_action, ask_action, last_room_type, next_room_type, curr_room_type, h, ctx, ctx_mask, nav_logit_mask, ask_logit_mask, budget, cov)
         else:
             # semantics update signature!
-            return self.forward_nav(nav_action, ask_action, next_room_type, curr_room_type, h, ctx, ctx_mask, nav_logit_mask, cov)
+            return self.forward_nav(nav_action, ask_action, last_room_type, next_room_type, curr_room_type, h, ctx, ctx_mask, nav_logit_mask, cov)
 
 
 class AttentionSeq2SeqModel(nn.Module):
