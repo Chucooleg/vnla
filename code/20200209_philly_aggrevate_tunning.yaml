@@ -1,0 +1,67 @@
+description: VNLA aggrevate experiments hparams 10 recent frames
+# experiment named vnla_time_comparisons
+
+target:
+  # which virtual cluster you belong to (msrlabs, etc.). Everyone has access to "msrlabs".
+  vc: msrlabs
+  # physical cluster to use (cam, gcr, rr1, rr2) or Azure clusters (eu1, eu2, etc.)
+  cluster: eu1
+
+environment:
+  image: philly/jobs/test/pytorch:pytorch1.2.0-py36-mattersim
+  registry: phillyregistry.azurecr.io
+
+  setup:
+    - pip install scikit-learn --user
+    - python -m pip install networkx==2.3 --user
+    - CUDA_VISIBLE_DEVICES=0
+    # - pip install tensorboard --user
+    # - CUDA_VISIBLE_DEVICES=0,1,2,3
+    # - pip install ipdb --user
+
+storage:
+  input1:
+    storage_account_name: msrairesidentssa4
+    container_name: matterport3d
+    mount_dir: /mnt/matterport3d
+    # local_dir: /home/hoyeung/blob_matterport3d/
+  output:
+    storage_account_name: msrairesidentssa4
+    container_name: experiment-results
+    mount_dir: /mnt/experiment-results-philly/
+    # local_dir: /home/hoyeung/blob_experiments/
+
+code:
+  # local directory of the code. this will be uploaded to the server.
+  # $CONFIG_DIR is expanded to the directory of this config file
+  local_dir: $CONFIG_DIR/
+
+# data:
+#   data upload is not required for this example
+
+# seed list
+# 10 [42, 677, 848, 163, 620, 511, 102, 158, 2, 204]
+# 20 + [471, 154, 220, 748, 623, 47, 882, 136, 315, 48]
+
+# list of jobs to run, we run 2 jobs in this example
+jobs:
+  # name must be unique across the jobs
+- name: data_94798_seed_42_batch_size_250_tr_batch_size_1024_loss_l1_lr_0.0001_beta_decay_0.95_recent_frames_10
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200209_philly_aggrevate_tunning" "data_94798_seed_42_batch_size_250_tr_batch_size_1024_loss_l1_lr_0.0001_beta_decay_0.95" "configs/experiment.json" -batch_size 250 -train_batch_size 1024 -start_beta_decay 5000 -decay_beta_every 1000 -beta_decay_rate 0.95 -min_history_to_learn 1000 -save_every 2000 -log_every 2000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -loss_function l1 -lr 0.0001 -n_iters 100000 -num_recent_frames 10 -seed 42
+
+- name: data_94798_seed_42_batch_size_250_tr_batch_size_1024_loss_l2_lr_0.0001_beta_decay_0.95_recent_frames_10
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200209_philly_aggrevate_tunning" "data_94798_seed_42_batch_size_250_tr_batch_size_1024_loss_l2_lr_0.0001_beta_decay_0.95" "configs/experiment.json" -batch_size 250 -train_batch_size 1024 -start_beta_decay 5000 -decay_beta_every 1000 -beta_decay_rate 0.95 -min_history_to_learn 1000 -save_every 2000 -log_every 2000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -loss_function l2 -lr 0.0001 -n_iters 100000 -num_recent_frames 10 -seed 42
+  
+- name: data_94798_seed_42_batch_size_250_tr_batch_size_1024_loss_l1_lr_0.0001_beta_decay_0.98_recent_frames_10
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200209_philly_aggrevate_tunning" "data_94798_seed_42_batch_size_250_tr_batch_size_1024_loss_l1_lr_0.0001_beta_decay_0.98" "configs/experiment.json" -batch_size 250 -train_batch_size 1024 -start_beta_decay 5000 -decay_beta_every 1000 -beta_decay_rate 0.98 -min_history_to_learn 1000 -save_every 2000 -log_every 2000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -loss_function l1 -lr 0.0001 -n_iters 100000 -num_recent_frames 10 -seed 42
+
+- name: data_94798_seed_42_batch_size_250_tr_batch_size_1024_loss_l2_lr_0.0001_beta_decay_0.98_recent_frames_10
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200209_philly_aggrevate_tunning" "data_94798_seed_42_batch_size_250_tr_batch_size_1024_loss_l2_lr_0.0001_beta_decay_0.98" "configs/experiment.json" -batch_size 250 -train_batch_size 1024 -start_beta_decay 5000 -decay_beta_every 1000 -beta_decay_rate 0.98 -min_history_to_learn 1000 -save_every 2000 -log_every 2000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -loss_function l2 -lr 0.0001 -n_iters 100000 -num_recent_frames 10 -seed 42
