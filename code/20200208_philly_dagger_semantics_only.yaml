@@ -60,4 +60,4 @@ jobs:
   - name: dagger_learned_ask_semantics_only
     sku: G1
     command:
-    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200208_philly_dagger_semantics_only" "dagger_learned_ask_with_semantics" "configs/verbal_hard.json" -seed 42 -semantics_only 1 -room_cheat 1
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200208_philly_dagger_semantics_only" "dagger_learned_ask_semantics_only" "configs/verbal_hard.json" -seed 42 -semantics_only 1 -room_cheat 1
