@@ -1,4 +1,4 @@
-description: VNLA run dagger with semantics loss
+description: VNLA run dagger with semantics loss current room only
 # experiment named vnla_time_comparisons
 
 target:
@@ -52,12 +52,17 @@ jobs:
     command:
     - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200211_philly_dagger_semantics_loss" "dagger_learned_ask_curr_room_target" "configs/verbal_hard.json" -seed 42 -semantics_loss 1 -room_target "current"
 
-  - name: dagger_no_ask_next_room_target
+  - name: debug
     sku: G1
     command:
-    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200211_philly_dagger_semantics_loss" "dagger_no_ask_next_room_target" "configs/verbal_hard.json" -seed 42 -no_ask 1 -semantics_loss 1 -room_target "next"
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200211_philly_dagger_semantics_loss" "debug" "configs/verbal_hard.json" -seed 42 -semantics_loss 1 -room_target "current"
 
-  - name: dagger_learned_ask_next_room_target
-    sku: G1
-    command:
-    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200211_philly_dagger_semantics_loss" "dagger_learned_ask_next_room_target" "configs/verbal_hard.json" -seed 42 -semantics_loss 1 -room_target "next"
+  # - name: dagger_no_ask_next_room_target
+  #   sku: G1
+  #   command:
+  #   - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200211_philly_dagger_semantics_loss" "dagger_no_ask_next_room_target" "configs/verbal_hard.json" -seed 42 -no_ask 1 -semantics_loss 1 -room_target "next"
+
+  # - name: dagger_learned_ask_next_room_target
+  #   sku: G1
+  #   command:
+  #   - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200211_philly_dagger_semantics_loss" "dagger_learned_ask_next_room_target" "configs/verbal_hard.json" -seed 42 -semantics_loss 1 -room_target "next"

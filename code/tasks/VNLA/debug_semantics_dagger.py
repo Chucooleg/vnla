@@ -4,7 +4,7 @@ from train import vs_code_debug
 
 # from train_experiments.sh
 exp_name = "20200211_debug_dagger_semantics_loss"
-job_name = "debug_dagger_with_room_loss_data_100"
+job_name = "debug_cuda_assertion_error"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/verbal_hard.json"
 
 # from scripts/define_vars.sh
@@ -44,7 +44,7 @@ args['plot_to_philly'] = 0
 
 args['seed'] = 42
 
-args['no_ask'] = 1
+args['no_ask'] = 0
 
 args['semantics_loss'] = 1
 args['room_target'] = 'current'

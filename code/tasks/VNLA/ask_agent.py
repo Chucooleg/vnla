@@ -85,9 +85,9 @@ class AskAgent(BaseAgent):
 
         if self.semantics_loss:
             self.room_types = room_types
-            if hparams.room_target = "current":
+            if hparams.room_target == "current":
                 self.room_classifier = make_oracle('curr_room_type', room_types)
-            elif hparams.room_target = "next":
+            elif hparams.room_target == "next":
                 self.room_classifier = make_oracle('next_room_type', room_types)
             else:
                 raise ValueError('check room prediction target from config or flags. Must be either current or next')
