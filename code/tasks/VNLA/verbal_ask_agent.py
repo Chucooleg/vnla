@@ -67,12 +67,12 @@ class VerbalAskAgent(AskAgent):
 
     def rollout(self, iter_idx=None):
         # semantics update!
-        if self.semantics_only:
-            return self._rollout_with_semantics_only(iter_idx)
+        if self.semantics_loss:
+            return self._rollout_with_semantics_loss(iter_idx)
         else:
             return self._rollout(iter_idx)
 
-    def _rollout_with_semantics_only(self, iter_idx=None):
+    def _rollout_with_semantics_loss(self, iter_idx=None):
 
         # timming bookkeeping
         time_keep = {
@@ -133,6 +133,7 @@ class VerbalAskAgent(AskAgent):
             'agent_ask_logits': [],  # added
             'agent_ask_softmax': [],  # added
             'teacher_ask': [],
+            'teacher_room': [],          
             'teacher_nav': [],  # added
             'teacher_ask_reason': [],
             'agent_nav': [],
@@ -140,11 +141,11 @@ class VerbalAskAgent(AskAgent):
             'agent_nav_softmax_initial': [],  # added
             'agent_nav_logits_final': [],  # added
             'agent_nav_softmax_final': [],  # added
+            'agent_room_logits': [],  # added
+            'agent_room_softmax': [],  # added
             'subgoals': [],
             'agent_nav_logit_masks': [],  # added 
             'agent_ask_logit_masks': [],  # added
-            'curr_rm_idx': [],  # added 
-            'next_rm_idx': []  # added 
         } for ob in obs]
 
         # Encode initial command
@@ -164,12 +165,16 @@ class VerbalAskAgent(AskAgent):
             self.nav_actions.index('<start>')
         q_t = torch.ones(batch_size, dtype=torch.long, device=self.device) * \
             self.ask_actions.index('<start>')
+        
+        # Initialize image features
+        f_t = torch.zeros(batch_size, self.img_feature_size, dtype=torch.float, device=self.device)
 
         # Whether agent decides to stop
         ended = np.array([False] * batch_size)
 
         self.nav_loss = 0
         self.ask_loss = 0
+        self.room_loss = 0
 
         action_subgoals = [[] for _ in range(batch_size)]
         n_subgoal_steps = [0] * batch_size
@@ -203,31 +208,21 @@ class VerbalAskAgent(AskAgent):
             nav_logit_mask[list(zip(*nav_mask_indices))] = 1
             ask_logit_mask[list(zip(*ask_mask_indices))] = 1
 
+            # Image features
+            if not self.blind_fold:
+                f_t = self._feature_variable(obs)
+            else:
+                assert torch.sum(f_t.nonzero()).item() == 0
+
             # Budget features
             b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)
-
-            # Update semantics!
-            # numpy array shape (batch_size, len(room_types))
-            if time_step > 0:
-                last_r_t = curr_r_t
-            curr_rooms, curr_rooms_idx = self.curr_room_classifier(obs)
-            curr_r_t = torch.tensor(curr_rooms_idx, dtype=torch.long, device=self.device)
-            # curr_r_t = torch.from_numpy(curr_rooms).long().to(self.device)
-            if time_step == 0:
-                last_r_t = curr_r_t
-
-            # Update semantics!
-            # numpy array shape (batch_size, len(room_types))
-            next_rooms, next_rooms_idx = self.next_room_classifier(obs)
-            next_r_t = torch.tensor(next_rooms_idx, dtype=torch.long, device=self.device)
-            # next_r_t = torch.from_numpy(next_rooms).long().to(self.device)
 
             time_keep['initial_setup_pertimestep'] += time.time() - start_time
 
             # Run first forward pass to compute ask logit
             start_time = time.time() 
-            _, _, nav_logit, nav_softmax, ask_logit, ask_softmax, _ = self.model.decode(
-                a_t, q_t, last_r_t, next_r_t, curr_r_t, decoder_h, ctx, seq_mask, nav_logit_mask,
+            _, _, nav_logit, nav_softmax, room_logit, room_softmax, ask_logit, ask_softmax, _ = self.model.decode(
+                a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask,
                 ask_logit_mask, budget=b_t, cov=cov)
             time_keep['decode_tentative'] += time.time() - start_time
 
@@ -310,15 +305,25 @@ class VerbalAskAgent(AskAgent):
             # NOTE: q_t and b_t changed since the first forward pass.
             q_t = torch.tensor(q_t_list, dtype=torch.long, device=self.device)
             # b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)
-            decoder_h, _, nav_logit, nav_softmax, cov = self.model.decode_nav(
-                a_t, q_t, last_r_t, next_r_t, curr_r_t, decoder_h, ctx, seq_mask, nav_logit_mask, cov=cov)
+            decoder_h, _, nav_logit, nav_softmax, room_logit, room_softmax, cov = self.model.decode_nav(
+                a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask, cov=cov)
             time_keep['decode_final'] += time.time() - start_time
 
             # logging only
             start_time = time.time()
             nav_logits_final_list = nav_logit.data.tolist()
             nav_softmax_final_list = nav_softmax.data.tolist()
+            room_logits_list = room_logit.data.tolist()
+            room_softmax_list = room_softmax.data.tolist()
             time_keep['logging_2'] += time.time() - start_time
+
+            # Room target (from oracle)
+            _, rooms_target_list = self.room_classifier(obs)
+            rooms_target = torch.tensor(rooms_target_list, dtype=torch.long, device=self.device)
+
+            # Room loss
+            if not self.is_eval:
+                self.room_loss += self.room_criterion(room_logit, rooms_target)            
 
             # Repopulate agent state
             # NOTE: queries_unused may have changed but it's fine since nav_teacher does not use it!
@@ -384,7 +389,10 @@ class VerbalAskAgent(AskAgent):
                     traj[i]['agent_nav_softmax_initial'].append(nav_softmax_initial_list[i])  #  added
                     traj[i]['agent_nav_logits_final'].append(nav_logits_final_list[i])  #  added
                     traj[i]['agent_nav_softmax_final'].append(nav_softmax_final_list[i])  #  added
+                    traj[i]['agent_room_logits'].append(room_logits_list[i])  #  added
+                    traj[i]['agent_room_softmax'].append(room_softmax_list[i])  #  added
                     traj[i]['teacher_nav'].append(nav_target_list[i])  # added
+                    traj[i]['teacher_room'].append(rooms_target_list[i])  # added
                     traj[i]['teacher_ask'].append(ask_target_list[i])
                     traj[i]['agent_ask'].append(q_t_list[i])
                     traj[i]['agent_ask_logits'].append(ask_logits_list[i])  # added
@@ -393,8 +401,6 @@ class VerbalAskAgent(AskAgent):
                     traj[i]['subgoals'].append(verbal_subgoals[i])
                     traj[i]['agent_nav_logit_masks'].append(nav_logit_masks_list[i])  # added
                     traj[i]['agent_ask_logit_masks'].append(ask_logit_masks_list[i])  # added
-                    traj[i]['curr_rm_idx'].append(curr_rooms_idx[i])  # added
-                    traj[i]['next_rm_idx'].append(next_rooms_idx[i])  # added
 
                     if a_t_list[i] == self.nav_actions.index('<end>') or \
                        time_step >= ob['traj_len'] - 1:
@@ -517,6 +523,7 @@ class VerbalAskAgent(AskAgent):
 
         self.nav_loss = 0
         self.ask_loss = 0
+        self.room_loss = 0
 
         action_subgoals = [[] for _ in range(batch_size)]
         n_subgoal_steps = [0] * batch_size
