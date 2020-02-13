@@ -579,11 +579,7 @@ class AttentionSeq2SeqModel(nn.Module):
         else:
             sys.exit('%s advisor not supported' % hparams.advisor)
 
-        # semantics update
-        if hparams.semantics_loss:
-            self.decoder = AskAttnSemanticsLossDecoderLSTM(hparams, agent_class, device).to(device)
-        else:
-            self.decoder = AskAttnDecoderLSTM(hparams, agent_class, device).to(device)
+        self.decoder = AskAttnDecoderLSTM(hparams, agent_class, device).to(device)
 
         if torch.cuda.device_count() > 1:
             # self.encoder = nn.DataParallel(self.encoder, device_ids=[0,1,2,3])

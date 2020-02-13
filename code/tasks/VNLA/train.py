@@ -177,16 +177,13 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
 
             loss_str = '\n * train loss: %.4f' % train_loss_avg
             train_nav_loss_avg = np.average(np.array(agent.nav_losses))
-            train_room_loss_avg = np.average(np.array(agent.room_losses))
             train_ask_loss_avg = np.average(np.array(agent.ask_losses))
             loss_str += ', nav loss: %.4f' % train_nav_loss_avg
-            loss_str += ', room loss: %.4f' % train_room_loss_avg
             loss_str += ', ask loss: %.4f' % train_ask_loss_avg
             loss_str += compute_ask_stats(traj)
 
             SW.add_scalar('train loss per {} iters'.format(hparams.log_every), train_loss_avg, iter)
             SW.add_scalar('train nav loss per {} iters'.format(hparams.log_every), train_nav_loss_avg, iter)
-            SW.add_scalar('train room loss per {} iters'.format(hparams.log_every), train_room_loss_avg, iter)
             SW.add_scalar('train ask loss per {} iters'.format(hparams.log_every), train_ask_loss_avg, iter)
 
         metrics = defaultdict(dict)
@@ -200,14 +197,11 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str += '\n * %s loss: %.4f' % (env_name, val_loss_avg)
             val_nav_loss_avg = np.average(agent.nav_losses)
             loss_str += ', nav loss: %.4f' % val_nav_loss_avg
-            val_room_loss_avg = np.average(agent.room_losses)
-            loss_str += ', room loss: %.4f' % val_room_loss_avg
             val_ask_loss_avg = np.average(agent.ask_losses)
             loss_str += ', ask loss: %.4f' % val_ask_loss_avg
 
             SW.add_scalar('{} loss per {} iters'.format(env_name, hparams.log_every), val_loss_avg, iter)
             SW.add_scalar('{} nav loss per {} iters'.format(env_name, hparams.log_every), val_nav_loss_avg, iter)
-            SW.add_scalar('{} room loss per {} iters'.format(env_name, hparams.log_every), val_room_loss_avg, iter)
             SW.add_scalar('{} ask loss per {} iters'.format(env_name, hparams.log_every), val_ask_loss_avg, iter)
 
             # Get validation distance from goal under test evaluation conditions

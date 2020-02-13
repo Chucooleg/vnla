@@ -72,31 +72,7 @@ class AskAgent(BaseAgent):
 
         self.coverage_size = hparams.coverage_size if hasattr(hparams, 'coverage_size') else None
 
-        # semantics update
-        self.semantics_loss = hasattr(hparams, 'semantics_loss') \
-                                 and hparams.semantics_loss
-        # if self.semantics_only:
-        #     self.room_types = room_types
-        #     if hparams.room_cheat:
-        #         self.curr_room_classifier = make_oracle('curr_room_type', room_types)
-        #         self.next_room_classifier = make_oracle('next_room_type', room_types)
-        #     else:
-        #         raise ValueError('learned room classifier not implemented yet.')
-
-        if self.semantics_loss:
-            self.room_types = room_types
-            if hparams.room_target == "current":
-                self.room_classifier = make_oracle('curr_room_type', room_types)
-            elif hparams.room_target == "next":
-                self.room_classifier = make_oracle('next_room_type', room_types)
-            else:
-                raise ValueError('check room prediction target from config or flags. Must be either current or next')
-        # blind fold
-        self.blind_fold = hasattr(hparams, 'blind_fold') \
-                                 and hparams.blind_fold
         self.img_feature_size = hparams.img_feature_size
-
-        # self.SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
 
     @staticmethod
     def n_input_nav_actions():
@@ -366,24 +342,9 @@ class AskAgent(BaseAgent):
 
         return traj
 
-    # def _compute_loss(self, iter_idx=None):
-
-    #     self.loss = self.nav_loss + self.ask_loss
-    #     iter_loss_avg = self.loss.item() / self.episode_len
-    #     self.losses.append(iter_loss_avg)
-
-    #     iter_nav_loss_avg = self.nav_loss.item() / self.episode_len
-    #     self.nav_losses.append(iter_nav_loss_avg)
-
-    #     if self.random_ask or self.ask_first or self.teacher_ask or self.no_ask:
-    #         iter_ask_loss_avg = 0
-    #     else:
-    #         iter_ask_loss_avg = self.ask_loss.item() / self.episode_len
-    #     self.ask_losses.append(iter_ask_loss_avg)
-
     def _compute_loss(self, iter_idx=None):
 
-        self.loss = self.nav_loss + self.ask_loss + (0.25 * self.room_loss)
+        self.loss = self.nav_loss + self.ask_loss
         iter_loss_avg = self.loss.item() / self.episode_len
         self.losses.append(iter_loss_avg)
 
@@ -395,12 +356,6 @@ class AskAgent(BaseAgent):
         else:
             iter_ask_loss_avg = self.ask_loss.item() / self.episode_len
         self.ask_losses.append(iter_ask_loss_avg)
-
-        if not self.semantics_loss:
-            iter_room_loss_avg = 0
-        else:
-            iter_room_loss_avg = self.room_loss.item() / self.episode_len
-        self.room_losses.append(iter_room_loss_avg)
 
     def _setup(self, env, feedback):
         self.nav_feedback = feedback['nav']

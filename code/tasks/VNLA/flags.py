@@ -120,16 +120,8 @@ def make_parser():
         help='Use rules (b) to (d) only for help-requesting teacher')
 
    # Semantics
-   parser.add_argument('-semantics_loss', type=int,
-        help='semantics only mode on (1) or off (0)')
-   parser.add_argument('-room_target', type=str,
-        help='current or next')
    parser.add_argument('-room_types_path', type=str,
         help='DATA_DIR/<path> that points to a text file with room types. ')
-
-   # blind fold
-   parser.add_argument('-blind_fold', type=int,
-        help='blind fold agent on (1) or off (0)')  
 
    # data suffix
    parser.add_argument('-data_suffix', type=int,

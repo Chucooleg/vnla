@@ -3,8 +3,8 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "20200211_debug_dagger_semantics_loss"
-job_name = "debug_cuda_assertion_error"
+exp_name = "20200213_debug_dagger_original"
+job_name = "debug_original_dagger"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/verbal_hard.json"
 
 # from scripts/define_vars.sh
@@ -45,11 +45,6 @@ args['plot_to_philly'] = 0
 args['seed'] = 42
 
 args['no_ask'] = 0
-
-args['semantics_loss'] = 1
-args['room_target'] = 'current'
-
-args['blind_fold'] = 0
 
 args['data_suffix'] = "small_three_houses_single_goal_short"
 

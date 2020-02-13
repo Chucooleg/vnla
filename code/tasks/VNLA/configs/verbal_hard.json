@@ -39,10 +39,7 @@
     "coverage_size"      : 10,
     "n_subgoal_steps"    : 4,
     "local_run"          : 0,
-    "semantics_loss"     : 0,
-    "room_target"        : "current",
     "room_types_path"    : "semantics/asknav_tr_room_types.txt",
-    "blind_fold"         : 0,
     "plot_to_philly"     : 0,
     "data_suffix"        : "original"
 }
