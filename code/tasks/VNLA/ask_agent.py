@@ -383,7 +383,7 @@ class AskAgent(BaseAgent):
 
     def _compute_loss(self, iter_idx=None):
 
-        self.loss = self.nav_loss + self.ask_loss + self.room_loss
+        self.loss = self.nav_loss + self.ask_loss + (0.25 * self.room_loss)
         iter_loss_avg = self.loss.item() / self.episode_len
         self.losses.append(iter_loss_avg)
 
