@@ -77,19 +77,20 @@ class AskAgent(BaseAgent):
         # image data augmentation by swapping
         self.swap_images = hparams.swap_images
         self.swap_first = hparams.swap_first
+        self.image_match = hparams.image_match
+        assert self.image_match in ["current", "current_elevation", "current_next_elevation"]
         self.start_gamma_decay = hparams.start_gamma_decay
         self.decay_gamma_every = hparams.decay_gamma_every
         self.gamma_decay_rate = hparams.gamma_decay_rate
 
         # semantics lookup
-        self.room_types = room_types
+        self.room_types = room_types + ['None']
         self.curr_room_oracle = make_oracle('curr_room_type', room_types)
         self.next_room_oracle = make_oracle('next_room_type', room_types)
         with open(hparams.image_pool_path, 'r') as fh:
             self.image_pool = json.load(fh)
-            assert set(self.image_pool.keys()) == set(room_types)
-            for key in self.image_pool.keys():
-                assert set(self.image_pool[key].keys()) == set(['0','1','2'])
+        with open(hparams.curr_next_image_pool_path, 'r') as fh:
+            self.curr_next_image_pool = json.load(fh)
 
     @staticmethod
     def n_input_nav_actions():
@@ -136,18 +137,38 @@ class AskAgent(BaseAgent):
         return torch.from_numpy(features).to(self.device)
 
     def _feature_variable_random(self, obs):
-        ''' Make a variable for a batch of precomputed image features. Data augmentation version -- features are drawn from other environments. '''
+        ''' Make a variable for a batch of precomputed image features. Data augmentation version -- features are drawn from other environments. 
+        lookup[current room label][elevation] = (scan, viexpointIndex, viewIndex)
+        '''
         feature_size = obs[0]['feature'].shape[0]
         features = np.empty((len(obs),feature_size), dtype=np.float32)
 
         _, curr_room_indices = self.curr_room_oracle(obs)
-        # next_room_indices = self.next_room_oracle(obs)
         elevations = [ob['viewIndex']//12 for ob in obs]
 
         for i, ob in enumerate(obs):
             # randomly draw an image of the same roonm type
             drawn_idx = np.random.choice(len(self.image_pool[self.room_types[curr_room_indices[i]]][str(elevations[i])]))
             scan, viewpoint, viewix = self.image_pool[self.room_types[curr_room_indices[i]]][str(elevations[i])][drawn_idx]
+            long_id = scan + "_" + viewpoint
+            features[i,:] = self.env.env.features[long_id][viewix, :]
+        return torch.from_numpy(features).to(self.device)
+
+    def _feature_variable_random_curr_next(self, obs):
+        ''' Make a variable for a batch of precomputed image features. Data augmentation version -- features are drawn from other environments. 
+        lookup[current room label][next room label][elevation] = (scan, viexpointIndex, viewIndex)
+        '''
+        feature_size = obs[0]['feature'].shape[0]
+        features = np.empty((len(obs),feature_size), dtype=np.float32)
+
+        _, curr_room_indices = self.curr_room_oracle(obs)
+        _, next_room_indices = self.next_room_oracle(obs)
+        elevations = [ob['viewIndex']//12 for ob in obs]
+
+        for i, ob in enumerate(obs):
+            # randomly draw an image of the same roonm type
+            drawn_idx = np.random.choice(len(self.curr_next_image_pool[self.room_types[curr_room_indices[i]]][self.room_types[next_room_indices[i]]][str(elevations[i])]))
+            scan, viewpoint, viewix = self.curr_next_image_pool[self.room_types[curr_room_indices[i]]][self.room_types[next_room_indices[i]]][str(elevations[i])][drawn_idx]
             long_id = scan + "_" + viewpoint
             features[i,:] = self.env.env.features[long_id][viewix, :]
         return torch.from_numpy(features).to(self.device)

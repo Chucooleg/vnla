@@ -62,6 +62,7 @@ def set_path():
     # semantics update!
     hparams.room_types_path = os.path.join(DATA_DIR, hparams.room_types_path)
     hparams.image_pool_path = os.path.join(DATA_DIR, hparams.image_pool_path)
+    hparams.curr_next_image_pool_path = os.path.join(DATA_DIR, hparams.curr_next_image_pool_path)
 
 def save(path, model, optimizer, iter, best_metrics, train_env, gamma):
     ckpt = {

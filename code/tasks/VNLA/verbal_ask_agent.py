@@ -205,12 +205,16 @@ class VerbalAskAgent(AskAgent):
             ask_logit_mask[list(zip(*ask_mask_indices))] = 1
 
             # Image features
-            if self.allow_cheat:
-                swap_image = np.random.binomial(1, self.gamma if self.swap_first else (1 - self.gamma))
-            else:
+            if self.is_eval:
                 swap_image = 0
+            else:
+                swap_image = np.random.binomial(1, self.gamma if self.swap_first else (1 - self.gamma))
+
             if swap_image:
-                f_t = self._feature_variable_random(obs)
+                if self.image_match == 'current_elevation':
+                    f_t = self._feature_variable_random(obs)
+                if self.image_match == 'current_next_elevation':
+                    f_t = self._feature_variable_random_curr_next(obs)                
             else:
                 f_t = self._feature_variable(obs)
 

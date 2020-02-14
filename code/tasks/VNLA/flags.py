@@ -124,12 +124,17 @@ def make_parser():
         help='DATA_DIR/<path> that points to a text file with room types. ')
    parser.add_argument('-image_pool_path', type=str,
         help='DATA_DIR/<path> that points to a json file containing a lookup table lookup[current room label][elevation (0/1/2)] = (scan, vertex, viewix). ')
+   parser.add_argument('-curr_next_image_pool_path', type=str,
+        help='DATA_DIR/<path> that points to a json file containing a lookup table lookup[current room label][next_room_label][elevation (0/1/2)] = (scan, vertex, viewix). ')
+
 
    # Semantics - data augmentation
    parser.add_argument('-swap_images', type=int,
         help='Data augmentation by swapping out images from current env to image from different environments.')
    parser.add_argument('-swap_first', type=int,
         help='Swap images more in the beginning (1) or towards the end (0) of training.')
+   parser.add_argument('-image_match', type=str,
+        help='current, current_elevation, current_next_elevation')        
    parser.add_argument('-start_gamma', type=float,
         help='Start gamma. If swap_first=1, gamma is the probability of swapping out image. If swap_first=0, the probability is 1-gamma. float.')
    parser.add_argument('-start_gamma_decay', type=int,
