@@ -74,6 +74,23 @@ class AskAgent(BaseAgent):
 
         self.img_feature_size = hparams.img_feature_size
 
+        # image data augmentation by swapping
+        self.swap_images = hparams.swap_images
+        self.swap_first = hparams.swap_first
+        self.start_gamma_decay = hparams.start_gamma_decay
+        self.decay_gamma_every = hparams.decay_gamma_every
+        self.gamma_decay_rate = hparams.gamma_decay_rate
+
+        # semantics lookup
+        self.room_types = room_types
+        self.curr_room_oracle = make_oracle('curr_room_type', room_types)
+        self.next_room_oracle = make_oracle('next_room_type', room_types)
+        with open(hparams.image_pool_path, 'r') as fh:
+            self.image_pool = json.load(fh)
+            assert set(self.image_pool.keys()) == set(room_types)
+            for key in self.image_pool.keys():
+                assert set(self.image_pool[key].keys()) == set(['0','1','2'])
+
     @staticmethod
     def n_input_nav_actions():
         return len(AskAgent.nav_actions)
@@ -116,6 +133,23 @@ class AskAgent(BaseAgent):
         features = np.empty((len(obs),feature_size), dtype=np.float32)
         for i,ob in enumerate(obs):
             features[i,:] = ob['feature']
+        return torch.from_numpy(features).to(self.device)
+
+    def _feature_variable_random(self, obs):
+        ''' Make a variable for a batch of precomputed image features. Data augmentation version -- features are drawn from other environments. '''
+        feature_size = obs[0]['feature'].shape[0]
+        features = np.empty((len(obs),feature_size), dtype=np.float32)
+
+        _, curr_room_indices = self.curr_room_oracle(obs)
+        # next_room_indices = self.next_room_oracle(obs)
+        elevations = [ob['viewIndex']//12 for ob in obs]
+
+        for i, ob in enumerate(obs):
+            # randomly draw an image of the same roonm type
+            drawn_idx = np.random.choice(len(self.image_pool[self.room_types[curr_room_indices[i]]][str(elevations[i])]))
+            scan, viewpoint, viewix = self.image_pool[self.room_types[curr_room_indices[i]]][str(elevations[i])][drawn_idx]
+            long_id = scan + "_" + viewpoint
+            features[i,:] = self.env.env.features[long_id][viewix, :]
         return torch.from_numpy(features).to(self.device)
 
     def _argmax(self, logit):
@@ -165,7 +199,7 @@ class AskAgent(BaseAgent):
     def rollout(self, iter_idx=None):
         # iter_idx indicates which batch we are at over the whole training process
         # Reset environment
-        obs = self.env.reset(self.is_eval)
+        obs = self.env.reset(self.allow_cheat)
         batch_size = len(obs)
 
         # Sample random ask positions
@@ -260,12 +294,12 @@ class AskAgent(BaseAgent):
 
             # Nav loss
             nav_target = torch.tensor(nav_target, dtype=torch.long, device=self.device)
-            if not self.is_eval:
+            if self.allow_cheat:
                 self.nav_loss += self.nav_criterion(nav_logit, nav_target)
 
             # Ask loss
             ask_target = torch.tensor(ask_target, dtype=torch.long, device=self.device)
-            if not self.is_eval and not (self.random_ask or self.ask_first or self.teacher_ask or self.no_ask):
+            if not self.allow_cheat and not (self.random_ask or self.ask_first or self.teacher_ask or self.no_ask):
                 self.ask_loss += self.ask_criterion(ask_logit, ask_target)
 
             # Determine next actions
@@ -337,7 +371,9 @@ class AskAgent(BaseAgent):
             if ended.all():
                 break
 
-        if not self.is_eval:
+        # 1. training 
+        # 2. eval mode with dropout and want to compute loss
+        if self.allow_cheat:
             self._compute_loss(iter_idx)
 
         return traj
@@ -375,8 +411,8 @@ class AskAgent(BaseAgent):
     def test(self, env, feedback, use_dropout=False, allow_cheat=False):
         ''' Evaluate once on each instruction in the current environment '''
 
+        self.is_eval = True
         self.allow_cheat = allow_cheat
-        self.is_eval = not allow_cheat
         self._setup(env, feedback)
         if use_dropout:
             self.model.train()
@@ -388,8 +424,12 @@ class AskAgent(BaseAgent):
         ''' Train for a given number of iterations '''
 
         self.is_eval = False
+        self.allow_cheat = True
         self._setup(env, feedback)
         self.model.train()
+
+        # check (1 - image swapping prob)
+        assert self.gamma >= 0.0
 
          # timming bookkeeping
         time_keep = {
@@ -427,6 +467,7 @@ class AskAgent(BaseAgent):
 
         last_traj = []
         for iter in range(1, n_iters + 1):
+            global_iter_idx = idx + iter
             optimizer.zero_grad()
             traj, iter_time_keep = self.rollout(idx + iter)
             if n_iters - iter <= 10:
@@ -444,19 +485,9 @@ class AskAgent(BaseAgent):
                 if key in iter_time_keep:
                     time_keep[key] += iter_time_keep[key]
 
+            # exponential decay gamma
+            if global_iter_idx >= self.start_gamma_decay and global_iter_idx % self.decay_gamma_every == 0:
+                self.gamma *= self.gamma_decay_rate
+                print('New image swap probability %f' % (self.gamma if self.swap_first else (1 - self.gamma)))
+
         return last_traj, time_keep
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

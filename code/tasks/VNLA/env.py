@@ -157,7 +157,6 @@ class VNLABatch():
     def _next_minibatch(self):
         if self.ix == 0:
             self.random.shuffle(self.data)
-            print ("Shuffle, setting data ix at 0.")
         batch = self.data[self.ix:self.ix+self.batch_size]
         if len(batch) < self.batch_size:
             self.random.shuffle(self.data)
@@ -207,7 +206,7 @@ class VNLABatch():
         frac_max_queries = max_queries - int_max_queries
         return int_max_queries + (self.random.random() < frac_max_queries)
 
-    def reset(self, is_eval):
+    def reset(self, allow_cheat):
         ''' Load a new minibatch / episodes. '''
 
         self._next_minibatch()
@@ -223,8 +222,8 @@ class VNLABatch():
 
         for i, item in enumerate(self.batch):
             # Assign time budget
-            if is_eval:
-                # If eval use expected trajectory length between start_region and end_region
+            if not allow_cheat:
+                # If eval (with no dropout, with no loss computation) use expected trajectory length between start_region and end_region
                 key = self.make_traj_estimate_key(item)
                 traj_len_estimate = self.traj_len_estimates[key]
             else:

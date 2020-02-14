@@ -3,8 +3,8 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "20200213_debug_dagger_original"
-job_name = "debug_original_dagger"
+exp_name = "20200213_debug_dagger_with_image_swap"
+job_name = "debug_image_swap_data_94798_no_ask"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/verbal_hard.json"
 
 # from scripts/define_vars.sh
@@ -44,8 +44,16 @@ args['plot_to_philly'] = 0
 
 args['seed'] = 42
 
-args['no_ask'] = 0
+args['no_ask'] = 1
 
-args['data_suffix'] = "small_three_houses_single_goal_short"
+args['swap_images'] = 1
+args['swap_first'] = 1
+args['start_gamma'] = 1.0
+args['start_gamma_decay'] = 100
+args['decay_gamma_every'] = 100
+args['gamma_decay_rate'] = 0.95
+
+# args['data_suffix'] = "small_three_houses_single_goal_short"
+args['data_suffix'] = "original"
 
 vs_code_debug(args)

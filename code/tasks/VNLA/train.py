@@ -61,8 +61,9 @@ def set_path():
 
     # semantics update!
     hparams.room_types_path = os.path.join(DATA_DIR, hparams.room_types_path)
+    hparams.image_pool_path = os.path.join(DATA_DIR, hparams.image_pool_path)
 
-def save(path, model, optimizer, iter, best_metrics, train_env):
+def save(path, model, optimizer, iter, best_metrics, train_env, gamma):
     ckpt = {
             'model_state_dict': model.state_dict(),
             'optim_state_dict': optimizer.state_dict(),
@@ -70,7 +71,8 @@ def save(path, model, optimizer, iter, best_metrics, train_env):
             'iter'            : iter,
             'best_metrics'    : best_metrics,
             'data_idx'        : train_env.ix,
-            'vocab'           : train_env.tokenizer.vocab
+            'vocab'           : train_env.tokenizer.vocab,
+            'gamma'           : gamma
         }
     torch.save(ckpt, path)
 
@@ -153,7 +155,6 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     sr = 'success_rate'
 
     SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
-    # SW = SummaryWriter(os.environ.get('PHILLY_LOG_DIRECTORY', '.'), flush_secs=30) # pull from browser
 
     for idx in range(start_iter, end_iter, hparams.log_every):
         # An iter is a batch
@@ -166,6 +167,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str = '\n * eval mode'
         else:
             traj, time_keep = agent.train(train_env, optimizer, interval, train_feedback, idx)
+            SW.add_scalar('image swap probability', agent.gamma if hparams.swap_first else (1 - agent.gamma), iter)
             
             # timing for different processes in rollout and loss backward
             for key in sorted(time_keep.keys()):
@@ -278,7 +280,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             for env_name in should_save_ckpt:
                 save_path = os.path.join(hparams.exp_dir,
                     '%s_%s.ckpt' % (hparams.model_prefix, env_name))
-                save(save_path, model, optimizer, iter, best_metrics, train_env)
+                save(save_path, model, optimizer, iter, best_metrics, train_env, agent.gamma)
                 print("Saved %s model to %s" % (env_name, save_path))
         
         # progress per training job on philly
@@ -393,6 +395,11 @@ def train_val(device, seed=None):
     elif hparams.advisor == 'direct':
         # semantics update!
         agent = AskAgent(model, hparams, room_types, device)
+
+    if ckpt is not None:
+        agent.gamma = ckpt['gamma']
+    else:
+        agent.gamma = float(hparams.start_gamma) if hasattr(hparams, "start_gamma") else 1.0 
 
     # Train
     return train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,

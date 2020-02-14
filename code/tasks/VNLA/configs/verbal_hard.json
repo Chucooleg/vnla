@@ -16,7 +16,7 @@
     "reg_feedback"       : "teacher",
     "lr"                 : 1e-4,
     "weight_decay"       : 5e-4,
-    "n_iters"            : 100000,
+    "n_iters"            : 200000,
     "min_word_count"     : 1,
     "split_by_spaces"    : true,
     "start_lr_decay"     : 5000,
@@ -40,6 +40,13 @@
     "n_subgoal_steps"    : 4,
     "local_run"          : 0,
     "room_types_path"    : "semantics/asknav_tr_room_types.txt",
+    "image_pool_path"    : "semantics/asknav_rmtyp_ele_to_image.json",
     "plot_to_philly"     : 0,
-    "data_suffix"        : "original"
+    "data_suffix"        : "original",
+    "swap_images"        : 0,
+    "swap_first"         : 1,
+    "start_gamma"        : 1.0,
+    "start_gamma_decay"  : 5000,
+    "decay_gamma_every"  : 1000,
+    "gamma_decay_rate"   : 0.95
 }
