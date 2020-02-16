@@ -1,0 +1,73 @@
+description: VNLA dagger with image swapping current-next-elevation constant gamma, no teacher rollin
+# experiment named vnla_time_comparisons
+
+target:
+  # which virtual cluster you belong to (msrlabs, etc.). Everyone has access to "msrlabs".
+  vc: msrlabs
+  # physical cluster to use (cam, gcr, rr1, rr2) or Azure clusters (eu1, eu2, etc.)
+  cluster: eu1
+
+environment:
+  image: philly/jobs/test/pytorch:pytorch1.2.0-py36-mattersim
+  registry: phillyregistry.azurecr.io
+
+  setup:
+    - pip install scikit-learn --user
+    - python -m pip install networkx==2.3 --user
+    - CUDA_VISIBLE_DEVICES=0
+    # - CUDA_VISIBILE_DEVICES=0,1,2,3
+    # - pip install ipdb --user
+
+storage:
+  input1:
+    storage_account_name: msrairesidentssa4
+    container_name: matterport3d
+    mount_dir: /mnt/matterport3d
+    # local_dir: /home/hoyeung/blob_matterport3d/
+  output:
+    storage_account_name: msrairesidentssa4
+    container_name: experiment-results
+    mount_dir: /mnt/experiment-results-philly
+    # local_dir: /home/hoyeung/Documents/vnla/code/tasks/VNLA/output
+
+code:
+  # local directory of the code. this will be uploaded to the server.
+  # $CONFIG_DIR is expanded to the directory of this config file
+  local_dir: $CONFIG_DIR/
+
+
+# data:
+#   data upload is not required for this example
+
+# list of jobs to run, we run 2 jobs in this example
+jobs:
+    # name must be unique across the jobs
+  - name: dagger_no_ask_with_image_swapping_curr_next_gamma_0.10
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200216_philly_dagger_swap_images_constant_gamma" "dagger_no_ask_with_image_swapping_curr_next_gamma_0.10" "configs/verbal_hard.json" -seed 42 -no_ask 1 -swap_images 1 -image_match "current_next_elevation" -teacher_rollin 0 -swap_first 1 -start_gamma 0.10 -gamma_decay_rate 1.0
+
+  - name: dagger_no_ask_with_image_swapping_curr_gamma_0.10
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200216_philly_dagger_swap_images_constant_gamma" "dagger_no_ask_with_image_swapping_curr_gamma_0.10" "configs/verbal_hard.json" -seed 42 -no_ask 1 -swap_images 1 -image_match "current_elevation" -teacher_rollin 0 -swap_first 1 -start_gamma 0.10 -gamma_decay_rate 1.0
+
+  - name: dagger_no_ask_with_image_swapping_curr_next_gamma_0.25
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200216_philly_dagger_swap_images_constant_gamma" "dagger_no_ask_with_image_swapping_curr_next_gamma_0.25" "configs/verbal_hard.json" -seed 42 -no_ask 1 -swap_images 1 -image_match "current_next_elevation" -teacher_rollin 0 -swap_first 1 -start_gamma 0.25 -gamma_decay_rate 1.0
+
+  - name: dagger_no_ask_with_image_swapping_curr_gamma_0.25
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200216_philly_dagger_swap_images_constant_gamma" "dagger_no_ask_with_image_swapping_curr_gamma_0.25" "configs/verbal_hard.json" -seed 42 -no_ask 1 -swap_images 1 -image_match "current_elevation" -teacher_rollin 0 -swap_first 1 -start_gamma 0.25 -gamma_decay_rate 1.0
+
+  - name: dagger_no_ask_with_image_swapping_curr_next_gamma_0.50
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200216_philly_dagger_swap_images_constant_gamma" "dagger_no_ask_with_image_swapping_curr_next_gamma_0.50" "configs/verbal_hard.json" -seed 42 -no_ask 1 -swap_images 1 -image_match "current_next_elevation" -teacher_rollin 0 -swap_first 1 -start_gamma 0.50 -gamma_decay_rate 1.0
+
+  - name: dagger_no_ask_with_image_swapping_curr_gamma_0.50
+    sku: G1
+    command:
+    - cd tasks/VNLA/scripts/ && bash train_semantic_dagger.sh "20200216_philly_dagger_swap_images_constant_gamma" "dagger_no_ask_with_image_swapping_curr_gamma_0.50" "configs/verbal_hard.json" -seed 42 -no_ask 1 -swap_images 1 -image_match "current_elevation" -teacher_rollin 0 -swap_first 1 -start_gamma 0.50 -gamma_decay_rate 1.0
