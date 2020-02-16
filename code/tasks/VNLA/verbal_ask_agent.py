@@ -345,7 +345,10 @@ class VerbalAskAgent(AskAgent):
 
             # Determine next nav action
             start_time = time.time()
-            a_t = self._next_action('nav', nav_logit, nav_target, self.nav_feedback)
+            if swap_image and self.teacher_rollin:
+                a_t = self._next_action('nav', nav_logit, nav_target, 'teacher')            
+            else:
+                a_t = self._next_action('nav', nav_logit, nav_target, self.nav_feedback)
 
             # Translate agent action to environment action
             a_t_list = a_t.data.tolist()

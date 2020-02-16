@@ -133,8 +133,10 @@ def make_parser():
         help='Data augmentation by swapping out images from current env to image from different environments.')
    parser.add_argument('-swap_first', type=int,
         help='Swap images more in the beginning (1) or towards the end (0) of training.')
+   parser.add_argument('-teacher_rollin', type=int,
+        help='Use teacher rollin with probability gamma. int, on (1) off (0)') 
    parser.add_argument('-image_match', type=str,
-        help='current, current_elevation, current_next_elevation')        
+        help='current, current_elevation, current_next_elevation')          
    parser.add_argument('-start_gamma', type=float,
         help='Start gamma. If swap_first=1, gamma is the probability of swapping out image. If swap_first=0, the probability is 1-gamma. float.')
    parser.add_argument('-start_gamma_decay', type=int,

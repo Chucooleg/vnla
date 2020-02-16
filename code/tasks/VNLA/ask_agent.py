@@ -77,6 +77,7 @@ class AskAgent(BaseAgent):
         # image data augmentation by swapping
         self.swap_images = hparams.swap_images
         self.swap_first = hparams.swap_first
+        self.teacher_rollin = hparams.teacher_rollin
         self.image_match = hparams.image_match
         assert self.image_match in ["current", "current_elevation", "current_next_elevation"]
         self.start_gamma_decay = hparams.start_gamma_decay

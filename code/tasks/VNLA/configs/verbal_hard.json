@@ -46,6 +46,7 @@
     "data_suffix"        : "original",
     "swap_images"        : 0,
     "swap_first"         : 1,
+    "teacher_rollin"      : 1,
     "image_match"        : "current_elevation",
     "start_gamma"        : 1.0,
     "start_gamma_decay"  : 5000,
