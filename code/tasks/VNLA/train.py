@@ -67,7 +67,9 @@ def set_path():
     DATA_DIR = os.getenv('PT_DATA_DIR')
     hparams.data_path = os.path.join(DATA_DIR, hparams.data_dir)  #e.g. $PT_DATA_DIR/asknav/
     hparams.img_features = os.path.join(DATA_DIR, hparams.img_features)
-    # hparams.img_features = os.path.join(DATA_DIR, 'img_features/ResNet-152-imagenet.tsv')
+    
+    # Set time report path
+    hparams.time_report_path = os.path.join(hparams.exp_dir, "time_report.txt")
 
 def save(path, model, optimizer, iter, best_metrics, train_env, history_buffer, beta):
     '''save model checkpt'''
@@ -205,16 +207,20 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                 idx=idx,
                 explore_env=explore_env)
             SW.add_scalar('expert rollin - beta', agent.beta, iter)
-        
+
             # Report time for rollout and backprop
-            for time_key, time_val in sorted(list(time_report.items()), key=lambda x: x[1], reverse=True):
-                print ("Train {} time = {}".format(time_key, time_val)) 
+            with open(hparams.time_report_path, "a") as f:
+                f.write("\n\nbatch_size {}, train_batch_size {}\n".format(hparams.batch_size, hparams.train_batch_size))
+                for time_key, time_val in sorted(list(time_report.items()), key=lambda x: x[1], reverse=True):
+                    report_line = "Train {} time = {}".format(time_key, time_val)
+                    f.write(report_line + "\n")
+                    print(report_line)
 
             # Report per `interval` agent rollout losses
             # Main training loss -- summed all loss types
             train_losses = np.array(agent.losses)
             assert len(train_losses) <= interval  # one scalar per batch (i.e. iter)
-            train_loss_avg = np.average(train_losses)  # across 1000 batches (i.e. iters)  
+            train_loss_avg = np.average(train_losses)  # across 1000 batches (i.e. iters)
             loss_str = '\n * train loss: %.4f' % train_loss_avg
             SW.add_scalar('train - all losses', train_loss_avg, iter)
 
@@ -226,7 +232,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             if hparams.uncertainty_handling != 'no_ask':
                 assert hasattr(agent, "ask_losses") and len(agent.ask_losses) <= interval
             if hparams.recovery_strategy != 'no_recovery':
-                assert hasattr(agent, "recover_losses") and len(agent.recover_losses) <= interval        
+                assert hasattr(agent, "recover_losses") and len(agent.recover_losses) <= interval  
 
             # Log individual training loss types (navigation, ask, value, recovery)
             for loss_type in loss_types:
@@ -468,13 +474,15 @@ def train_val(device, seed=None):
         print ("Action Imitation model: Navigation Policy with mutli-head and continous LSTM decoder") 
         # model = AttentionSeq2SeqContinuousMultiHeadModel(len(vocab), hparams, device)
         raise NotImplementedError
-    elif hparams.navigation_objective == 'value_estimation' and not hparams.bootstrap:
-        print ("Value Estimation model: Cost-to-go Estimator with single-head and recent-frames LSTM decoder") 
+
+    elif hparams.navigation_objective == 'value_estimation':
+        if not hparams.bootstrap:
+            print ("Value Estimation model: Cost-to-go Estimator with single-head and recent-frames LSTM decoder")
+        else:
+            print ("Value Estimation model: Cost-to-go Estimator with mutli-head and recent-frames LSTM decoder")
+        # Bootstrapped decoder will be set inside Model init using hparams.bootstrap
         model = AttentionSeq2SeqFramesModel(len(vocab), hparams, device)
-    elif hparams.navigation_objective == 'value_estimation' and hparams.bootstrap:
-        print ("Value Estimation model: Cost-to-go Estimator with mutli-head and recent-frames LSTM decoder")
-        # model = AttentionSeq2SeqFramesMultiHeadModel(len(vocab), hparams, device)
-        raise NotImplementedError
+        
     else:
         raise ValueError('model definition is not clear. check navigation_objective argument in hparams config')
 

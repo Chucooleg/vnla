@@ -314,9 +314,6 @@ class AskAttnDecoderRegressorLSTM(AskAttnDecoderLSTM):
 
         super(AskAttnDecoderRegressorLSTM, self).__init__(hparams, agent_class, device)
 
-        # Q-value regressor output dim is 1
-        self.q_predictor = nn.Linear(hparams.hidden_size, 1)
-
     def _lstm_and_attend(self, nav_action, ask_action, feature, h, ctx, ctx_mask, cov=None):
         '''run LSTM cell, run attention layer on coverage vector'''
 
@@ -343,20 +340,75 @@ class AskAttnDecoderRegressorLSTM(AskAttnDecoderLSTM):
 
         return h_tilde, alpha, output_drop, new_h, new_cov        
 
-    def forward(self, tentative_bool, nav_action, ask_action, feature, h, ctx, ctx_mask, view_index_mask, cov=None):
+
+class AskAttnDecoderRegressorSingleHeadLSTM(AskAttnDecoderRegressorLSTM):
+
+    def __init__(self, hparams, agent_class, device):
+
+        super(AskAttnDecoderRegressorSingleHeadLSTM, self).__init__(hparams, agent_class, device)
+
+        # Q-value regressor output dim is 1
+        self.q_predictor = nn.Linear(hparams.hidden_size, 1)   
+
+    def forward(self, tentative_bool, nav_action, ask_action, feature, h, ctx, ctx_mask, view_index_mask, cov=None, pred_val=True):
         '''run LSTM to decode q-value for a particular view'''
 
         h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
             nav_action, ask_action, feature, h, ctx, ctx_mask, cov=cov)        
 
         # Predict q-value -- cost
-        # tensor shape (batch_size, 1) -> (batch_size,)
-        q_value = self.q_predictor(h_tilde).squeeze(-1)
-        if view_index_mask is not None:
-            # tensor shape (batch_size,)
-            q_value.data.masked_fill_(view_index_mask, 1e9)
+        if pred_val:
+            # tensor shape (batch_size, 1) -> (batch_size,)
+            q_value = self.q_predictor(h_tilde).squeeze(-1)
+            if view_index_mask is not None:
+                # tensor shape (batch_size,)
+                q_value.data.masked_fill_(view_index_mask, 1e9)
+        else:
+            q_value = None
 
         return new_h, alpha, q_value, new_cov
+ 
+
+class AskAttnDecoderRegressorMultiHeadLSTM(AskAttnDecoderRegressorLSTM):
+
+    def __init__(self, hparams, agent_class, device):
+
+        super(AskAttnDecoderRegressorMultiHeadLSTM, self).__init__(hparams, agent_class, device)
+
+        assert hparams.bootstrap
+        assert hparams.n_ensemble > 0
+
+        # Q-value regressor output dim is 1
+        self.q_predictors = nn.ModuleList([nn.Linear(hparams.hidden_size, 1) for _ in self.n_ensemble])  
+
+    def forward(self, tentative_bool, nav_action, ask_action, feature, h, ctx, ctx_mask, view_index_mask, cov=None, pred_val=True):
+        '''run LSTM to decode q-value for a particular view'''
+
+        h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
+            nav_action, ask_action, feature, h, ctx, ctx_mask, cov=cov)        
+
+        # Predict q-values -- cost
+        if pred_val:
+
+            # tensor shape (batch_size, n_ensemble)
+            q_value_heads = torch.empty(feature.shape[0], self.n_ensemble, dtype=torch.float, device=self.device)
+
+            for h, predictor_head in self.q_predictors:
+                # tensor shape (batch_size, )
+                q_value_heads[:, h] = predictor_head(h_tilde).squeeze(-1)
+
+            # tensor shape (batch_size,), tensor shape (batch_size,)
+            q_value, q_value_variance = torch.var_mean(q_value_heads, dim=1)
+            if view_index_mask is not None:
+                # tensor shape (batch_size,), 
+                q_value.data.masked_fill_(view_index_mask, 1e9)
+                # tensor shape (batch_size,)
+                q_value_variance.data.masked_fill_(view_index_mask, 1e9)
+        else:
+            q_value = None
+            q_value_variance = None
+
+        return new_h, alpha, q_value, q_value_variance, new_cov
 
 
 class AttentionSeq2SeqFramesModel(nn.Module):
@@ -388,7 +440,10 @@ class AttentionSeq2SeqFramesModel(nn.Module):
         else:
             sys.exit('%s uncertainty handling and %s recovery strategy not supported, no matching agent classes.' % hparams.uncertainty_handling, hparams.recovery_strategy)
 
-        self.decoder = AskAttnDecoderRegressorLSTM(hparams, agent_class, device).to(device)
+        if hparams.bootstrap:
+            self.decoder = AskAttnDecoderRegressorMultiHeadLSTM(hparams, agent_class, device).to(device)
+        else:
+            self.decoder = AskAttnDecoderRegressorSingleHeadLSTM(hparams, agent_class, device).to(device)
 
         if torch.cuda.device_count() > 1:
             self.encoder = nn.DistributedDataParallel(self.encoder)

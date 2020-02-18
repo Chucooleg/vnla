@@ -77,9 +77,8 @@
 
 
     "bootstrap"             : 0,
-    "n_ensemble"            : 8,
+    "n_ensemble"            : 10,
     "bernoulli_probability" : 0.9,
-    "bootstrap_majority_vote" : 1,
 
 
     "plot_to_philly"        : 0

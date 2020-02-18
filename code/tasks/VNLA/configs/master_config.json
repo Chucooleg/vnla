@@ -80,7 +80,6 @@
     "bootstrap"             : 0,
     "n_ensemble"            : 8,
     "bernoulli_probability" : 0.9,
-    "bootstrap_majority_vote" : 1,
 
     # tensorboard logging
     "plot_to_philly"        : 0

@@ -116,6 +116,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         self.value_losses.append(iter_value_loss_avg)
 
     def pred_training_batch(self, training_batch, global_iter_idx, output_res=False):
+        if self.bootstrap:
+            return self._pred_training_batch_ensemble(training_batch, global_iter_idx, output_res)
+        else:
+            return self._pred_training_batch(training_batch, global_iter_idx, output_res)
+
+    def _pred_training_batch_ensemble(self, training_batch, global_iter_idx, output_res=False):
         '''
         Agent makes prediction on training batch sampled from history buffer.
         Compute self.loss, accumulate self.losses, self.value_losses
@@ -145,6 +151,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # q_values
                 'teacher_values_target': [],
                 'agent_values_estimate': [],
+
+                # bootstrapping
+                'agent_q_values_uncertainty': []
             } for (instr_iter_key_pair, timestep) \
                 in zip(tr_key_pairs, tr_timesteps)]
 
@@ -199,7 +208,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             f_out_t = self.get_tr_variable_by_t(tr_key_pairs, t_ix, 'feature')
 
             # Run decoder forward pass
-            decoder_h, _, _, cov = self.model.decode_nav(a_out_t, ques_out_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov)
+            decoder_h, _, _, _, cov = self.model.decode_nav(a_out_t, ques_out_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov, pred_val=False)
 
         time_report['decode_training_batch_history'] += time.time() - start_time
 
@@ -209,6 +218,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Initialize tensor to store q-value estimates
         # shape (36, batch_size)
         q_values_tr_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device)
+        # shape (36, batch_size)
+        q_values_tr_estimate_variance = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device)
         # count non-masked predictions to normalize loss value
         tot_pred = 0
 
@@ -235,14 +246,20 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # ques_asked = ...
 
             # Run decoder forward pass
-            _, _, q_values_tr_estimate[view_ix], _ = self.model.decode_nav(a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
+            _, _, q_values_tr_estimate[view_ix], q_values_tr_estimate_variance[view_ix], _ = self.model.decode_nav(a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
 
         # Reshape q_values_tr_estimate for loss computation
         # to (batch_size, self.num_viewIndex)
         q_values_tr_estimate = q_values_tr_estimate.t()
+        # to (batch_size, self.num_viewIndex)
+        q_values_tr_estimate_variance = q_values_tr_estimate_variance.t()
+
+        # Estimate uncertainty
+        # shape (batch_size,)
+        q_values_tr_uncertainty = torch.mean(q_values_tr_estimate_variance, dim=1)
+        assert q_values_tr_uncertainty.shape = (batch_size, )
 
         time_report['decode_training_batch_frontier'] += time.time() - start_time
-
         # -----------------------------------------------------------------
         # Compute q-value loss
         start_time = time.time()
@@ -265,6 +282,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             for i in range(len(tr_timesteps)):
                 training_batch_results[i]['teacher_values_target'] = q_values_target[i].tolist()
                 training_batch_results[i]['agent_values_estimate'] = q_values_tr_estimate[i].tolist()
+                training_batch_results[i]['agent_q_values_uncertainty'] = q_values_tr_uncertainties[i].tolist()
             time_report['save_training_batch_results'] += time.time() - start_time
 
         print ("finished training from history buffer. self.value_loss = {}".format(self.value_loss))
@@ -274,6 +292,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         return training_batch_results, time_report
 
     def rollout(self, global_iter_idx=None):
+        if self.bootstrap:
+            return self._rollout_ensemble(global_iter_idx=global_iter_idx)
+        else:
+            return self._rollout(global_iter_idx=global_iter_idx)
+
+    def _rollout_ensemble(self, global_iter_idx=None):
 
         # time keeping
         time_report = defaultdict(int)
@@ -338,6 +362,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # rollin
             'beta': None if self.is_eval else self.beta,
             'expert_rollin_bool': 0 if self.is_eval else expert_rollin_bool,
+
+            # bootstrapping
+            'agent_q_values_uncertainty': [], 
         } for ob in obs]
         time_report['initial_setup_initialize_traj_bookkeeping'] += time.time() - start_time
 
@@ -567,7 +594,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # tensor shape (batch_size, feature size)
                     f_out_t = local_buffer[t]['f_t']
 
-                    decoder_h, _, _, cov = self.model.decode_nav(a_out_t, ques_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov)
+                    decoder_h, _, _, _, cov = self.model.decode_nav(a_out_t, ques_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov, pred_val=False)
 
                 time_report['decode_history'] += time.time() - decode_hist_start_time
 
@@ -575,8 +602,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 decode_frontier_start_time = time.time()
 
                 # Initialize tensor to store q-value estimates
-                # tensor shape (36, 100)
-                q_values_rollout_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device)
+                # tensor shape (36, batch_size)
+                q_values_rollout_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device) 
+                q_values_rollout_estimate_variance = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device) 
                 # count non-masked predictions to normalize loss value
                 tot_pred = 0
 
@@ -612,13 +640,22 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                     # Run decoder forward pass
                     frontier_decode_time = time.time()
-                    _, _, q_values_rollout_estimate[view_ix], _ = self.model.decode_nav(a_proposed, ques_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
+                    # shape (batch_size,)
+                    # shape (batch_size,)
+                    _, _, q_values_rollout_estimate[view_ix], q_values_rollout_estimate_variance[view_ix], _ = self.model.decode_nav(a_proposed, ques_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
                     time_report['decode_frontier_decoder_forward'] += time.time() - frontier_decode_time
 
                 # Reshape q-value estimates tensor back to 
                 # shape (batch_size, self.num_viewIndex=36) 
                 # .t() expects 2-D tensor
                 q_values_rollout_estimate = q_values_rollout_estimate.t()
+                # shape (batch_size, self.num_viewIndex=36) 
+                q_values_rollout_estimate_variance = q_values_rollout_estimate_variance.t()
+
+                # Estimate uncertainty
+                # shape (batch_size,)
+                q_values_rollout_uncertainty = torch.mean(q_values_rollout_estimate_variance, dim=1)
+                assert q_values_rollout_uncertainty.shape = (batch_size, )
 
                 time_report['decode_frontier'] += time.time() - decode_frontier_start_time
                 # -------
@@ -701,7 +738,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
             # Convert np array to list for traj logging
             q_values_target_list = q_values_target_arr.tolist()
-
+            q_values_rollout_uncertainty_list = q_values_rollout_uncertainty.tolist()
             # Update experience batch & traj post rotation
             for i, ob in enumerate(obs):
                 if not ended[i]:
@@ -740,6 +777,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # q-values
                     traj[i]['agent_q_values'].append(None if expert_rollin_bool else q_values_rollout_estimate_list[i])
                     traj[i]['teacher_q_values'].append(q_values_target_list[i])
+                    # bootstrapping
+                    traj[i]['agent_q_values_uncertainty'].append(q_values_rollout_uncertainty_list[i])
             time_report['write_experience_batch'] += time.time() - start_time  
 
             if use_hist_buffer:
