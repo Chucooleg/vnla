@@ -4,7 +4,7 @@ from train import vs_code_debug
 
 # from train_experiments.sh
 exp_name = "20200221_philly_aggrevate_costtogo_logging"
-job_name = "trial_2"
+job_name = "trial_4"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh
@@ -31,13 +31,13 @@ args['exp_name'] = exp_name
 args['job_name'] = job_name
 
 # extras here!
-args['load_path'] = '/home/hoyeung/blob_experiments/output_philly/20200206_philly_aggrevate_tunning/data_94798_seed_42_batch_size_250_tr_batch_size_512_loss_l2_lr_0.0001_beta_decay_0.8/value_estimation_no_ask_no_recovery_last.ckpt'
+args['load_path'] = '/home/hoyeung/blob_experiments/output_local/20200207_debug_aggrevate/debug_faster_tensor_loading_2/value_estimation_no_ask_no_recovery_last.ckpt'
 args['multi_seed_eval'] = 1
 
 # args['data_suffix'] = 'small_three_goals_short'
-# args['data_suffix'] = 'small_three_houses_single_goal_short'
+args['data_suffix'] = 'small_three_houses_single_goal_short'
 # args['data_suffix'] = 'original'
-args['eval_data_suffix'] = 'small_ten_goals_short'
+# args['eval_data_suffix'] = 'small_ten_goals_short'
 
 
 vs_code_debug(args)

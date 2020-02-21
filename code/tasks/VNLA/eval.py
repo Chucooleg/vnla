@@ -122,9 +122,9 @@ class Evaluation(object):
                     self._score_item(item['instr_id'], item['trajectory'])
 
         # TODO: uncomment/comment this block on with large/small data!
-        assert len(instr_ids) == 0, 'Missing %d of %d instruction ids from %s - not in %s'\
-                       % (len(instr_ids), len(self.instr_ids), ",".join(self.splits), output_file)
-        assert len(self.scores['nav_errors']) == len(self.instr_ids)
+        # assert len(instr_ids) == 0, 'Missing %d of %d instruction ids from %s - not in %s'\
+        #                % (len(instr_ids), len(self.instr_ids), ",".join(self.splits), output_file)
+        # assert len(self.scores['nav_errors']) == len(self.instr_ids)
 
         score_summary = {
             'nav_error': np.average(self.scores['nav_errors']),

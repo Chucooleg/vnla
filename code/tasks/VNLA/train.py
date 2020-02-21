@@ -91,10 +91,13 @@ def load(path, device, args_copy):
     hparams = ckpt['hparams']
 
     # Overwrite hparams by args
-    for flag in vars(args_copy):
-        value = getattr(args_copy, flag)
+    for flag in args_copy:
+        # import pdb; pdb.set_trace()
+        value = args_copy[flag]
         if value is not None:
             setattr(hparams, flag, value)
+        if flag == 'multi_seed_eval' and value == 1:
+            setattr(hparams, 'eval_only', 1)
 
     set_path()
     return ckpt
@@ -259,7 +262,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             # Main validation loss -- summed all loss types
             val_loss_avg = np.average(agent.losses)
             loss_str += '\n * %s loss: %.4f' % (env_name, val_loss_avg)
-            SW.add_scalar('%s - all losses' None% env_name, val_loss_avg, iter)
+            SW.add_scalar('%s - all losses'% env_name, val_loss_avg, iter)
 
             # Individual validation loss types (navigation, ask, value, recovery)
             for loss_type in loss_types:
@@ -281,14 +284,16 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
 
             # Write the validation results out to json file
             # Compute in both train and test modes
-            agent.results_path = hparams.load_path.replace('.ckpt', '_') + env_name + '_for_eval.json'
+            agent.results_path = os.path.join(hparams.exp_dir, '{}_{}_for_eval.json'.format(hparams.model_prefix, env_name))
+            # agent.results_path = hparams.load_path.replace('.ckpt', '_') + env_name + '_for_eval.json'
             agent.write_results() # doesn't write is_success results yet
             score_summary, _, is_success = evaluator.score(agent.results_path)
 
             # Add success 1/0 to each traj
             # Compute only in eval mode (e.g. on test_seen or test_unseen data)
             if eval_mode:
-                agent.results_path = hparams.load_path.replace('.ckpt', '_') + env_name + '_for_eval_complete.json'
+                agent.results_path = os.path.join(hparams.exp_dir, '{}_{}_for_eval_complete.json'.format(hparams.model_prefix, env_name))
+                # agent.results_path = hparams.load_path.replace('.ckpt', '_') + env_name + '_for_eval_complete.json'
                 agent.add_is_success(is_success)
                 print('Save result with is_success metric to', agent.results_path)
                 agent.write_results()
@@ -647,6 +652,7 @@ def vs_code_debug(args_temp):
         seeds = [123, 435]
         metrics = defaultdict(lambda: defaultdict(list))
         for seed in seeds:
+            print ("EVAL SEED {}".format(seed))
             this_metrics = train_val(device, args_temp, seed=seed)
             for metric in this_metrics:
                 for k, v in this_metrics[metric].items():
