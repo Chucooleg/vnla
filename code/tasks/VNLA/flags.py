@@ -115,6 +115,8 @@ def make_parser():
     # Optimizer parameters
     parser.add_argument('-loss_function', type=str,
         help='loss function. `l1` or `l2`')
+    parser.add_argument('-norm_loss_by_dist', type=int,
+        help='Normalize loss by expert q-value size. 1/0')
     parser.add_argument('-lr', type=float,
         help='learning rate')
     parser.add_argument('-weight_decay', type=float,

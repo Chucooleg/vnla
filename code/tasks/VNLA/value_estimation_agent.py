@@ -54,6 +54,7 @@ class ValueEstimationAgent(NavigationAgent):
             self.loss_function_ref_str = "l1"
             self.value_criterion = nn.MSELoss(reduction='none')
             self.value_ref_criterion = nn.SmoothL1Loss(reduction='none')
+        self.norm_loss_by_dist = hparams.norm_loss_by_dist
 
         # Oracle
         self.value_teacher = make_oracle('frontier_shortest', self.nav_actions, self.env_actions)
@@ -97,12 +98,23 @@ class ValueEstimationAgent(NavigationAgent):
             scalar loss value
         '''
         assert q_values_estimate.shape == q_values_target.shape
+
         if ref:
-            # tensor shape (batch_size, self.num_viewIndex)
-            value_losses_full =  self.value_ref_criterion(q_values_estimate, q_values_target)            
+            criterion_func = self.value_ref_criterion
         else:
+            criterion_func = self.value_criterion
+
+        # either l1 or l2
+        # whether to normalize loss by gold current-to-gold distance or not
+        if self.loss_function_str == "l1":
             # tensor shape (batch_size, self.num_viewIndex)
-            value_losses_full =  self.value_criterion(q_values_estimate, q_values_target)
+            value_losses_full =  criterion_func(q_values_estimate, q_values_target) / (q_values_target if self.norm_loss_by_dist else 1)
+        elif self.loss_function_str == "l2":
+            # tensor shape (batch_size, self.num_viewIndex)
+            value_losses_full =  criterion_func(q_values_estimate, q_values_target) / ((q_values_target)**2 if self.norm_loss_by_dist else 1)
+        else:
+            raise ValueError('loss function str not supported')  
+
         assert value_losses_full.shape == (batch_size, self.num_viewIndex)
         # tensor shape (batch_size, )
         value_losses = torch.empty(batch_size, dtype=torch.float, device=self.device)

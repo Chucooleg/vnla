@@ -53,6 +53,7 @@
 
 
     "loss_function"         : "l1",
+    "norm_loss_by_dist"     : 1,
     "lr"                    : 1e-4,
     "weight_decay"          : 5e-4,
     "start_lr_decay"        : 5000,
