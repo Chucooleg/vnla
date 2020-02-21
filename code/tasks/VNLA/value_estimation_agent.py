@@ -47,13 +47,13 @@ class ValueEstimationAgent(NavigationAgent):
             # https://pytorch.org/docs/stable/nn.html?highlight=smooth%20l1#torch.nn.SmoothL1Loss
             self.loss_function_str = "l1"
             self.loss_function_ref_str = "l2"
-            self.value_criterion = nn.SmoothL1Loss(reduction='sum')
-            self.value_ref_criterion = nn.MSELoss(reduction='sum')
+            self.value_criterion = nn.SmoothL1Loss(reduction='none')
+            self.value_ref_criterion = nn.MSELoss(reduction='none')
         elif hparams.loss_function == 'l2':
             self.loss_function_str = "l2"
             self.loss_function_ref_str = "l1"
-            self.value_criterion = nn.MSELoss(reduction='sum')
-            self.value_ref_criterion = nn.SmoothL1Loss(reduction='sum')
+            self.value_criterion = nn.MSELoss(reduction='none')
+            self.value_ref_criterion = nn.SmoothL1Loss(reduction='none')
 
         # Oracle
         self.value_teacher = make_oracle('frontier_shortest', self.nav_actions, self.env_actions)
@@ -84,6 +84,36 @@ class ValueEstimationAgent(NavigationAgent):
         self.allow_cheat = False  
         # Compute losses if not eval (i.e. training)
         self.is_eval = False
+
+    def normalize_loss(self, batch_size, q_values_estimate, q_values_target, ref=False):
+        '''
+        Normalize value loss first across panoramic views per example, then across examples in batch
+
+        batch_size : scalar
+        q_values_estimate : torch tensor shape (batch_size, self.num_viewIndex)
+        q_values_target   : torch tensor shape (batch_size, self.num_viewIndex)
+
+        Returns:
+            scalar loss value
+        '''
+        assert q_values_estimate.shape == q_values_target.shape
+        if ref:
+            # tensor shape (batch_size, self.num_viewIndex)
+            value_losses_full =  self.value_ref_criterion(q_values_estimate, q_values_target)            
+        else:
+            # tensor shape (batch_size, self.num_viewIndex)
+            value_losses_full =  self.value_criterion(q_values_estimate, q_values_target)
+        assert value_losses_full.shape == (batch_size, self.num_viewIndex)
+        # tensor shape (batch_size, )
+        value_losses = torch.empty(batch_size, dtype=torch.float, device=self.device)
+        # average across 36 views, if the view is not masked
+        for i in range(batch_size):
+            not_masked_indices = torch.nonzero(q_values_target[i] != 1e9).squeeze()
+            value_losses[i] = torch.mean(value_losses_full[i][not_masked_indices])
+        # average across batch
+        # scalar
+        return torch.mean(value_losses)      
+
 
     def make_tr_instructions_by_t(self, tr_key_pairs, tr_timesteps):
         '''
