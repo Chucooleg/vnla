@@ -397,18 +397,17 @@ class AskAttnDecoderRegressorMultiHeadLSTM(AskAttnDecoderRegressorLSTM):
                 # tensor shape (batch_size, )
                 q_value_heads[:, h] = predictor_head(h_tilde).squeeze(-1)
 
-            # tensor shape (batch_size,), tensor shape (batch_size,)
-            q_value, q_value_variance = torch.var_mean(q_value_heads, dim=1)
+            # --------
+            # view_index_mask has shape (batch_size, )
             if view_index_mask is not None:
-                # tensor shape (batch_size,), 
-                q_value.data.masked_fill_(view_index_mask, 1e9)
                 # tensor shape (batch_size,)
-                q_value_variance.data.masked_fill_(view_index_mask, 1e9)
+                # TODO check if this broadcasting works
+                q_value_heads.data.masked_fill_(view_index_mask, 1e9)
+            # --------
         else:
-            q_value = None
-            q_value_variance = None
+            q_value_heads = None
 
-        return new_h, alpha, q_value, q_value_variance, new_cov
+        return new_h, alpha, q_value_heads, new_cov
 
 
 class AttentionSeq2SeqFramesModel(nn.Module):
