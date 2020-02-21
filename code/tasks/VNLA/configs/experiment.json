@@ -79,7 +79,7 @@
     "bootstrap"             : 0,
     "n_ensemble"            : 10,
     "bernoulli_probability" : 0.9,
-
+    "normalize_per_head"    : 1,
 
     "plot_to_philly"        : 0
 }

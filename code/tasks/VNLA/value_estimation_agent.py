@@ -47,13 +47,13 @@ class ValueEstimationAgent(NavigationAgent):
             # https://pytorch.org/docs/stable/nn.html?highlight=smooth%20l1#torch.nn.SmoothL1Loss
             self.loss_function_str = "l1"
             self.loss_function_ref_str = "l2"
-            self.value_criterion = nn.SmoothL1Loss(reduction='sum')
-            self.value_ref_criterion = nn.MSELoss(reduction='sum')
+            self.value_criterion = nn.SmoothL1Loss(reduction='none')
+            self.value_ref_criterion = nn.MSELoss(reduction='none')
         elif hparams.loss_function == 'l2':
             self.loss_function_str = "l2"
             self.loss_function_ref_str = "l1"
-            self.value_criterion = nn.MSELoss(reduction='sum')
-            self.value_ref_criterion = nn.SmoothL1Loss(reduction='sum')
+            self.value_criterion = nn.MSELoss(reduction='none')
+            self.value_ref_criterion = nn.SmoothL1Loss(reduction='none')
 
         # Oracle
         self.value_teacher = make_oracle('frontier_shortest', self.nav_actions, self.env_actions)
@@ -84,6 +84,80 @@ class ValueEstimationAgent(NavigationAgent):
         self.allow_cheat = False  
         # Compute losses if not eval (i.e. training)
         self.is_eval = False
+
+    def normalize_loss_with_mask(self, batch_size, q_values_estimate_heads, q_values_target):
+        '''
+        Used during backprop.
+        1. For each head, draw a (batch_size, ) mask to mask away each example with (1 - bernoulli probability). If a head is not supposed to see an example, all 36 views of that example are masked away.
+        2. 
+        '''
+        assert q_values_estimate_heads.shape == (batch_size, self.num_viewIndex, self.n_ensemble)
+        assert q_values_target.shape == (batch_size, self.num_viewIndex)
+
+        # Sample a mask
+        # tensor shape (batch_size, self.n_ensemble)
+        mask = torch.bernoulli(torch.ones(batch_size, self.n_ensemble, dtype=torch.float, device=self.device) * self.bernoulli_probability)
+
+        # Compute full loss
+        # tensor shape (batch_size, self.num_viewIndex, self.n_ensemble)
+        value_losses_full =  self.value_criterion(q_values_estimate, q_values_target)
+
+        # Which view angles were not masked?
+        # len (batchs_size) of variable tensor length
+        not_masked_indices = []
+        for i in range(batch_size):
+            not_masked_indices.append(torch.nonzero(q_values_target[i] != 1e9).squeeze())
+
+        # Collapse loss across 36 view angles down to 1
+        # tensor shape (batch_size, self.n_ensemble)
+        value_losses = torch.empty(batch_size, self.n_ensemble, dtype=torch.float, device=self.device)
+        for h in range(self.n_ensemble):
+            for i in range(batch_size):
+                # value_losses_full[i,:,h] tensor shape (self.num_viewIndex, )
+                # value_losses[i, h] scalar
+                value_losses[i, h] = torch.mean(value_losses_full[i,:,h][not_masked_indices[i]]) 
+        
+        # tensor shape (batch_size, self.n_ensemble)
+        masked_value_losses = value_losses * mask
+        assert masked_value_losses == (batch_size, self.n_ensemble)
+
+        # Normalize across batch, then normalize across heads
+        if self.normalize_per_head:
+            # tensor shape (self.n_ensemble, )
+            loss_per_head = torch.sum(masked_value_losses, dim=0) / torch.sum(mask, dim=0)
+            assert loss_per_head.shape == (self.n_ensemble, )
+            # scalar
+            return torch.mean(loss_per_head)
+        else:
+            # scalar
+            return torch.mean(torch.mean(masked_value_losses, dim=0))
+
+    def normalize_loss(self, batch_size, q_values_estimate, q_values_target, ref=False):
+            '''
+            Normalize value loss first across panoramic views per example, then across examples in batch
+            batch_size : scalar
+            q_values_estimate : torch tensor shape (batch_size, self.num_viewIndex)
+            q_values_target   : torch tensor shape (batch_size, self.num_viewIndex)
+            Returns:
+                scalar loss value
+            '''
+            assert q_values_estimate.shape == q_values_target.shape
+            if ref:
+                # tensor shape (batch_size, self.num_viewIndex)
+                value_losses_full =  self.value_ref_criterion(q_values_estimate, q_values_target)            
+            else:
+                # tensor shape (batch_size, self.num_viewIndex)
+                value_losses_full =  self.value_criterion(q_values_estimate, q_values_target)
+            assert value_losses_full.shape == (batch_size, self.num_viewIndex)
+            # tensor shape (batch_size, )
+            value_losses = torch.empty(batch_size, dtype=torch.float, device=self.device)
+            # average across 36 views, if the view is not masked
+            for i in range(batch_size):
+                not_masked_indices = torch.nonzero(q_values_target[i] != 1e9).squeeze()
+                value_losses[i] = torch.mean(value_losses_full[i][not_masked_indices])
+            # average across batch
+            # scalar
+            return torch.mean(value_losses)     
 
     def make_tr_instructions_by_t(self, tr_key_pairs, tr_timesteps):
         '''
@@ -330,11 +404,15 @@ class ValueEstimationAgent(NavigationAgent):
                 optimizer.zero_grad()
                 self.loss.backward()
 
-                # NOTE add code to divide up gradients by 1/n_ensemble in the shared encoder if we are bootstrapping
-                # if self.bootstrap:
-                #     for param in self.model.encoder.parameters():
-                #         if param.grad is not None:
-                #             param.grad.data *= 1.0/float(self.n_ensemble)
+                # Divide up gradients by 1/n_ensemble in the shared encoder if we are bootstrapping
+                if self.bootstrap:
+                    for param in self.model.decoder.parameters():
+                        if param.grad is not None:
+                            param.grad.data *= 1.0/float(self.n_ensemble)
+                    for param in self.model.encoder.parameters():
+                        if param.grad is not None:
+                            param.grad.data *= 1.0/float(self.n_ensemble)
+
                 # NOTE add code here if gradient clipping
 
                 # Update torch model params

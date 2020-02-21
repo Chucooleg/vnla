@@ -222,8 +222,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # q_values_tr_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device)
         # # shape (36, batch_size)
         # q_values_tr_estimate_variance = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device)
-        # count non-masked predictions to normalize loss value
-        tot_pred = 0
+        # # count non-masked predictions to normalize loss value
+        # tot_pred = 0
 
         # Loop through 36 view indices in the pano sphere
         # run 100 in parallel instead of 36*100 in parallel
@@ -240,16 +240,16 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # Get mask at that viewIndex(rotation)
             # i.e. not all rotation angles can connect to other vertices on graph
             # tensor shape (batch_size,)
-            view_ix_mask = self.get_tr_view_indexed_mask_by_t(tr_key_pairs, tr_timesteps, view_ix)
-            # torch scalar
-            tot_pred += batch_size - torch.sum(view_ix_mask)
+            viewix_mask = self.get_tr_view_indexed_mask_by_t(tr_key_pairs, tr_timesteps, view_ix)
+            # # torch scalar
+            # tot_pred += batch_size - torch.sum(viewix_mask)
 
             # If implementing Ask Agent
             # ques_asked = ...
 
             # Run decoder forward pass
             # shape (batch_size, self.n_ensemble)
-            _, _, q_values_tr_estimate_heads[view_ix], _ = self.model.decode_nav(a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
+            _, _, q_values_tr_estimate_heads[view_ix], _ = self.model.decode_nav(a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=viewix_mask, cov=cov)
 
         # shape (batch_size, 36, n_ensemble)
         q_values_tr_estimate_heads = q_values_tr_estimate_heads.transpose(0, 1)
@@ -272,25 +272,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Get q_values_target from history buffer
         # tensor shape (batch_size, self.num_viewIndex)
         q_values_target = self.get_tr_variable_by_t(tr_key_pairs, tr_timesteps, 'q_values_target')
-
-        # TODO redo -- draw mask and compute loss
-        # tot_pred needs to * h
-        # tile q_values_target by h
-        # find bernoulli prob from self.bernoulli_probability
-        # draw a mask (batch_size, 36, n_ensemble) or (batch_size, n_ensemble) then tile by 36?
-        # divide gradient up ?? 
-        # call loss on each head??
-
-        # for each head:
-            # compute loss
-        losses = torch.ones(self.n_ensemble, dtype=torch.float, device=self.device)
-        for h in range(self.n_ensemble):
-            losses[h] = self.value_criterion(q_values_tr_estimate_heads[], q_values_target) / tot_pred
-
-
         # Compute scalar loss
-        self.value_loss = self.value_criterion(q_values_tr_estimate_heads, q_values_target_heads) / (tot_pred * self.n_ensemble)
-
+        self.value_loss = self.normalize_loss_with_mask(batch_size, q_values_tr_estimate_heads, q_values_target)
         time_report['compute_training_value_loss'] += time.time() - start_time
 
         # Save per batch loss to self.loss for backprop
@@ -657,8 +640,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     get_viewix_mask_start_time = time.time()
                     view_ix_mask = torch.tensor(view_index_mask[view_ix], dtype=torch.bool, device=self.device)
                     time_report['decode_frontier_get_viewix_mask'] += time.time() - get_viewix_mask_start_time
-                    # torch scalar
-                    tot_pred += batch_size - torch.sum(view_ix_mask)
+                    # # torch scalar
+                    # tot_pred += batch_size - torch.sum(view_ix_mask)
 
                     # If implementing Ask Agent
                     # ques_asked = ...
@@ -680,7 +663,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 assert q_values_rollout_estimate_variance.shape == (batch_size, self.num_viewIndex)
 
                 # Estimate uncertainty
-                # TODO verify this in notebook
                 # shape (batch_size,)
                 q_values_rollout_uncertainty = torch.empty(batch_size, dtype=torch.float, device=self.device)
                 for i in batch_size:
@@ -720,8 +702,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             if compute_rollout_loss:
                 start_time = time.time()
                 # scalar
-                self.rollout_value_loss += self.value_criterion(q_values_rollout_estimate, q_values_target) / tot_pred
-                self.rollout_value_ref_loss += self.value_ref_criterion(q_values_rollout_estimate, q_values_target) / tot_pred
+                self.rollout_value_loss += self.normalize_loss(batch_size, q_values_rollout_estimate, q_values_target, ref=False)
+                self.rollout_value_ref_loss += self.normalize_loss(batch_size, q_values_rollout_estimate, q_values_target, ref=True)
                 time_report['compute_rollout_value_loss_with_critierion'] += time.time() - start_time
 
             # Translate chosen macro-rotations to env actions

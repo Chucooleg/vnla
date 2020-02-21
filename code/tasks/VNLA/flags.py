@@ -161,8 +161,8 @@ def make_parser():
         help='number of bootstrap heads')
     parser.add_argument('-bernoulli_probability', type=float,
         help='bernoulli probability that a datapt is exposed to backprop a head')
-    parser.add_argument('-bootstrap_majority_vote', type=int,
-        help='majority vote among heads (1) or sampling heads (0)')
+    parser.add_argument('-normalize_per_head', type=int,
+        help='normalize loss per head by number of examples it is exposed to. 1/0')
 
     # tensorboard logging
     parser.add_argument('-plot_to_philly', type=int,

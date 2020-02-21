@@ -169,11 +169,9 @@ class Attention(nn.Module):
 
 class AskAttnDecoderLSTM(nn.Module):
 
-    def __init__(self, hparams, agent_class, device):
+    def __init__(self, hparams, agent_class):
 
         super(AskAttnDecoderLSTM, self).__init__()
-
-        self.device = device
 
         self.nav_embedding = nn.Embedding(agent_class.n_input_nav_actions(),
             hparams.nav_embed_size, padding_idx=padding_idx)
@@ -225,9 +223,9 @@ class AskAttnDecoderLSTM(nn.Module):
 
 class AskAttnDecoderClassifierLSTM(AskAttnDecoderLSTM):
 
-    def __init__(self, hparams, agent_class, device):
+    def __init__(self, hparams, agent_class):
 
-        super(AskAttnDecoderClassifierLSTM, self).__init__(hparams, agent_class, device)
+        super(AskAttnDecoderClassifierLSTM, self).__init__(hparams, agent_class)
 
         self.nav_predictor = nn.Linear(hparams.hidden_size, agent_class.n_output_nav_actions())
 
@@ -310,9 +308,9 @@ class AskAttnDecoderClassifierLSTM(AskAttnDecoderLSTM):
 
 class AskAttnDecoderRegressorLSTM(AskAttnDecoderLSTM):
 
-    def __init__(self, hparams, agent_class, device):
+    def __init__(self, hparams, agent_class):
 
-        super(AskAttnDecoderRegressorLSTM, self).__init__(hparams, agent_class, device)
+        super(AskAttnDecoderRegressorLSTM, self).__init__(hparams, agent_class)
 
     def _lstm_and_attend(self, nav_action, ask_action, feature, h, ctx, ctx_mask, cov=None):
         '''run LSTM cell, run attention layer on coverage vector'''
@@ -340,73 +338,62 @@ class AskAttnDecoderRegressorLSTM(AskAttnDecoderLSTM):
 
         return h_tilde, alpha, output_drop, new_h, new_cov        
 
+    def forward(self, tentative_bool, nav_action, ask_action, feature, h, ctx, ctx_mask, view_index_mask, cov=None, pred_val=True):
+        '''run LSTM to decode hidden state for a particular view'''
 
-class AskAttnDecoderRegressorSingleHeadLSTM(AskAttnDecoderRegressorLSTM):
+        h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
+            nav_action, ask_action, feature, h, ctx, ctx_mask, cov=cov)
 
-    def __init__(self, hparams, agent_class, device):
+        return new_h, alpha, new_cov, h_tilde, view_index_mask    
 
-        super(AskAttnDecoderRegressorSingleHeadLSTM, self).__init__(hparams, agent_class, device)
 
+class RegressorSingleHead(nn.Module):
+
+    def __init__(self, hparams, device):
+        super(RegressorSingleHead, self).__init__()
+        self.device = device
         # Q-value regressor output dim is 1
         self.q_predictor = nn.Linear(hparams.hidden_size, 1)   
 
-    def forward(self, tentative_bool, nav_action, ask_action, feature, h, ctx, ctx_mask, view_index_mask, cov=None, pred_val=True):
-        '''run LSTM to decode q-value for a particular view'''
-
-        h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
-            nav_action, ask_action, feature, h, ctx, ctx_mask, cov=cov)        
+    def forward(self, new_h, alpha, new_cov, h_tilde, view_index_mask):
+        '''run LSTM to decode q-value for a particular view'''    
 
         # Predict q-value -- cost
-        if pred_val:
-            # tensor shape (batch_size, 1) -> (batch_size,)
-            q_value = self.q_predictor(h_tilde).squeeze(-1)
-            if view_index_mask is not None:
-                # tensor shape (batch_size,)
-                q_value.data.masked_fill_(view_index_mask, 1e9)
-        else:
-            q_value = None
+        # tensor shape (batch_size, 1) -> (batch_size,)
+        q_value = self.q_predictor(h_tilde).squeeze(-1)
+        if view_index_mask is not None:
+            # tensor shape (batch_size,)
+            q_value.data.masked_fill_(view_index_mask, 1e9)
 
         return new_h, alpha, q_value, new_cov
  
 
-class AskAttnDecoderRegressorMultiHeadLSTM(AskAttnDecoderRegressorLSTM):
+class RegressorMultiHead(nn.Module): 
 
-    def __init__(self, hparams, agent_class, device):
-
-        super(AskAttnDecoderRegressorMultiHeadLSTM, self).__init__(hparams, agent_class, device)
-
+    def __init__(self, hparams, device):
+        super(RegressorMultiHead, self).__init__()
         assert hparams.bootstrap
         assert hparams.n_ensemble > 0
-
+        self.device = device
         # Q-value regressor output dim is 1
         self.q_predictors = nn.ModuleList([nn.Linear(hparams.hidden_size, 1) for _ in self.n_ensemble])  
 
-    def forward(self, tentative_bool, nav_action, ask_action, feature, h, ctx, ctx_mask, view_index_mask, cov=None, pred_val=True):
-        '''run LSTM to decode q-value for a particular view'''
-
-        h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
-            nav_action, ask_action, feature, h, ctx, ctx_mask, cov=cov)        
+    def forward(self, new_h, alpha, new_cov, h_tilde, view_index_mask):
+        '''run LSTM to decode q-value for a particular view'''   
 
         # Predict q-values -- cost
-        if pred_val:
+        # tensor shape (batch_size, n_ensemble)
+        q_value_heads = torch.empty(feature.shape[0], self.n_ensemble, dtype=torch.float, device=self.device)
 
-            # tensor shape (batch_size, n_ensemble)
-            q_value_heads = torch.empty(feature.shape[0], self.n_ensemble, dtype=torch.float, device=self.device)
-
-            for h, predictor_head in self.q_predictors:
-                # tensor shape (batch_size, )
-                q_value_heads[:, h] = predictor_head(h_tilde).squeeze(-1)
-
-            # --------
-            # view_index_mask has shape (batch_size, )
-            if view_index_mask is not None:
-                # tensor shape (batch_size,)
-                # TODO check if this broadcasting works
-                q_value_heads.data.masked_fill_(view_index_mask, 1e9)
-            # --------
-        else:
-            q_value_heads = None
-
+        for h, predictor_head in self.q_predictors:
+            # tensor shape (batch_size, )
+            q_value_heads[:, h] = predictor_head(h_tilde).squeeze(-1)
+        # --------
+        # view_index_mask has shape (batch_size, )
+        if view_index_mask is not None:
+            # tensor shape (batch_size,)
+            q_value_heads.data.masked_fill_(view_index_mask.view(-1, 1), 1e9)
+        # --------
         return new_h, alpha, q_value_heads, new_cov
 
 
@@ -416,6 +403,8 @@ class AttentionSeq2SeqFramesModel(nn.Module):
         super(AttentionSeq2SeqFramesModel, self).__init__()
         enc_hidden_size = hparams.hidden_size // 2 \
             if hparams.bidirectional else hparams.hidden_size
+        self.bootstrap = hparams.bootstrap
+        
         self.encoder = EncoderLSTM(vocab_size,
                                 hparams.word_embed_size,
                                 enc_hidden_size,
@@ -439,14 +428,17 @@ class AttentionSeq2SeqFramesModel(nn.Module):
         else:
             sys.exit('%s uncertainty handling and %s recovery strategy not supported, no matching agent classes.' % hparams.uncertainty_handling, hparams.recovery_strategy)
 
-        if hparams.bootstrap:
-            self.decoder = AskAttnDecoderRegressorMultiHeadLSTM(hparams, agent_class, device).to(device)
+        self.decoder = AskAttnDecoderRegressorLSTM(hparams, agent_class).to(device)
+
+        if self.bootstrap:
+            self.value_heads = RegressorMultiHead(hparams, device).to(device)
         else:
-            self.decoder = AskAttnDecoderRegressorSingleHeadLSTM(hparams, agent_class, device).to(device)
+            self.value_heads = RegressorSingleHead(hparams, device).to(device)
 
         if torch.cuda.device_count() > 1:
             self.encoder = nn.DistributedDataParallel(self.encoder)
             self.decoder = nn.DistributedDataParallel(self.decoder)
+            self.value_heads = nn.DistributedDataParallel(self.value_heads)
 
     def encode(self, *args, **kwargs):
         return self.encoder(*args, **kwargs)
@@ -455,7 +447,11 @@ class AttentionSeq2SeqFramesModel(nn.Module):
         return self.decoder(True, *args, **kwargs)
 
     def decode_nav(self, *args, **kwargs):
-        return self.decoder(False, *args, **kwargs)
+        pred_val_bool = kwargs['pred_val']
+        if pred_val_bool:
+            return self.value_heads(self.decoder(False, *args, **kwargs))
+        else:
+            return self.decoder(False, *args, **kwargs)
 
 
 class AttentionSeq2SeqContinuousModel(nn.Module):

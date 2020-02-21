@@ -64,6 +64,7 @@ class NavigationAgent(BaseAgent):
         self.bootstrap = hparams.bootstrap
         self.n_ensemble = hparams.n_ensemble
         self.bernoulli_probability = hparams.bernoulli_probability
+        self.normalize_per_head = hparams.normalize_per_head
         if self.bootstrap:
             assert (self.bernoulli_probability > 0.0), "boostrap bernoulli prob must be greater than 0.0"
 
