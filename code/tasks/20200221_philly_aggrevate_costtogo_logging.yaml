@@ -1,0 +1,52 @@
+description: VNLA aggrevate experiments eval
+# experiment named vnla_time_comparisons
+
+target:
+  # which virtual cluster you belong to (msrlabs, etc.). Everyone has access to "msrlabs".
+  vc: msrlabs
+  # physical cluster to use (cam, gcr, rr1, rr2) or Azure clusters (eu1, eu2, etc.)
+  cluster: eu1
+
+environment:
+  image: philly/jobs/test/pytorch:pytorch1.2.0-py36-mattersim
+  registry: phillyregistry.azurecr.io
+
+  setup:
+    - pip install scikit-learn --user
+    - python -m pip install networkx==2.3 --user
+    - CUDA_VISIBLE_DEVICES=0
+    # - pip install tensorboard --user
+    # - CUDA_VISIBLE_DEVICES=0,1,2,3
+    # - pip install ipdb --user
+
+storage:
+  input1:
+    storage_account_name: msrairesidentssa4
+    container_name: matterport3d
+    mount_dir: /mnt/matterport3d
+    # local_dir: /home/hoyeung/blob_matterport3d/
+  output:
+    storage_account_name: msrairesidentssa4
+    container_name: experiment-results
+    mount_dir: /mnt/experiment-results-philly/
+    # local_dir: /home/hoyeung/blob_experiments/
+
+code:
+  # local directory of the code. this will be uploaded to the server.
+  # $CONFIG_DIR is expanded to the directory of this config file
+  local_dir: $CONFIG_DIR/
+
+# data:
+#   data upload is not required for this example
+
+# seed list
+# 10 [42, 677, 848, 163, 620, 511, 102, 158, 2, 204]
+# 20 + [471, 154, 220, 748, 623, 47, 882, 136, 315, 48]
+
+# list of jobs to run, we run 2 jobs in this example
+jobs:
+  # name must be unique across the jobs
+- name: eval_t2
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash eval_experiments.sh "20200221_philly_aggrevate_costtogo_logging" "eval_t2" "configs/experiment.json" "/mnt/experiment-results-philly/output_philly/20200206_philly_aggrevate_tunning/data_94798_seed_42_batch_size_250_tr_batch_size_512_loss_l2_lr_0.0001_beta_decay_0.8/value_estimation_no_ask_no_recovery_last.ckpt" "original"

@@ -642,13 +642,18 @@ class VNLABatch():
         # we are not experimenting with NoRoom dataset
         self.no_room = hasattr(hparams, 'no_room') and hparams.no_room
 
+        # set data suffix for env based on flags
+        env_data_suffix = hparams.data_suffix if hasattr(hparams, 'data_suffix') else ''
+        if ('val' in split or 'test' in split) and (hasattr(hparams, 'eval_data_suffix') and hparams.eval_data_suffix != ''):
+            env_data_suffix = hparams.eval_data_suffix
+
         if self.split is not None:
             print ("Using env split = {}".format(self.split))
             self.load_data(load_datasets(
                 splits=[split], 
                 path=hparams.data_path, 
                 prefix='noroom' if self.no_room else 'asknav', 
-                suffix=hparams.data_suffix if hasattr(hparams, 'data_suffix') else ''))
+                suffix=env_data_suffix))
 
         # Estimate time budget ^T
         # key k -- (item['start_region_name'], item['end_region_name'])

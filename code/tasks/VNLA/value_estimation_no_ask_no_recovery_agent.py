@@ -332,8 +332,11 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             'agent_nav': [], # from env action, list of lists of tuples 
 
             # q-value related
+            # list of per timestep vectors
             'agent_q_values': [],  
-            'teacher_q_values': [],  # list of per timestep vectors
+            'teacher_q_values': [],
+            'teacher_cost_togo': [],
+            'teacher_cost_stepping': [], 
 
             # rollin
             'beta': None if self.is_eval else self.beta,
@@ -500,7 +503,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             start_time = time.time()
             # arr shape (batch_size, self.num_viewIndex=36)
             # arr shape (batch_size, )
-            q_values_target_arr, end_target = self.value_teacher.compute_frontier_costs(obs, viewix_next_vertex_map, timestep)
+            # arr shape (batch_size, self.num_viewIndex=36)
+            # arr shape (batch_size, self.num_viewIndex=36)
+            q_values_target_arr, end_target, cost_togo_arr, cost_stepping_arr = self.value_teacher.compute_frontier_costs(obs, viewix_next_vertex_map, timestep)
             # tensor shape (batch_size, self.num_viewIndex=36)
             q_values_target = torch.tensor(q_values_target_arr, dtype=torch.float, device=self.device)
 
@@ -701,7 +706,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
             # Convert np array to list for traj logging
             q_values_target_list = q_values_target_arr.tolist()
-
+            cost_togo_list = cost_togo_arr.tolist()
+            cost_stepping_list = cost_stepping_arr.tolist()
             # Update experience batch & traj post rotation
             for i, ob in enumerate(obs):
                 if not ended[i]:
@@ -740,6 +746,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # q-values
                     traj[i]['agent_q_values'].append(None if expert_rollin_bool else q_values_rollout_estimate_list[i])
                     traj[i]['teacher_q_values'].append(q_values_target_list[i])
+                    traj[i]['teacher_cost_togo'].append(cost_togo_list[i])
+                    traj[i]['teacher_cost_stepping'].append(cost_stepping_list[i])
             time_report['write_experience_batch'] += time.time() - start_time  
 
             if use_hist_buffer:
