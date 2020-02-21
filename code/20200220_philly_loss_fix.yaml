@@ -1,4 +1,4 @@
-description: VNLA aggrevate experiments loss normalization fix
+description: VNLA aggrevate experiments loss normalization fix tr batch size 256
 # experiment named vnla_time_comparisons
 
 target:
@@ -46,26 +46,26 @@ code:
 # list of jobs to run, we run 2 jobs in this example
 jobs:
   # name must be unique across the jobs
-- name: data_94798_seed_42_batch_size_250_tr_batch_size_512_loss_l2_lr_0.0001_beta_decay_0.8
+- name: data_94798_seed_42_batch_size_250_tr_batch_size_256_loss_l2_lr_0.0001_beta_decay_0.8
 
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200220_philly_loss_fix" "data_94798_seed_42_batch_size_250_tr_batch_size_512_loss_l2_lr_0.0001_beta_decay_0.8" "configs/experiment.json" -batch_size 250 -train_batch_size 512 -start_beta_decay 5000 -decay_beta_every 1000 -beta_decay_rate 0.8 -min_history_to_learn 1000 -save_every 2000 -log_every 2000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -loss_function l2 -lr 0.0001 -n_iters 100000 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200220_philly_loss_fix" "data_94798_seed_42_batch_size_250_tr_batch_size_256_loss_l2_lr_0.0001_beta_decay_0.8" "configs/experiment.json" -batch_size 250 -train_batch_size 256 -start_beta_decay 5000 -decay_beta_every 1000 -beta_decay_rate 0.8 -min_history_to_learn 1000 -save_every 2000 -log_every 2000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -loss_function l2 -lr 0.0001 -n_iters 100000 -seed 42
 
-- name: data_94798_seed_42_batch_size_250_tr_batch_size_512_loss_l2_lr_0.0001_beta_decay_0.9
-
-  sku: G1
-  command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200220_philly_loss_fix" "data_94798_seed_42_batch_size_250_tr_batch_size_512_loss_l2_lr_0.0001_beta_decay_0.9" "configs/experiment.json" -batch_size 250 -train_batch_size 512 -start_beta_decay 5000 -decay_beta_every 1000 -beta_decay_rate 0.9 -min_history_to_learn 1000 -save_every 2000 -log_every 2000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -loss_function l2 -lr 0.0001 -n_iters 100000 -seed 42
-
-- name: data_94798_seed_42_batch_size_250_tr_batch_size_512_loss_l1_lr_0.0001_beta_decay_0.8
+- name: data_94798_seed_42_batch_size_250_tr_batch_size_256_loss_l2_lr_0.0001_beta_decay_0.9
 
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200220_philly_loss_fix" "data_94798_seed_42_batch_size_250_tr_batch_size_512_loss_l1_lr_0.0001_beta_decay_0.8" "configs/experiment.json" -batch_size 250 -train_batch_size 512 -start_beta_decay 5000 -decay_beta_every 1000 -beta_decay_rate 0.8 -min_history_to_learn 1000 -save_every 2000 -log_every 2000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -loss_function l2 -lr 0.0001 -n_iters 100000 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200220_philly_loss_fix" "data_94798_seed_42_batch_size_250_tr_batch_size_256_loss_l2_lr_0.0001_beta_decay_0.9" "configs/experiment.json" -batch_size 250 -train_batch_size 256 -start_beta_decay 5000 -decay_beta_every 1000 -beta_decay_rate 0.9 -min_history_to_learn 1000 -save_every 2000 -log_every 2000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -loss_function l2 -lr 0.0001 -n_iters 100000 -seed 42
 
-- name: data_94798_seed_42_batch_size_250_tr_batch_size_512_loss_l1_lr_0.0001_beta_decay_0.9
+- name: data_94798_seed_42_batch_size_250_tr_batch_size_256_loss_l1_lr_0.0001_beta_decay_0.8
 
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200220_philly_loss_fix" "data_94798_seed_42_batch_size_250_tr_batch_size_512_loss_l1_lr_0.0001_beta_decay_0.9" "configs/experiment.json" -batch_size 250 -train_batch_size 512 -start_beta_decay 5000 -decay_beta_every 1000 -beta_decay_rate 0.9 -min_history_to_learn 1000 -save_every 2000 -log_every 2000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -loss_function l2 -lr 0.0001 -n_iters 100000 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200220_philly_loss_fix" "data_94798_seed_42_batch_size_250_tr_batch_size_256_loss_l1_lr_0.0001_beta_decay_0.8" "configs/experiment.json" -batch_size 250 -train_batch_size 256 -start_beta_decay 5000 -decay_beta_every 1000 -beta_decay_rate 0.8 -min_history_to_learn 1000 -save_every 2000 -log_every 2000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -loss_function l2 -lr 0.0001 -n_iters 100000 -seed 42
+
+- name: data_94798_seed_42_batch_size_250_tr_batch_size_256_loss_l1_lr_0.0001_beta_decay_0.9
+
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200220_philly_loss_fix" "data_94798_seed_42_batch_size_250_tr_batch_size_256_loss_l1_lr_0.0001_beta_decay_0.9" "configs/experiment.json" -batch_size 250 -train_batch_size 256 -start_beta_decay 5000 -decay_beta_every 1000 -beta_decay_rate 0.9 -min_history_to_learn 1000 -save_every 2000 -log_every 2000 -plot_to_philly 0 -data_suffix original -dropout_ratio 0.5 -loss_function l2 -lr 0.0001 -n_iters 100000 -seed 42
