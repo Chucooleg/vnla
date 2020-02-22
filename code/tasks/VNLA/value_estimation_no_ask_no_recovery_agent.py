@@ -667,12 +667,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # shape (batch_size,)
                 q_values_rollout_uncertainty = torch.empty(batch_size, dtype=torch.float, device=self.device)
                 for i in range(batch_size):
-                    no_mask_idx = torch.nonzero(q_values_rollout_estimate != 1e9).squeeze()
-                    import pdb; pdb.set_trace()
-                    try:
-                        q_values_rollout_uncertainty[i] = torch.var(q_values_rollout_estimate_variance[i][no_mask_idx])
-                    except:
-                        import pdb; pdb.set_trace()
+                    no_mask_idx = torch.nonzero(q_values_target[i] != 1e9).squeeze()
+                    assert len(no_mask_idx.shape) == 1 and no_mask_idx.shape[0] <= self.num_viewIndex
+                    q_values_rollout_uncertainty[i] = torch.var(q_values_rollout_estimate_variance[i][no_mask_idx])
 
                 time_report['decode_frontier'] += time.time() - decode_frontier_start_time
                 # -------
