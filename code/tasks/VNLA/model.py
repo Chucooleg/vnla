@@ -306,11 +306,11 @@ class AskAttnDecoderClassifierLSTM(AskAttnDecoderLSTM):
             return self.forward_nav(nav_action, ask_action, feature, h, ctx, ctx_mask, nav_logit_mask, cov)
 
 
-class AskAttnDecoderRegressorLSTM(AskAttnDecoderLSTM):
+class AskAttnDecoderRegressorBodyLSTM(AskAttnDecoderLSTM):
 
     def __init__(self, hparams, agent_class):
 
-        super(AskAttnDecoderRegressorLSTM, self).__init__(hparams, agent_class)
+        super(AskAttnDecoderRegressorBodyLSTM, self).__init__(hparams, agent_class)
 
     def _lstm_and_attend(self, nav_action, ask_action, feature, h, ctx, ctx_mask, cov=None):
         '''run LSTM cell, run attention layer on coverage vector'''
@@ -344,7 +344,7 @@ class AskAttnDecoderRegressorLSTM(AskAttnDecoderLSTM):
         h_tilde, alpha, output_drop, new_h, new_cov = self._lstm_and_attend(
             nav_action, ask_action, feature, h, ctx, ctx_mask, cov=cov)
 
-        return new_h, alpha, new_cov, h_tilde, view_index_mask    
+        return new_h, alpha, new_cov, h_tilde, view_index_mask
 
 
 class RegressorSingleHead(nn.Module):
@@ -375,17 +375,18 @@ class RegressorMultiHead(nn.Module):
         assert hparams.bootstrap
         assert hparams.n_ensemble > 0
         self.device = device
+        self.n_ensemble = hparams.n_ensemble
         # Q-value regressor output dim is 1
-        self.q_predictors = nn.ModuleList([nn.Linear(hparams.hidden_size, 1) for _ in self.n_ensemble])  
+        self.q_predictors = nn.ModuleList([nn.Linear(hparams.hidden_size, 1) for _ in range(self.n_ensemble)])  
 
     def forward(self, new_h, alpha, new_cov, h_tilde, view_index_mask):
         '''run LSTM to decode q-value for a particular view'''   
 
         # Predict q-values -- cost
         # tensor shape (batch_size, n_ensemble)
-        q_value_heads = torch.empty(feature.shape[0], self.n_ensemble, dtype=torch.float, device=self.device)
+        q_value_heads = torch.empty(h_tilde.shape[0], self.n_ensemble, dtype=torch.float, device=self.device)
 
-        for h, predictor_head in self.q_predictors:
+        for h, predictor_head in enumerate(self.q_predictors):
             # tensor shape (batch_size, )
             q_value_heads[:, h] = predictor_head(h_tilde).squeeze(-1)
         # --------
@@ -428,7 +429,7 @@ class AttentionSeq2SeqFramesModel(nn.Module):
         else:
             sys.exit('%s uncertainty handling and %s recovery strategy not supported, no matching agent classes.' % hparams.uncertainty_handling, hparams.recovery_strategy)
 
-        self.decoder = AskAttnDecoderRegressorLSTM(hparams, agent_class).to(device)
+        self.decoder = AskAttnDecoderRegressorBodyLSTM(hparams, agent_class).to(device)
 
         if self.bootstrap:
             self.value_heads = RegressorMultiHead(hparams, device).to(device)
@@ -449,7 +450,8 @@ class AttentionSeq2SeqFramesModel(nn.Module):
     def decode_nav(self, *args, **kwargs):
         pred_val_bool = kwargs['pred_val']
         if pred_val_bool:
-            return self.value_heads(self.decoder(False, *args, **kwargs))
+            new_h, alpha, new_cov, h_tilde, view_index_mask = self.decoder(False, *args, **kwargs)
+            return self.value_heads(new_h, alpha, new_cov, h_tilde, view_index_mask)
         else:
             return self.decoder(False, *args, **kwargs)
 

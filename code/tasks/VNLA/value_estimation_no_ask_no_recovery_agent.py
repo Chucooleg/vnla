@@ -208,7 +208,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             f_out_t = self.get_tr_variable_by_t(tr_key_pairs, t_ix, 'feature')
 
             # Run decoder forward pass
-            decoder_h, _, _, cov = self.model.decode_nav(a_out_t, ques_out_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov, pred_val=False)
+            decoder_h, _, cov, _, _ = self.model.decode_nav(a_out_t, ques_out_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov, pred_val=False)
 
         time_report['decode_training_batch_history'] += time.time() - start_time
 
@@ -249,7 +249,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
             # Run decoder forward pass
             # shape (batch_size, self.n_ensemble)
-            _, _, q_values_tr_estimate_heads[view_ix], _ = self.model.decode_nav(a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=viewix_mask, cov=cov)
+            _, _, q_values_tr_estimate_heads[view_ix], _ = self.model.decode_nav(a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=viewix_mask, cov=cov, pred_val=True)
 
         # shape (batch_size, 36, n_ensemble)
         q_values_tr_estimate_heads = q_values_tr_estimate_heads.transpose(0, 1)
@@ -553,6 +553,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             start_time = time.time()
             # tensor shape (36, 100) if agent rollin
             q_values_rollout_estimate = None
+            q_values_rollout_uncertainty = None
             # arr (batch_size) if agent rollin
             end_estimated = None
 
@@ -600,7 +601,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # tensor shape (batch_size, feature size)
                     f_out_t = local_buffer[t]['f_t']
 
-                    decoder_h, _, _, cov = self.model.decode_nav(a_out_t, ques_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov, pred_val=False)
+                    decoder_h, _, cov, _, _ = self.model.decode_nav(a_out_t, ques_t, f_out_t, decoder_h, ctx, seq_mask, view_index_mask=None, cov=cov, pred_val=False)
 
                 time_report['decode_history'] += time.time() - decode_hist_start_time
 
@@ -650,7 +651,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     frontier_decode_time = time.time()
                     # shape (batch_size,)
                     # shape (batch_size,)
-                    _, _, q_values_rollout_estimate_heads[view_ix], _ = self.model.decode_nav(a_proposed, ques_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov)
+                    _, _, q_values_rollout_estimate_heads[view_ix], _ = self.model.decode_nav(a_proposed, ques_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov, pred_val=True)
                     time_report['decode_frontier_decoder_forward'] += time.time() - frontier_decode_time
 
                 # shape (batch_size, 36, n_ensemble)
@@ -741,6 +742,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # logging only
             if not expert_rollin_bool:
                 q_values_rollout_estimate_list = q_values_rollout_estimate.data.tolist()
+                q_values_rollout_uncertainty_list = q_values_rollout_uncertainty.data.tolist()
             time_report['prepare_tensors_for_saving'] += time.time() - start_time
 
             # Initialize new experience_batch_t
@@ -750,7 +752,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
             # Convert np array to list for traj logging
             q_values_target_list = q_values_target_arr.tolist()
-            q_values_rollout_uncertainty_list = q_values_rollout_uncertainty.tolist()
             # Update experience batch & traj post rotation
             for i, ob in enumerate(obs):
                 if not ended[i]:
@@ -790,7 +791,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     traj[i]['agent_q_values'].append(None if expert_rollin_bool else q_values_rollout_estimate_list[i])
                     traj[i]['teacher_q_values'].append(q_values_target_list[i])
                     # bootstrapping
-                    traj[i]['agent_q_values_uncertainty'].append(q_values_rollout_uncertainty_list[i])
+                    traj[i]['agent_q_values_uncertainty'].append(None if expert_rollin_bool else q_values_rollout_uncertainty_list[i])
             time_report['write_experience_batch'] += time.time() - start_time  
 
             if use_hist_buffer:
