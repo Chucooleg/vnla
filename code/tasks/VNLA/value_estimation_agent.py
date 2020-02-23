@@ -47,13 +47,13 @@ class ValueEstimationAgent(NavigationAgent):
             # https://pytorch.org/docs/stable/nn.html?highlight=smooth%20l1#torch.nn.SmoothL1Loss
             self.loss_function_str = "l1"
             self.loss_function_ref_str = "l2"
-            self.value_criterion = nn.SmoothL1Loss(reduction='none')
-            self.value_ref_criterion = nn.MSELoss(reduction='none')
+            self.value_criterion = nn.SmoothL1Loss(reduction='sum')
+            self.value_ref_criterion = nn.MSELoss(reduction='sum')
         elif hparams.loss_function == 'l2':
             self.loss_function_str = "l2"
             self.loss_function_ref_str = "l1"
-            self.value_criterion = nn.MSELoss(reduction='none')
-            self.value_ref_criterion = nn.SmoothL1Loss(reduction='none')
+            self.value_criterion = nn.MSELoss(reduction='sum')
+            self.value_ref_criterion = nn.SmoothL1Loss(reduction='sum')
 
         # Oracle
         self.value_teacher = make_oracle('frontier_shortest', self.nav_actions, self.env_actions)
@@ -85,87 +85,161 @@ class ValueEstimationAgent(NavigationAgent):
         # Compute losses if not eval (i.e. training)
         self.is_eval = False
 
+    # def normalize_loss_with_mask_heavy(self, batch_size, q_values_estimate_heads, q_values_target):
+    #     '''
+    #     Used during backprop.
+    #     1. For each head, draw a (batch_size, ) mask to mask away each example with (1 - bernoulli probability). If a head is not supposed to see an example, all 36 views of that example are masked away.
+    #     2. 
+    #     '''
+    #     assert q_values_estimate_heads.shape == (batch_size, self.num_viewIndex, self.n_ensemble)
+    #     assert q_values_target.shape == (batch_size, self.num_viewIndex)
+
+    #     # Sample a mask
+    #     # tensor shape (batch_size, self.n_ensemble)
+    #     mask = torch.bernoulli(torch.ones(batch_size, self.n_ensemble, dtype=torch.float, device=self.device) * self.bernoulli_probability)
+
+    #     # # Compute full loss
+    #     # # tensor shape (batch_size, self.num_viewIndex, self.n_ensemble)
+    #     # value_losses_full =  self.value_criterion(q_values_estimate_heads, q_values_target)
+
+    #     # Which view angles were not masked?
+    #     # len (batchs_size) of variable tensor length
+    #     not_masked_indices = []
+    #     for i in range(batch_size):
+    #         not_masked_indices.append(torch.nonzero(q_values_target[i] != 1e9).squeeze())
+
+    #     # Collapse loss across 36 view angles down to 1
+    #     # tensor shape (batch_size, self.n_ensemble)
+    #     value_losses = torch.empty(batch_size, self.n_ensemble, dtype=torch.float, device=self.device)
+    #     for h in range(self.n_ensemble):
+    #         # compute loss for the head
+    #         # tensor shape (batch_size, self.num_viewIndex)
+    #         value_losses_head = self.value_criterion(q_values_estimate_heads[:,:,h], q_values_target)
+    #         for i in range(batch_size):
+    #             # value_losses_head[i] tensor shape (self.num_viewIndex, )
+    #             # not_masked_indices[i] tensor shape (< self.num_viewIndex, )
+    #             # value_losses[i, h] scalar
+    #             value_losses[i, h] = torch.mean(value_losses_head[i][not_masked_indices[i]]) 
+        
+    #     # tensor shape (batch_size, self.n_ensemble)
+    #     masked_value_losses = value_losses * mask
+    #     assert masked_value_losses.shape == (batch_size, self.n_ensemble)
+
+    #     # Normalize across batch, then normalize across heads
+    #     if self.normalize_per_head:
+    #         # tensor shape (self.n_ensemble, )
+    #         loss_per_head = torch.sum(masked_value_losses, dim=0) / torch.sum(mask, dim=0)
+    #         assert loss_per_head.shape == (self.n_ensemble, )
+    #         # scalar
+    #         return torch.mean(loss_per_head)
+    #     else:
+    #         # scalar
+    #         return torch.mean(torch.mean(masked_value_losses, dim=0))
+
     def normalize_loss_with_mask(self, batch_size, q_values_estimate_heads, q_values_target):
-        '''
-        Used during backprop.
-        1. For each head, draw a (batch_size, ) mask to mask away each example with (1 - bernoulli probability). If a head is not supposed to see an example, all 36 views of that example are masked away.
-        2. 
-        '''
+
         assert q_values_estimate_heads.shape == (batch_size, self.num_viewIndex, self.n_ensemble)
         assert q_values_target.shape == (batch_size, self.num_viewIndex)
 
-        # Sample a mask
-        # tensor shape (batch_size, self.n_ensemble)
-        mask = torch.bernoulli(torch.ones(batch_size, self.n_ensemble, dtype=torch.float, device=self.device) * self.bernoulli_probability)
+        # tensor shape (self.n_ensemble, )
+        value_loss_heads = torch.empty(self.n_ensemble, dtype=torch.float, device=self.device)
 
-        # # Compute full loss
-        # # tensor shape (batch_size, self.num_viewIndex, self.n_ensemble)
-        # value_losses_full =  self.value_criterion(q_values_estimate_heads, q_values_target)
-
-        # Which view angles were not masked?
-        # len (batchs_size) of variable tensor length
-        not_masked_indices = []
-        for i in range(batch_size):
-            not_masked_indices.append(torch.nonzero(q_values_target[i] != 1e9).squeeze())
-
-        # Collapse loss across 36 view angles down to 1
-        # tensor shape (batch_size, self.n_ensemble)
-        value_losses = torch.empty(batch_size, self.n_ensemble, dtype=torch.float, device=self.device)
         for h in range(self.n_ensemble):
-            # compute loss for the head
-            # tensor shape (batch_size, self.num_viewIndex)
-            value_losses_head = self.value_criterion(q_values_estimate_heads[:,:,h], q_values_target)
-            for i in range(batch_size):
-                # value_losses_head[i] tensor shape (self.num_viewIndex, )
-                # not_masked_indices[i] tensor shape (< self.num_viewIndex, )
-                # value_losses[i, h] scalar
-                value_losses[i, h] = torch.mean(value_losses_head[i][not_masked_indices[i]]) 
-        
-        # tensor shape (batch_size, self.n_ensemble)
-        masked_value_losses = value_losses * mask
-        assert masked_value_losses.shape == (batch_size, self.n_ensemble)
+            # Sample a mask -> 1 means the head can see the example
+            # tensor shape (batch_size,)
+            mask_per_head = torch.bernoulli(torch.ones(batch_size, dtype=torch.float, device=self.device) * self.bernoulli_probability)
+            # Compute loss, apply mask, and normalize
+            # value_loss_heads[h] scalar
+            value_loss_heads[h] = \
+                (self._normalize_loss_across_viewing_angles(batch_size, q_values_estimate_heads[:,:,h], q_values_target, ref=ref) * \
+                mask_per_head) / torch.sum(mask_per_head)
 
-        # Normalize across batch, then normalize across heads
-        if self.normalize_per_head:
-            # tensor shape (self.n_ensemble, )
-            loss_per_head = torch.sum(masked_value_losses, dim=0) / torch.sum(mask, dim=0)
-            assert loss_per_head.shape == (self.n_ensemble, )
-            # scalar
-            return torch.mean(loss_per_head)
-        else:
-            # scalar
-            return torch.mean(torch.mean(masked_value_losses, dim=0))
+        return torch.mean(value_loss_heads)
+
+    def _normalize_loss_across_viewing_angles(self, batch_size, q_values_estimate, q_values_target, ref=False):
+        '''
+        Normalize value loss across 36 panoramic views per example
+
+        batch_size : scalar
+        q_values_estimate : torch tensor shape (batch_size, self.num_viewIndex)
+        q_values_target   : torch tensor shape (batch_size, self.num_viewIndex)
+
+        Returns:
+            value_losses : torch tensor (batch_size, )
+            not_ended_count : scalar. count the number of task which has not ended
+        '''
+        value_criterion = self.value_ref_criterion if ref else self.value_criterion
+
+        # tensor shape (batch_size, )
+        value_losses = torch.empty(batch_size, dtype=torch.float, device=self.device)
+
+        # average across 36 views, if the view is not masked
+        not_ended_count = 0
+        for i in range(batch_size):
+            not_masked_count = torch.sum(q_values_target[i] != 1e9)
+            if not_masked_count > 0:
+                # the task has not ended
+                not_ended_count += 1
+                value_losses[i] = value_criterion(q_values_estimate[i], q_values_target[i]) / not_masked_count
+            else:
+                # the task has ended already
+                value_losses[i] = 0
+        
+        return value_losses, not_ended_count
 
     def normalize_loss(self, batch_size, q_values_estimate, q_values_target, ref=False):
-            '''
-            Normalize value loss first across panoramic views per example, then across examples in batch
-            batch_size : scalar
-            q_values_estimate : torch tensor shape (batch_size, self.num_viewIndex)
-            q_values_target   : torch tensor shape (batch_size, self.num_viewIndex)
-            Returns:
-                scalar loss value
-            '''
-            assert q_values_estimate.shape == q_values_target.shape
-            if ref:
-                # tensor shape (batch_size, self.num_viewIndex)
-                value_losses_full =  self.value_ref_criterion(q_values_estimate, q_values_target)            
-            else:
-                # tensor shape (batch_size, self.num_viewIndex)
-                value_losses_full =  self.value_criterion(q_values_estimate, q_values_target)
-            assert value_losses_full.shape == (batch_size, self.num_viewIndex)
-            # tensor shape (batch_size, )
-            value_losses = torch.empty(batch_size, dtype=torch.float, device=self.device)
-            # average across 36 views, if the view is not masked
-            for i in range(batch_size):
-                not_masked_indices = torch.nonzero(q_values_target[i] != 1e9).squeeze()
-                value_losses[i] = torch.mean(value_losses_full[i][not_masked_indices])
-            # average across batch
-            # scalar
-            loss = torch.mean(value_losses)
-            # # DEBUG ONLY
-            # if loss != loss:
-            #     import pdb; pdb.set_trace()
-            return loss
+        '''
+        Normalize value loss first across panoramic views per example, 
+        then across all examples in the batch, accounting for only tasks which has not 'ended' their episodes
+
+        batch_size : scalar
+        q_values_estimate : torch tensor shape (batch_size, self.num_viewIndex)
+        q_values_target   : torch tensor shape (batch_size, self.num_viewIndex)        
+        '''
+        assert q_values_estimate.shape == q_values_target.shape
+        # average across 36 views
+        value_losses, not_ended_count = self._normalize_loss_across_viewing_angles(batch_size, q_values_estimate, q_values_target, ref=ref)
+
+        # average across the batch
+        # scalar
+        loss = torch.sum(value_losses) / not_ended_count
+        # check not nan value
+        assert loss == loss
+        return loss
+
+    # def normalize_loss_heavy(self, batch_size, q_values_estimate, q_values_target, ref=False):
+    #         '''
+    #         Normalize value loss first across panoramic views per example, then across examples in batch
+    #         batch_size : scalar
+    #         q_values_estimate : torch tensor shape (batch_size, self.num_viewIndex)
+    #         q_values_target   : torch tensor shape (batch_size, self.num_viewIndex)
+    #         Returns:
+    #             scalar loss value
+    #         '''
+    #         assert q_values_estimate.shape == q_values_target.shape
+
+    #         if ref:
+    #             # tensor shape (batch_size, self.num_viewIndex)
+    #             value_losses_full =  self.value_ref_criterion(q_values_estimate, q_values_target)            
+    #         else:
+    #             # tensor shape (batch_size, self.num_viewIndex)
+    #             value_losses_full =  self.value_criterion(q_values_estimate, q_values_target)
+    #         assert value_losses_full.shape == (batch_size, self.num_viewIndex)
+
+    #         # tensor shape (batch_size, )
+    #         value_losses = torch.empty(batch_size, dtype=torch.float, device=self.device)
+    #         # average across 36 views, if the view is not masked
+    #         for i in range(batch_size):
+    #             not_masked_indices = torch.nonzero(q_values_target[i] != 1e9).squeeze()
+    #             value_losses[i] = torch.mean(value_losses_full[i][not_masked_indices])
+
+    #         # average across batch
+    #         # scalar
+    #         loss = torch.mean(value_losses)
+    #         # # DEBUG ONLY
+    #         # if loss != loss:
+    #         #     import pdb; pdb.set_trace()
+    #         return loss
 
     def make_tr_instructions_by_t(self, tr_key_pairs, tr_timesteps):
         '''
