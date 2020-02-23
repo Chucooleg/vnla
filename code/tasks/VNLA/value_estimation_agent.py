@@ -47,13 +47,13 @@ class ValueEstimationAgent(NavigationAgent):
             # https://pytorch.org/docs/stable/nn.html?highlight=smooth%20l1#torch.nn.SmoothL1Loss
             self.loss_function_str = "l1"
             self.loss_function_ref_str = "l2"
-            self.value_criterion = nn.SmoothL1Loss(reduction='none')
-            self.value_ref_criterion = nn.MSELoss(reduction='none')
+            self.value_criterion = nn.SmoothL1Loss(reduction='sum')
+            self.value_ref_criterion = nn.MSELoss(reduction='sum')
         elif hparams.loss_function == 'l2':
             self.loss_function_str = "l2"
             self.loss_function_ref_str = "l1"
-            self.value_criterion = nn.MSELoss(reduction='none')
-            self.value_ref_criterion = nn.SmoothL1Loss(reduction='none')
+            self.value_criterion = nn.MSELoss(reduction='sum')
+            self.value_ref_criterion = nn.SmoothL1Loss(reduction='sum')
 
         # Oracle
         self.value_teacher = make_oracle('frontier_shortest', self.nav_actions, self.env_actions)
@@ -85,35 +85,56 @@ class ValueEstimationAgent(NavigationAgent):
         # Compute losses if not eval (i.e. training)
         self.is_eval = False
 
-    def normalize_loss(self, batch_size, q_values_estimate, q_values_target, ref=False):
+    def _normalize_loss_across_viewing_angles(self, batch_size, q_values_estimate, q_values_target, ref=False):
         '''
-        Normalize value loss first across panoramic views per example, then across examples in batch
+        Normalize value loss across 36 panoramic views per example
 
         batch_size : scalar
         q_values_estimate : torch tensor shape (batch_size, self.num_viewIndex)
         q_values_target   : torch tensor shape (batch_size, self.num_viewIndex)
 
         Returns:
-            scalar loss value
+            value_losses : torch tensor (batch_size, )
+            not_ended_count : scalar. count the number of task which has not ended
         '''
-        assert q_values_estimate.shape == q_values_target.shape
-        if ref:
-            # tensor shape (batch_size, self.num_viewIndex)
-            value_losses_full =  self.value_ref_criterion(q_values_estimate, q_values_target)            
-        else:
-            # tensor shape (batch_size, self.num_viewIndex)
-            value_losses_full =  self.value_criterion(q_values_estimate, q_values_target)
-        assert value_losses_full.shape == (batch_size, self.num_viewIndex)
+        value_criterion = self.value_ref_criterion if ref else self.value_criterion
+
         # tensor shape (batch_size, )
         value_losses = torch.empty(batch_size, dtype=torch.float, device=self.device)
-        # average across 36 views, if the view is not masked
-        for i in range(batch_size):
-            not_masked_indices = torch.nonzero(q_values_target[i] != 1e9).squeeze()
-            value_losses[i] = torch.mean(value_losses_full[i][not_masked_indices])
-        # average across batch
-        # scalar
-        return torch.mean(value_losses)      
 
+        # average across 36 views, if the view is not masked
+        not_ended_count = 0
+        for i in range(batch_size):
+            not_masked_count = torch.sum(q_values_target[i] != 1e9)
+            if not_masked_count > 0:
+                # the task has not ended
+                not_ended_count += 1
+                value_losses[i] = value_criterion(q_values_estimate[i], q_values_target[i]) / not_masked_count
+            else:
+                # the task has ended already
+                value_losses[i] = 0
+        
+        return value_losses, not_ended_count
+
+    def normalize_loss(self, batch_size, q_values_estimate, q_values_target, ref=False):
+        '''
+        Normalize value loss first across panoramic views per example, 
+        then across all examples in the batch, accounting for only tasks which has not 'ended' their episodes
+
+        batch_size : scalar
+        q_values_estimate : torch tensor shape (batch_size, self.num_viewIndex)
+        q_values_target   : torch tensor shape (batch_size, self.num_viewIndex)        
+        '''
+        assert q_values_estimate.shape == q_values_target.shape
+        # average across 36 views
+        value_losses, not_ended_count = self._normalize_loss_across_viewing_angles(batch_size, q_values_estimate, q_values_target, ref=ref)
+
+        # average across the batch
+        # scalar
+        loss = torch.sum(value_losses) / not_ended_count
+        # check not nan value
+        assert loss == loss
+        return loss    
 
     def make_tr_instructions_by_t(self, tr_key_pairs, tr_timesteps):
         '''
