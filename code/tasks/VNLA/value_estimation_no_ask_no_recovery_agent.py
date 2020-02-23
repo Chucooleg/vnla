@@ -23,6 +23,8 @@ from value_estimation_agent import ValueEstimationAgent
 from oracle import make_oracle
 from env import VNLAExplorationBatch
 
+# DEBUG ONLY
+import pickle
 
 class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
     '''
@@ -659,7 +661,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                 # Compute mean and variance among heads for every task and every view angle
                 # shape (batch_size, 36)
-                q_values_rollout_estimate, q_values_rollout_estimate_variance = torch.var_mean(q_values_rollout_estimate_heads, dim=2)
+                q_values_rollout_estimate_variance, q_values_rollout_estimate = torch.var_mean(q_values_rollout_estimate_heads, dim=2)
                 assert q_values_rollout_estimate.shape == (batch_size, self.num_viewIndex)
                 assert q_values_rollout_estimate_variance.shape == (batch_size, self.num_viewIndex)
 
@@ -667,8 +669,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # shape (batch_size,)
                 q_values_rollout_uncertainty = torch.empty(batch_size, dtype=torch.float, device=self.device)
                 for i in range(batch_size):
-                    no_mask_idx = torch.nonzero(q_values_target[i] != 1e9).squeeze()
-                    import pdb; pdb.set_trace()
+                    no_mask_idx = torch.nonzero(q_values_target[i] != 1e9).squeeze(-1)
                     assert len(no_mask_idx.shape) == 1 and no_mask_idx.shape[0] <= self.num_viewIndex
                     q_values_rollout_uncertainty[i] = torch.var(q_values_rollout_estimate_variance[i][no_mask_idx])
 
@@ -695,6 +696,18 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # array shape (batch_size,)
                 end_estimated = (torch.min(q_values_rollout_estimate, dim=1)[0] <= self.agent_end_criteria).cpu().data.numpy()
                 assert end_estimated.shape[0] == batch_size
+
+                # # DEBUG ONLY
+                # with open('dummies/q_values_rollout_estimate.pickle', 'wb') as f:
+                #     pickle.dump(q_values_rollout_estimate, f)           
+                # with open('dummies/best_view_ix.pickle', 'wb') as f:
+                #     pickle.dump(best_view_ix, f)
+                # with open('dummies/best_view_ix_tiled.pickle', 'wb') as f:
+                #     pickle.dump(best_view_ix_tiled, f)
+                # with open('dummies/viewix_actions_map.pickle', 'wb') as f:
+                #     pickle.dump(viewix_actions_map, f)
+                # with open('dummies/a_t.pickle', 'wb') as f:
+                #     pickle.dump(a_t, f)
 
                 time_report['select_agent_macro_action'] += time.time() - agent_select_start_time
 
@@ -801,7 +814,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 start_time = time.time()
                 self.history_buffer.add_experience(experience_batch_t)
                 # print("Added new experience, history buffer size = {}".format(self.history_buffer.curr_buffer_size()))
-                time_report['save_to_history_buffer'] += time.time() - start_time  
+                time_report['save_to_history_buffer'] += time.time() - start_time
 
             # Append tensors for the whole batch for this time step
             start_time = time.time()
@@ -813,12 +826,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 'f_t': f_t,     #f out
                 # ask, instruction update in Ask Agents
             })
-            time_report['save_to_local_buffer'] += time.time() - start_time  
+            time_report['save_to_local_buffer'] += time.time() - start_time
 
             # Simulators step forward to the direct-facing vertex after rotation
             start_time = time.time()
             obs = self.env.step(env_stepping)
-            time_report['env_forward_step'] += time.time() - start_time  
+            time_report['env_forward_step'] += time.time() - start_time
 
             # Update traj after stepping forward
             start_time = time.time()

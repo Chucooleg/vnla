@@ -123,7 +123,7 @@ class ValueEstimationAgent(NavigationAgent):
         
         # tensor shape (batch_size, self.n_ensemble)
         masked_value_losses = value_losses * mask
-        assert masked_value_losses == (batch_size, self.n_ensemble)
+        assert masked_value_losses.shape == (batch_size, self.n_ensemble)
 
         # Normalize across batch, then normalize across heads
         if self.normalize_per_head:
@@ -161,7 +161,11 @@ class ValueEstimationAgent(NavigationAgent):
                 value_losses[i] = torch.mean(value_losses_full[i][not_masked_indices])
             # average across batch
             # scalar
-            return torch.mean(value_losses)     
+            loss = torch.mean(value_losses)
+            # # DEBUG ONLY
+            # if loss != loss:
+            #     import pdb; pdb.set_trace()
+            return loss
 
     def make_tr_instructions_by_t(self, tr_key_pairs, tr_timesteps):
         '''
