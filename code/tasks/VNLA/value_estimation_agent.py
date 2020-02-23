@@ -98,9 +98,9 @@ class ValueEstimationAgent(NavigationAgent):
         # tensor shape (batch_size, self.n_ensemble)
         mask = torch.bernoulli(torch.ones(batch_size, self.n_ensemble, dtype=torch.float, device=self.device) * self.bernoulli_probability)
 
-        # Compute full loss
-        # tensor shape (batch_size, self.num_viewIndex, self.n_ensemble)
-        value_losses_full =  self.value_criterion(q_values_estimate, q_values_target)
+        # # Compute full loss
+        # # tensor shape (batch_size, self.num_viewIndex, self.n_ensemble)
+        # value_losses_full =  self.value_criterion(q_values_estimate_heads, q_values_target)
 
         # Which view angles were not masked?
         # len (batchs_size) of variable tensor length
@@ -112,10 +112,14 @@ class ValueEstimationAgent(NavigationAgent):
         # tensor shape (batch_size, self.n_ensemble)
         value_losses = torch.empty(batch_size, self.n_ensemble, dtype=torch.float, device=self.device)
         for h in range(self.n_ensemble):
+            # compute loss for the head
+            # tensor shape (batch_size, self.num_viewIndex)
+            value_losses_head = self.value_criterion(q_values_estimate_heads[:,:,h], q_values_target)
             for i in range(batch_size):
-                # value_losses_full[i,:,h] tensor shape (self.num_viewIndex, )
+                # value_losses_head[i] tensor shape (self.num_viewIndex, )
+                # not_masked_indices[i] tensor shape (< self.num_viewIndex, )
                 # value_losses[i, h] scalar
-                value_losses[i, h] = torch.mean(value_losses_full[i,:,h][not_masked_indices[i]]) 
+                value_losses[i, h] = torch.mean(value_losses_head[i][not_masked_indices[i]]) 
         
         # tensor shape (batch_size, self.n_ensemble)
         masked_value_losses = value_losses * mask

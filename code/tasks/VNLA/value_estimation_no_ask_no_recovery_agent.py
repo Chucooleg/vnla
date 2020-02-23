@@ -152,8 +152,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 'teacher_values_target': [],
                 'agent_values_estimate': [],
 
-                # bootstrapping
-                'agent_q_values_uncertainty': []
             } for (instr_iter_key_pair, timestep) \
                 in zip(tr_key_pairs, tr_timesteps)]
 
@@ -285,10 +283,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Optional save training batch results
         if output_res:
             start_time = time.time()
+            q_values_target_list = q_values_target.data.tolist()
+            q_values_tr_estimate_heads_list = q_values_tr_estimate_heads.data.tolist()
+
             for i in range(len(tr_timesteps)):
-                training_batch_results[i]['teacher_values_target'] = q_values_target[i].tolist()
-                training_batch_results[i]['agent_values_estimate'] = q_values_tr_estimate[i].tolist()
-                training_batch_results[i]['agent_q_values_uncertainty'] = q_values_tr_uncertainties[i].tolist()
+                training_batch_results[i]['teacher_values_target'] = q_values_target_list[i]
+                training_batch_results[i]['agent_values_estimate'] = q_values_tr_estimate_heads_list[i]
             time_report['save_training_batch_results'] += time.time() - start_time
 
         print ("finished training from history buffer. self.value_loss = {}".format(self.value_loss))
@@ -668,6 +668,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 q_values_rollout_uncertainty = torch.empty(batch_size, dtype=torch.float, device=self.device)
                 for i in range(batch_size):
                     no_mask_idx = torch.nonzero(q_values_target[i] != 1e9).squeeze()
+                    import pdb; pdb.set_trace()
                     assert len(no_mask_idx.shape) == 1 and no_mask_idx.shape[0] <= self.num_viewIndex
                     q_values_rollout_uncertainty[i] = torch.var(q_values_rollout_estimate_variance[i][no_mask_idx])
 
