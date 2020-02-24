@@ -132,14 +132,12 @@ class ValueEstimationAgent(NavigationAgent):
         normalized_targets = torch.ones(self.num_viewIndex, dtype=torch.float, device=self.device) if self.norm_loss_by_dist else None
 
         # Average across 36 views, if the view is not masked
-        # not_ended_count = 0
         for i in range(batch_size):
             visible_vertex_count = torch.sum(q_values_target[i] != 1e9)
 
             # if the task has not ended yet
             if visible_vertex_count:
                 not_ended_mask[i] = 1
-                # not_ended_count += 1
 
                 # Compute loss WITH normalization by distance from current position to goal
                 if self.norm_loss_by_dist:
@@ -155,7 +153,6 @@ class ValueEstimationAgent(NavigationAgent):
                 not_ended_mask[i] = 0
                 value_losses[i] = 0
 
-        # return value_losses, not_ended_count
         return value_losses, not_ended_mask
 
     def normalize_loss(self, batch_size, q_values_estimate, q_values_target, ref=False):

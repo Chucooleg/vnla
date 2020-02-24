@@ -115,12 +115,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         self.value_losses.append(iter_value_loss_avg)
 
     def pred_training_batch(self, training_batch, global_iter_idx, output_res=False):
-        if self.bootstrap:
-            return self._pred_training_batch_ensemble(training_batch, global_iter_idx, output_res)
-        else:
-            return self._pred_training_batch(training_batch, global_iter_idx, output_res)
-
-    def _pred_training_batch_ensemble(self, training_batch, global_iter_idx, output_res=False):
         '''
         Agent makes prediction on training batch sampled from history buffer.
         Compute self.loss, accumulate self.losses, self.value_losses
@@ -213,8 +207,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # LSTM unfold one further step at the frontier
         start_time = time.time()
         # Initialize tensor to store q-value estimates
-        # shape (36, batch_size, n_ensemble)
-        q_values_tr_estimate_heads = torch.empty(self.num_viewIndex, batch_size, self.n_ensemble, dtype=torch.float, device=self.device)
+        if self.bootstrap:
+            # shape (36, batch_size, n_ensemble)
+            q_values_tr_estimate_heads = torch.empty(self.num_viewIndex, batch_size, self.n_ensemble, dtype=torch.float, device=self.device)
+        else:
+            # shape (36, batch_size)
+            q_values_tr_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device)
 
         # Loop through 36 view indices in the pano sphere
         # run 100 in parallel instead of 36*100 in parallel
@@ -237,8 +235,16 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # ques_asked = ...
 
             # Run decoder forward pass
-            # shape (batch_size, self.n_ensemble)
-            _, _, q_values_tr_estimate_heads[view_ix], _ = self.model.decode_nav(a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=viewix_mask, cov=cov, pred_val=True)
+            if self.bootstrap:
+                # shape (batch_size, self.n_ensemble)
+                _, _, q_values_tr_estimate_heads[view_ix], _ = self.model.decode_nav( 
+                    a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, 
+                    view_index_mask=viewix_mask, cov=cov, pred_val=True)
+            else:
+                # shape (batch_size, )
+                _, _, q_values_tr_estimate[view_ix], _ = self.model.decode_nav( 
+                    a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, 
+                    view_index_mask=viewix_mask, cov=cov, pred_val=True)
 
         # shape (batch_size, 36, n_ensemble)
         q_values_tr_estimate_heads = q_values_tr_estimate_heads.transpose(0, 1)
@@ -251,7 +257,12 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # tensor shape (batch_size, self.num_viewIndex)
         q_values_target = self.get_tr_variable_by_t(tr_key_pairs, tr_timesteps, 'q_values_target')
         # Compute scalar loss
-        self.value_loss = self.normalize_loss_with_mask(batch_size, q_values_tr_estimate_heads, q_values_target)
+        if self.bootstrap:
+            self.value_loss = self.normalize_loss_with_mask( 
+                batch_size, q_values_tr_estimate_heads, q_values_target)
+        else:
+            self.value_loss = self.normalize_loss( 
+                batch_size, q_values_tr_estimate, q_values_target, ref=False)
         time_report['compute_training_value_loss'] += time.time() - start_time
 
         # Save per batch loss to self.loss for backprop
@@ -263,12 +274,14 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Optional save training batch results
         if output_res:
             start_time = time.time()
-            q_values_target_list = q_values_target.data.tolist()
-            q_values_tr_estimate_heads_list = q_values_tr_estimate_heads.data.tolist()
-
+            teacher_values_target_list = q_values_target.data.tolist()
+            if self.bootstrap:
+                agent_tr_estimate_list = q_values_tr_estimate_heads.data.tolist()
+            else:
+                agent_tr_estimate_list = q_values_tr_estimate.data.tolist()
             for i in range(len(tr_timesteps)):
-                training_batch_results[i]['teacher_values_target'] = q_values_target_list[i]
-                training_batch_results[i]['agent_values_estimate'] = q_values_tr_estimate_heads_list[i]
+                training_batch_results[i]['teacher_values_target'] = teacher_values_target_list[i]
+                training_batch_results[i]['agent_values_estimate'] = agent_tr_estimate_list[i]
             time_report['save_training_batch_results'] += time.time() - start_time
 
         print ("finished training from history buffer. self.value_loss = {}".format(self.value_loss))
@@ -278,12 +291,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         return training_batch_results, time_report
 
     def rollout(self, global_iter_idx=None):
-        if self.bootstrap:
-            return self._rollout_ensemble(global_iter_idx=global_iter_idx)
-        else:
-            return self._rollout(global_iter_idx=global_iter_idx)
-
-    def _rollout_ensemble(self, global_iter_idx=None):
 
         # time keeping
         time_report = defaultdict(int)
@@ -589,8 +596,15 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 decode_frontier_start_time = time.time()
 
                 # Initialize tensor to store q-value estimates
-                # tensor shape (36, batch_size, self.n_ensemble)
-                q_values_rollout_estimate_heads = torch.empty(self.num_viewIndex, batch_size, self.n_ensemble, dtype=torch.float, device=self.device)
+                if self.bootstrap:
+                    # tensor shape (36, batch_size, self.n_ensemble)
+                    q_values_rollout_estimate_heads = torch.empty( 
+                        self.num_viewIndex, batch_size, self.n_ensemble, 
+                        dtype=torch.float, device=self.device)
+                else:
+                    # tensor shape (36, 100)
+                    q_values_rollout_estimate = torch.empty( 
+                        self.num_viewIndex, batch_size, dtype=torch.float, device=self.device)
 
                 # Loop through 36 view indices in the pano sphere
                 # run 100 in parallel instead of 36*100 in parallel
@@ -607,7 +621,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # tensor shape (batch_size, feature_size)
                     get_f_proposed_start_time = time.time()
                     f_proposed = self.get_rollout_view_indexed_features(obs, view_ix)
-                    # f_proposed = torch.stack([torch.tensor(self.env.env.features[ob['scan'] + '_' + ob['viewpoint']][view_ix, :], dtype=torch.float, device=self.device) for ob in obs])
                     time_report['decode_frontier_get_feature'] += time.time() - get_f_proposed_start_time
                     
                     # Get mask at that viewIndex(rotation)
@@ -622,27 +635,41 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                     # Run decoder forward pass
                     frontier_decode_time = time.time()
-                    # shape (batch_size,)
-                    # shape (batch_size,)
-                    _, _, q_values_rollout_estimate_heads[view_ix], _ = self.model.decode_nav(a_proposed, ques_t, f_proposed, decoder_h, ctx, seq_mask, view_index_mask=view_ix_mask, cov=cov, pred_val=True)
+                    if self.bootstrap:
+                        # shape (batch_size, self.n_ensemble)
+                        _, _, q_values_rollout_estimate_heads[view_ix], _ = self.model.decode_nav( 
+                            a_proposed, ques_t, f_proposed, decoder_h, ctx, seq_mask,
+                            view_index_mask=view_ix_mask, cov=cov, pred_val=True)
+                    else:
+                        # shape (batch_size,)
+                        _, _, q_values_rollout_estimate[view_ix], _ = self.model.decode_nav( 
+                            a_proposed, ques_t, f_proposed, decoder_h, ctx, seq_mask,
+                            view_index_mask=view_ix_mask, cov=cov, pred_val=True)
+
                     time_report['decode_frontier_decoder_forward'] += time.time() - frontier_decode_time
 
-                # shape (batch_size, 36, n_ensemble)
-                q_values_rollout_estimate_heads = q_values_rollout_estimate_heads.transpose(0,1)
+                if self.bootstrap:
+                    # shape (batch_size, 36, n_ensemble)
+                    q_values_rollout_estimate_heads = q_values_rollout_estimate_heads.transpose(0,1)
 
-                # Compute mean and variance among heads for every task and every view angle
-                # shape (batch_size, 36)
-                q_values_rollout_estimate_variance, q_values_rollout_estimate = torch.var_mean(q_values_rollout_estimate_heads, dim=2)
-                assert q_values_rollout_estimate.shape == (batch_size, self.num_viewIndex)
-                assert q_values_rollout_estimate_variance.shape == (batch_size, self.num_viewIndex)
+                    # Compute mean and variance among heads for every task and every view angle
+                    # shape (batch_size, 36)
+                    q_values_rollout_estimate_variance, q_values_rollout_estimate = torch.var_mean(q_values_rollout_estimate_heads, dim=2)
+                    assert q_values_rollout_estimate.shape == (batch_size, self.num_viewIndex)
+                    assert q_values_rollout_estimate_variance.shape == (batch_size, self.num_viewIndex)
 
-                # Estimate uncertainty
-                # shape (batch_size,)
-                q_values_rollout_uncertainty = torch.empty(batch_size, dtype=torch.float, device=self.device)
-                for i in range(batch_size):
-                    no_mask_idx = torch.nonzero(q_values_target[i] != 1e9).squeeze(-1)
-                    assert len(no_mask_idx.shape) == 1 and no_mask_idx.shape[0] <= self.num_viewIndex
-                    q_values_rollout_uncertainty[i] = torch.var(q_values_rollout_estimate_variance[i][no_mask_idx])
+                    # Estimate uncertainty
+                    # shape (batch_size,)
+                    q_values_rollout_uncertainty = torch.empty(batch_size, dtype=torch.float, device=self.device)
+                    for i in range(batch_size):
+                        no_mask_idx = torch.nonzero(q_values_target[i] != 1e9).squeeze(-1)
+                        assert len(no_mask_idx.shape) == 1 and no_mask_idx.shape[0] <= self.num_viewIndex
+                        q_values_rollout_uncertainty[i] = torch.var(q_values_rollout_estimate_variance[i][no_mask_idx])
+                else:
+                    # Reshape q-value estimates tensor back to 
+                    # shape (batch_size, self.num_viewIndex=36)
+                    # .t() expects 2-D tensor
+                    q_values_rollout_estimate = q_values_rollout_estimate.t()
 
                 time_report['decode_frontier'] += time.time() - decode_frontier_start_time
                 # -------
@@ -716,7 +743,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # logging only
             if not expert_rollin_bool:
                 q_values_rollout_estimate_list = q_values_rollout_estimate.data.tolist()
-                q_values_rollout_uncertainty_list = q_values_rollout_uncertainty.data.tolist()
+                if self.bootstrap:
+                    q_values_rollout_uncertainty_list = q_values_rollout_uncertainty.data.tolist()
             time_report['prepare_tensors_for_saving'] += time.time() - start_time
 
             # Initialize new experience_batch_t
@@ -764,8 +792,10 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # q-values
                     traj[i]['agent_q_values'].append(None if expert_rollin_bool else q_values_rollout_estimate_list[i])
                     traj[i]['teacher_q_values'].append(q_values_target_list[i])
+
                     # bootstrapping
-                    traj[i]['agent_q_values_uncertainty'].append(None if expert_rollin_bool else q_values_rollout_uncertainty_list[i])
+                    if self.bootstrap:
+                        traj[i]['agent_q_values_uncertainty'].append(None if expert_rollin_bool else q_values_rollout_uncertainty_list[i])
             time_report['write_experience_batch'] += time.time() - start_time  
 
             if use_hist_buffer:
@@ -838,11 +868,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         # Track how many trajectories are ended by applying q-value threshold
         print ("{} ended {} trajectories in batch.".format('expert' if expert_rollin_bool else 'agent', np.sum(ended_by_q_value)))
-
-        # Debug
-        # if expert_rollin_bool:
-        #     assert np.sum(ended_by_q_value) == batch_size
-        #     assert all(ended_by_q_value)
 
         time_report['total_rollout_time'] += time.time() - rollout_start_time
         return traj, time_report

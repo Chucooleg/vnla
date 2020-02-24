@@ -351,6 +351,7 @@ class RegressorSingleHead(nn.Module):
 
     def __init__(self, hparams, device):
         super(RegressorSingleHead, self).__init__()
+        assert not hparams.bootstrap
         self.device = device
         # Q-value regressor output dim is 1
         self.q_predictor = nn.Linear(hparams.hidden_size, 1)   
@@ -379,10 +380,6 @@ class RegressorMultiHead(nn.Module):
         # Q-value regressor output dim is 1
         self.q_predictors = nn.ModuleList([nn.Linear(hparams.hidden_size, 1) for _ in range(self.n_ensemble)])  
 
-        # Debug
-        self.debug_count = 0
-        self.debug_viewix = 0
-
     def forward(self, new_h, alpha, new_cov, h_tilde, view_index_mask):
         '''run LSTM to decode q-value for a particular view'''   
 
@@ -396,23 +393,9 @@ class RegressorMultiHead(nn.Module):
         # --------
         # view_index_mask has shape (batch_size, )
         if view_index_mask is not None:
-
-            # # DEBUG ONLY
-            # import pickle
-            # self.debug_count += 1
-            # self.debug_viewix = self.debug_count % 36
-            # with open('dummies/dummy_q_value_heads_1_{}_{}.pickle'.format(self.debug_viewix, self.debug_count), 'wb') as f:
-            #     pickle.dump(q_value_heads, f)
-
             # tensor shape (batch_size, n_ensemble)
             q_value_heads.data.masked_fill_(view_index_mask.view(-1, 1), 1e9)
             assert q_value_heads.shape == (h_tilde.shape[0], self.n_ensemble)
-
-            # # DEBUG ONLY
-            # with open('dummies/view_index_mask_{}_{}.pickle'.format(self.debug_viewix, self.debug_count), 'wb') as f:
-            #     pickle.dump(view_index_mask, f)           
-            # with open('dummies/dummy_q_value_heads_2_{}_{}.pickle'.format(self.debug_viewix, self.debug_count), 'wb') as f:
-            #     pickle.dump(q_value_heads, f)
         # --------
         return new_h, alpha, q_value_heads, new_cov
 
