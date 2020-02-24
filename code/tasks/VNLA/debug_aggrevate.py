@@ -3,8 +3,8 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "20200128_debug_aggrevate"
-job_name = "debug_pre_tunning_94798"
+exp_name = "20200223_debug_aggrevate"
+job_name = "debug_loss_func_7"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh
@@ -33,13 +33,13 @@ args['job_name'] = job_name
 # args['n_iters'] = 1000
 # data must be larger than batch_size
 args['batch_size'] = 100
-args['train_batch_size'] = 200
+args['train_batch_size'] = 512
 args['start_beta'] = 1.0 # 1.0
 args['beta_decay_rate'] = 0.98
 args['start_beta_decay'] = 5
 args['decay_beta_every'] = 5
 args['min_history_to_learn'] = 1000
-args['lr'] = 1e-3
+args['lr'] = 1e-2
 args['loss_function'] = 'l1'
 
 args['save_every'] = 10 # 50
@@ -52,6 +52,8 @@ args['seed'] = 42
 
 # args['data_suffix'] = 'small_three_goals_short'
 # args['data_suffix'] = 'small_three_houses_single_goal_short'
-args['data_suffix'] = 'original'
+args['data_suffix'] = 'small_three_goals_short'
+
+args['norm_loss_by_dist'] = 1
 
 vs_code_debug(args)
