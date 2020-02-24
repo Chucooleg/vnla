@@ -115,6 +115,8 @@ def make_parser():
     # Optimizer parameters
     parser.add_argument('-loss_function', type=str,
         help='loss function. `l1` or `l2`')
+    parser.add_argument('-norm_loss_by_dist', type=int,
+        help='1/0. Whether to normalize loss by gold distance-to-goal.')
     parser.add_argument('-lr', type=float,
         help='learning rate')
     parser.add_argument('-weight_decay', type=float,
@@ -161,8 +163,6 @@ def make_parser():
         help='number of bootstrap heads')
     parser.add_argument('-bernoulli_probability', type=float,
         help='bernoulli probability that a datapt is exposed to backprop a head')
-    parser.add_argument('-normalize_per_head', type=int,
-        help='normalize loss per head by number of examples it is exposed to. 1/0')
 
     # tensorboard logging
     parser.add_argument('-plot_to_philly', type=int,

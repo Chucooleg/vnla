@@ -23,9 +23,6 @@ from value_estimation_agent import ValueEstimationAgent
 from oracle import make_oracle
 from env import VNLAExplorationBatch
 
-# DEBUG ONLY
-import pickle
-
 class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
     '''
     Value Estimation Agent with NO asking mechanism and NO recovery strategy.
@@ -218,12 +215,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Initialize tensor to store q-value estimates
         # shape (36, batch_size, n_ensemble)
         q_values_tr_estimate_heads = torch.empty(self.num_viewIndex, batch_size, self.n_ensemble, dtype=torch.float, device=self.device)
-        # # shape (36, batch_size)
-        # q_values_tr_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device)
-        # # shape (36, batch_size)
-        # q_values_tr_estimate_variance = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device)
-        # # count non-masked predictions to normalize loss value
-        # tot_pred = 0
 
         # Loop through 36 view indices in the pano sphere
         # run 100 in parallel instead of 36*100 in parallel
@@ -241,8 +232,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             # i.e. not all rotation angles can connect to other vertices on graph
             # tensor shape (batch_size,)
             viewix_mask = self.get_tr_view_indexed_mask_by_t(tr_key_pairs, tr_timesteps, view_ix)
-            # # torch scalar
-            # tot_pred += batch_size - torch.sum(viewix_mask)
 
             # If implementing Ask Agent
             # ques_asked = ...
@@ -253,17 +242,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         # shape (batch_size, 36, n_ensemble)
         q_values_tr_estimate_heads = q_values_tr_estimate_heads.transpose(0, 1)
-
-        # # Reshape q_values_tr_estimate for loss computation
-        # # to (batch_size, self.num_viewIndex)
-        # q_values_tr_estimate = q_values_tr_estimate.t()
-        # # to (batch_size, self.num_viewIndex)
-        # q_values_tr_estimate_variance = q_values_tr_estimate_variance.t()
-
-        # # Estimate uncertainty
-        # # shape (batch_size,)
-        # q_values_tr_uncertainty = torch.mean(q_values_tr_estimate_variance, dim=1)
-        # assert q_values_tr_uncertainty.shape = (batch_size, )
 
         time_report['decode_training_batch_frontier'] += time.time() - start_time
         # -----------------------------------------------------------------
@@ -613,11 +591,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # Initialize tensor to store q-value estimates
                 # tensor shape (36, batch_size, self.n_ensemble)
                 q_values_rollout_estimate_heads = torch.empty(self.num_viewIndex, batch_size, self.n_ensemble, dtype=torch.float, device=self.device)
-                # # tensor shape (36, batch_size)
-                # q_values_rollout_estimate = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device) 
-                # q_values_rollout_estimate_variance = torch.empty(self.num_viewIndex, batch_size, dtype=torch.float, device=self.device) 
-                # count non-masked predictions to normalize loss value
-                tot_pred = 0
 
                 # Loop through 36 view indices in the pano sphere
                 # run 100 in parallel instead of 36*100 in parallel
@@ -643,8 +616,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     get_viewix_mask_start_time = time.time()
                     view_ix_mask = torch.tensor(view_index_mask[view_ix], dtype=torch.bool, device=self.device)
                     time_report['decode_frontier_get_viewix_mask'] += time.time() - get_viewix_mask_start_time
-                    # # torch scalar
-                    # tot_pred += batch_size - torch.sum(view_ix_mask)
 
                     # If implementing Ask Agent
                     # ques_asked = ...
@@ -696,18 +667,6 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # array shape (batch_size,)
                 end_estimated = (torch.min(q_values_rollout_estimate, dim=1)[0] <= self.agent_end_criteria).cpu().data.numpy()
                 assert end_estimated.shape[0] == batch_size
-
-                # # DEBUG ONLY
-                # with open('dummies/q_values_rollout_estimate.pickle', 'wb') as f:
-                #     pickle.dump(q_values_rollout_estimate, f)           
-                # with open('dummies/best_view_ix.pickle', 'wb') as f:
-                #     pickle.dump(best_view_ix, f)
-                # with open('dummies/best_view_ix_tiled.pickle', 'wb') as f:
-                #     pickle.dump(best_view_ix_tiled, f)
-                # with open('dummies/viewix_actions_map.pickle', 'wb') as f:
-                #     pickle.dump(viewix_actions_map, f)
-                # with open('dummies/a_t.pickle', 'wb') as f:
-                #     pickle.dump(a_t, f)
 
                 time_report['select_agent_macro_action'] += time.time() - agent_select_start_time
 

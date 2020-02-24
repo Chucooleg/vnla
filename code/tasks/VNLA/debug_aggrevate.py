@@ -3,7 +3,7 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "2020221_debug_aggrevate_bootstrap"
+exp_name = "2020223_debug_aggrevate_bootstrap"
 job_name = "bootstrap_1"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
@@ -32,14 +32,14 @@ args['job_name'] = job_name
 # extras here!
 # args['n_iters'] = 1000
 # data must be larger than batch_size
-args['batch_size'] = 50
-args['train_batch_size'] = 50
+args['batch_size'] = 250
+args['train_batch_size'] = 512
 args['start_beta'] = 1.0 # 1.0
 args['beta_decay_rate'] = 0.98
 args['start_beta_decay'] = 2
 args['decay_beta_every'] = 2
 args['min_history_to_learn'] = 1000
-args['lr'] = 1e-4
+args['lr'] = 1e-3
 args['loss_function'] = 'l2'
 
 args['save_every'] = 10 # 50
@@ -57,7 +57,6 @@ args['data_suffix'] = 'small_three_goals_short'
 args['bootstrap'] = 1
 args['n_ensemble'] = 2
 args['bernoulli_probability'] = 0.9
-args['normalize_per_head'] = 1
-
+args['norm_loss_by_dist'] = 1
 
 vs_code_debug(args)
