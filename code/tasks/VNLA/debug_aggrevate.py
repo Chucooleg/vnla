@@ -4,7 +4,7 @@ from train import vs_code_debug
 
 # from train_experiments.sh
 exp_name = "2020223_debug_aggrevate_bootstrap"
-job_name = "bootstrap_4"
+job_name = "bootstrap_5"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh
@@ -50,7 +50,7 @@ args['dropout_ratio'] = 0.5
 args['agent_end_criteria'] = 2.5
 args['seed'] = 42
 
-args['data_suffix'] = 'small_three_goals_short'
+args['data_suffix'] = 'small_thirty_goals_anylength'
 # args['data_suffix'] = 'small_three_houses_single_goal_short'
 # args['data_suffix'] = 'original'
 
