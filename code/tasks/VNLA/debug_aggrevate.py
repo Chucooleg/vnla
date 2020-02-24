@@ -4,7 +4,7 @@ from train import vs_code_debug
 
 # from train_experiments.sh
 exp_name = "2020223_debug_aggrevate_bootstrap"
-job_name = "bootstrap_1"
+job_name = "bootstrap_4"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh

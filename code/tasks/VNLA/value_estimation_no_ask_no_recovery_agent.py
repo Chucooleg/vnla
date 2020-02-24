@@ -240,15 +240,18 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 _, _, q_values_tr_estimate_heads[view_ix], _ = self.model.decode_nav( 
                     a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, 
                     view_index_mask=viewix_mask, cov=cov, pred_val=True)
-                # tensor shape (batch_size, 36, n_ensemble)
-                q_values_tr_estimate_heads = q_values_tr_estimate_heads.transpose(0, 1)
             else:
                 # shape (batch_size, )
                 _, _, q_values_tr_estimate[view_ix], _ = self.model.decode_nav( 
                     a_proposed, ques_out_t, f_proposed, decoder_h, ctx, seq_mask, 
                     view_index_mask=viewix_mask, cov=cov, pred_val=True)
-                # tensor shape  (batch_size, 36)
-                q_values_tr_estimate = q_values_tr_estimate.t()
+
+        if self.bootstrap:
+            # tensor shape (batch_size, 36, n_ensemble)
+            q_values_tr_estimate_heads = q_values_tr_estimate_heads.transpose(0, 1)
+        else:
+            # tensor shape  (batch_size, 36)
+            q_values_tr_estimate = q_values_tr_estimate.t()
 
         time_report['decode_training_batch_frontier'] += time.time() - start_time
         # -----------------------------------------------------------------
