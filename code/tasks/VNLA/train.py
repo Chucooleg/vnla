@@ -92,7 +92,6 @@ def load(path, device, args_copy):
 
     # Overwrite hparams by args
     for flag in args_copy:
-        # import pdb; pdb.set_trace()
         value = args_copy[flag]
         if value is not None:
             setattr(hparams, flag, value)
@@ -285,7 +284,6 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             # Write the validation results out to json file
             # Compute in both train and test modes
             agent.results_path = os.path.join(hparams.exp_dir, '{}_{}_for_eval.json'.format(hparams.model_prefix, env_name))
-            # agent.results_path = hparams.load_path.replace('.ckpt', '_') + env_name + '_for_eval.json'
             agent.write_results() # doesn't write is_success results yet
             score_summary, _, is_success = evaluator.score(agent.results_path)
 
@@ -293,7 +291,6 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             # Compute only in eval mode (e.g. on test_seen or test_unseen data)
             if eval_mode:
                 agent.results_path = os.path.join(hparams.exp_dir, '{}_{}_for_eval_complete.json'.format(hparams.model_prefix, env_name))
-                # agent.results_path = hparams.load_path.replace('.ckpt', '_') + env_name + '_for_eval_complete.json'
                 agent.add_is_success(is_success)
                 print('Save result with is_success metric to', agent.results_path)
                 agent.write_results()
