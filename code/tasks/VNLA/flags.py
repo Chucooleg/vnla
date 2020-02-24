@@ -19,7 +19,9 @@ def make_parser():
     parser.add_argument('-job_name', type=str,
         help='name of the job')
     parser.add_argument('-data_suffix', type=str,
-        help='name of the custom data e.g. ask_nav_train_[data_suffix].json')  
+        help='name of the custom data for training e.g. ask_nav_train_[data_suffix].json')  
+    parser.add_argument('-eval_data_suffix', type=str,
+        help='name of the custom data for validation/eval e.g. ask_nav_val_[data_suffix].json')  
 
     # Vocab (not in master config)
     parser.add_argument('-external_main_vocab', type=str,

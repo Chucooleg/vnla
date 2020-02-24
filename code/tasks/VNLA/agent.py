@@ -84,6 +84,7 @@ class BaseAgent(object):
                             'agent_ask_logit_masks', 'teacher_ask', 'teacher_ask_reason',
                             # value estimation no ask no recovery agent
                             'agent_q_values', 'teacher_q_values', 'beta', 'expert_rollin_bool',
+                            'teacher_cost_togo', 'teacher_cost_stepping',
                             # value estimation no ask no recovery agent
                             # multihead
                             'agent_q_values_uncertainty'

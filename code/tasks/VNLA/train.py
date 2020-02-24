@@ -87,16 +87,18 @@ def save(path, model, optimizer, iter, best_metrics, train_env, history_buffer, 
         }
     torch.save(ckpt, path)
 
-def load(path, device):
+def load(path, device, args_copy):
     global hparams
     ckpt = torch.load(path, map_location=device)
     hparams = ckpt['hparams']
 
     # Overwrite hparams by args
-    for flag in vars(args):
-        value = getattr(args, flag)
+    for flag in args_copy:
+        value = args_copy[flag]
         if value is not None:
             setattr(hparams, flag, value)
+        if flag == 'multi_seed_eval' and value == 1:
+            setattr(hparams, 'eval_only', 1)
 
     set_path()
     return ckpt
@@ -287,14 +289,14 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
 
             # Write the validation results out to json file
             # Compute in both train and test modes
-            agent.results_path = hparams.load_path.replace('.ckpt', '_') + env_name + '_for_eval.json'
+            agent.results_path = os.path.join(hparams.exp_dir, '{}_{}_for_eval.json'.format(hparams.model_prefix, env_name))
             agent.write_results() # doesn't write is_success results yet
             score_summary, _, is_success = evaluator.score(agent.results_path)
 
             # Add success 1/0 to each traj
             # Compute only in eval mode (e.g. on test_seen or test_unseen data)
             if eval_mode:
-                agent.results_path = hparams.load_path.replace('.ckpt', '_') + env_name + '_for_eval_complete.json'
+                agent.results_path = os.path.join(hparams.exp_dir, '{}_{}_for_eval_complete.json'.format(hparams.model_prefix, env_name))
                 agent.add_is_success(is_success)
                 print('Save result with is_success metric to', agent.results_path)
                 agent.write_results()
@@ -374,7 +376,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
         # progress per training job on philly
         print("PROGRESS: {}%".format(float(iter)/end_iter*100))
 
-    return None
+    return best_metrics
 
 def setup(seed=None):
     '''
@@ -404,7 +406,7 @@ def setup(seed=None):
                     suffix=hparams.data_suffix if hasattr(hparams, 'data_suffix') else ''),
             train_vocab_path)     
 
-def train_val(device, seed=None):
+def train_val(device, args_copy, seed=None):
     ''' 
     Train on the training set, and validate on seen and unseen splits.
     - load last model 
@@ -420,7 +422,7 @@ def train_val(device, seed=None):
     # Resume from lastest checkpoint (if any)
     if os.path.exists(hparams.load_path):
         print('Load model from %s' % hparams.load_path)
-        ckpt = load(hparams.load_path, device)
+        ckpt = load(hparams.load_path, device, args_copy)
         start_iter = ckpt['iter']
     else:
         if hasattr(args, 'load_path') and hasattr(args, 'eval_only') and args.eval_only:
@@ -455,9 +457,9 @@ def train_val(device, seed=None):
     eval_mode = hasattr(hparams, 'eval_only') and hparams.eval_only
     if eval_mode:
         if '_unseen' in hparams.load_path:
-            val_splits = ['test_unseen']
+            val_splits = ['val_unseen']
         if '_seen' in hparams.load_path:
-            val_splits = ['test_seen']
+            val_splits = ['val_seen']
         end_iter = start_iter + hparams.log_every 
     # Create the seen and unseen environments
     val_envs = { split: (VNLABatch(hparams, split=split, tokenizer=tok,
@@ -583,10 +585,12 @@ if __name__ == "__main__":
         hparams = Namespace(**json.load(f))  
 
     # Overwrite hparams by args
+    args_copy = {}
     for flag in vars(args):
         value = getattr(args, flag)
         if value is not None:
-            setattr(hparams, flag, value)      
+            setattr(hparams, flag, value)
+            args_copy[flag] = value   
 
     set_path()
 
@@ -595,10 +599,11 @@ if __name__ == "__main__":
 
     if hasattr(hparams, 'multi_seed_eval') and hparams.multi_seed_eval:
         hparams.eval_only = 1
-        seeds = [123, 435, 6757, 867, 983]
+        # seeds = [123, 435, 6757, 867, 983]
+        seeds = [123, 435]
         metrics = defaultdict(lambda: defaultdict(list))
         for seed in seeds:
-            this_metrics = train_val(device, seed=seed)
+            this_metrics = train_val(device, args_copy, seed=seed)
             for metric in this_metrics:
                 for k, v in this_metrics[metric].items():
                     if 'rate' in metric:
@@ -609,7 +614,7 @@ if __name__ == "__main__":
                 print('%s %s: %.2f %.2f' % (metric, k, np.average(v), stats.sem(v) * 1.95))
     else:
         # Train
-        train_val(device)
+        train_val(device, args_copy)
 
 
 # TURN OFF WHEN NOT USING VS code debugger------------------------------------------------------------------------------
@@ -648,10 +653,12 @@ def vs_code_debug(args_temp):
 
     if hasattr(hparams, 'multi_seed_eval') and hparams.multi_seed_eval:
         hparams.eval_only = 1
-        seeds = [123, 435, 6757, 867, 983]
+        # seeds = [123, 435, 6757, 867, 983]
+        seeds = [123, 435]
         metrics = defaultdict(lambda: defaultdict(list))
         for seed in seeds:
-            this_metrics = train_val(seed=seed)
+            print ("EVAL SEED {}".format(seed))
+            this_metrics = train_val(device, args_temp, seed=seed)
             for metric in this_metrics:
                 for k, v in this_metrics[metric].items():
                     if 'rate' in metric:
@@ -662,5 +669,5 @@ def vs_code_debug(args_temp):
                 print('%s %s: %.2f %.2f' % (metric, k, np.average(v), stats.sem(v) * 1.95))
     else:
         # Train
-        train_val(device)
+        train_val(device, args_temp)
 # ------------------------------------------------------------------------------
