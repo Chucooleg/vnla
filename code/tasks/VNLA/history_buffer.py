@@ -173,8 +173,27 @@ class HistoryBuffer(object):
 
         self._curr_buffer_size += batch_size
 
-    def sample_minibatch(self, batch_size):
+    def _make_sampling_weights(self, key, t_len, samp_bias):
+        '''
+        Generate sampling weights from the ground truth distance-to-go for each data point that is indexed by (instr_id, global_iter_idx)
+
+        key : tuple. (experience['instr_id'], experience['global_iter_idx'])
+        t_len : trajectory length of the example self._indexed_data[key]
+        samp_bias : float between 1.0 and 0.0. Sampling bias
+
+        Return:
+            weights : np.array shape(t_len, )
+        '''
+        q_ground_truths = np.array([torch.min(self._indexed_data[key]['q_values_target'][t]).data.item() for t in range(1, t_len)])
+        q_ground_truths = q_ground_truths / np.max(q_ground_truths)  # normalize
+        weights = np.abs(samp_bias - q_ground_truths)
+        return weights
+
+    def sample_minibatch(self, batch_size, samp_bias, sort_by_gt=False):
         '''Sample a training batch for training'''
+
+        if sort_by_gt:
+            assert samp_bias is not None and samp_bias >= 0.0
 
         assert self._curr_buffer_size >= batch_size, \
             '''Buffer doesn't have enough history to sample a batch'''
@@ -182,13 +201,10 @@ class HistoryBuffer(object):
         # Sample (global_idx, instr_id) key pairs
         # shape (number of unique key pairs, 2)
         instr_key_pairs_list = sorted(list(self._instr_iter_keys))
+
         # shape (batch_size, 2)
         sampling_indices = np.random.randint(len(instr_key_pairs_list), size=batch_size)
         sampled_iter_instr_key_pair = [instr_key_pairs_list[idx] for idx in sampling_indices]
-
-        # Debug
-        # print ('training sampled training keys length', len(sampling_indices))
-        # print ('training sampled instr_key_pairs_list', sorted(sampling_indices))
 
         # Further sample the time step
         traj_lens = [len(self._indexed_data[key]['action']) for key in sampled_iter_instr_key_pair]
@@ -199,7 +215,10 @@ class HistoryBuffer(object):
 
         # Sample timesteps
         # do not sample from t=0 at <start> state
-        sampled_timesteps = [np.random.randint(low=1, high=t_len) for t_len in traj_lens]
+        if sort_by_gt:
+            sampled_timesteps = [np.random.choice(a=np.arange(1, t_len), size=1, p=self._make_sampling_weights(key, t_len, samp_bias))  for key, t_len in zip(sampled_iter_instr_key_pair, traj_lens)]
+        else:
+            sampled_timesteps = [np.random.randint(low=1, high=t_len) for t_len in traj_lens]
 
         # # Vectorized way to choose nearly random timesteps with upperbounds
         # random_ints = np.random.randint(1000000000, size=len(traj_lens))

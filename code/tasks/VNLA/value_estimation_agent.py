@@ -86,6 +86,9 @@ class ValueEstimationAgent(NavigationAgent):
         # Compute losses if not eval (i.e. training)
         self.is_eval = False
 
+        # 1/0. Whether to sort training data by ground truth distance-to-go
+        self.sort_by_groud_truth = hparams.sort_by_groud_truth
+
     def normalize_loss_with_mask(self, batch_size, q_values_estimate_heads, q_values_target):
 
         assert q_values_estimate_heads.shape == (batch_size, self.num_viewIndex, self.n_ensemble)
@@ -366,6 +369,9 @@ class ValueEstimationAgent(NavigationAgent):
 
         # Check expert roll-in prob
         assert self.beta >= 0.0 # always >= 0.0 in exponential decay
+        # Check sampling bias
+        if self.sort_by_groud_truth:
+            assert self.samp_bias >= 0.0 # always >= 0.0 in exponential decay
 
         # time report
         time_report = defaultdict(int)
@@ -398,7 +404,7 @@ class ValueEstimationAgent(NavigationAgent):
                 
                 # Sample a minibatch from the history buffer
                 start_time = time.time()
-                sampled_training_batch = self.history_buffer.sample_minibatch(self.tr_batch_size)
+                sampled_training_batch = self.history_buffer.sample_minibatch(self.tr_batch_size, self.samp_bias, self.sort_by_groud_truth)
                 time_report['sample_minibatch'] += time.time() - start_time
 
                 # Make predictions on training batch
@@ -434,6 +440,11 @@ class ValueEstimationAgent(NavigationAgent):
             if global_iter_idx >= self.start_beta_decay and global_iter_idx % self.decay_beta_every == 0:
                 self.beta *= self.beta_decay_rate
                 print('New expert roll-in probability %f' % self.beta)
+
+            # Decay sampling bias
+            if hparams.sort_by_groud_truth and global_iter_idx >= self.start_samp_bias_decay and global_iter_idx % self.decay_samp_bias_every == 0:
+                self.samp_bias *= self.samp_bias_decay_rate
+                print('New expert sampling bias %f' % self.samp_bias)
 
         time_report['per_training_interval'] += time.time() - interval_training_iter_start_time
         return last_traj, time_report

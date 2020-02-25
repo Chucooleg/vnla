@@ -8,6 +8,7 @@
     "img_features"          : "img_features/ResNet-152-imagenet.tsv",
     "data_suffix"           : "",
     "eval_data_suffix"      : "",
+    "sort_by_groud_truth"   : 0,
 
 
     "interaction_mode"      : "none_agent",

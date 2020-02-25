@@ -22,6 +22,8 @@ def make_parser():
         help='name of the custom data for training e.g. ask_nav_train_[data_suffix].json')  
     parser.add_argument('-eval_data_suffix', type=str,
         help='name of the custom data for validation/eval e.g. ask_nav_val_[data_suffix].json')  
+    parser.add_argument('-sort_by_groud_truth', type=str,
+        help='1/0. Whether to sort training data by ground truth distance-to-go')  
 
     # Vocab (not in master config)
     parser.add_argument('-external_main_vocab', type=str,

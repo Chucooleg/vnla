@@ -71,7 +71,7 @@ def set_path():
     # Set time report path
     hparams.time_report_path = os.path.join(hparams.exp_dir, "time_report.txt")
 
-def save(path, model, optimizer, iter, best_metrics, train_env, history_buffer, beta):
+def save(path, model, optimizer, iter, best_metrics, train_env, history_buffer, beta, samp_bias):
     '''save model checkpt'''
 
     ckpt = {
@@ -83,7 +83,8 @@ def save(path, model, optimizer, iter, best_metrics, train_env, history_buffer, 
             'data_idx'        : train_env.ix,
             'vocab'           : train_env.tokenizer.vocab,
             'history_buffer'  : history_buffer,
-            'beta'            : beta
+            'beta'            : beta,
+            'samp_bias'       : samp_bias,
         }
     torch.save(ckpt, path)
 
@@ -209,6 +210,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                 idx=idx,
                 explore_env=explore_env)
             SW.add_scalar('expert rollin - beta', agent.beta, iter)
+            SW.add_scalar('expert rollin - sampling bias', agent.samp_bias, iter)
 
             # Report time for rollout and backprop
             with open(hparams.time_report_path, "a") as f:
@@ -366,7 +368,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             for env_name in should_save_ckpt:
                 save_path = os.path.join(hparams.exp_dir,
                     '%s_%s.ckpt' % (hparams.model_prefix, env_name))
-                save(save_path, model, optimizer, iter, best_metrics, train_env, agent.history_buffer, agent.beta)
+                save(save_path, model, optimizer, iter, best_metrics, train_env, agent.history_buffer, agent.beta, agent.samp_bias)
                 print("Saved %s model to %s" % (env_name, save_path))
 
             # log time again after saving
@@ -528,6 +530,7 @@ def train_val(device, args_copy, seed=None):
         explore_env = None
         agent.history_buffer = None
         agent.beta = None
+        agent.samp_bias = None
 
     elif hparams.navigation_objective == 'value_estimation':
 
@@ -562,11 +565,13 @@ def train_val(device, args_copy, seed=None):
         else:
             agent.history_buffer = HistoryBuffer(hparams)
 
-        # Initialize / Load expert rollin probability beta for agent
+        # Initialize / Load expert rollin probability beta and sampling bias for agent
         if ckpt is not None:
             agent.beta = ckpt['beta']
+            agent.samp_bias = ckpt['samp_bias']
         else:
             agent.beta = float(hparams.start_beta) if hasattr(hparams, "start_beta") else 1.0
+            agent.samp_bias = float(hparams.start_samp_bias) if hasattr(hparams, "sort_by_groud_truth") else None
 
     else:
         raise ValueError('agent definition is not clear. check navigation_objective')

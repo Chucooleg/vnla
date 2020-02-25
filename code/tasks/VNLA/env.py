@@ -714,11 +714,8 @@ class VNLABatch():
             print('VNLABatch loaded with %d instructions, using split: %s' % (
                 len(self.data), self.split))
 
-    def _next_minibatch(self):
+    def _next_minibatch_2(self):
         '''put the next batch of data into self.batch from self.data'''
-
-        # TODO REDO there's no such thing as an epoch!
-
         if self.ix == 0:
             # normaliza trajectory lengths
             # then sample with abs(1 - t), abs(0.98 - t), ... abs(0.1 - t)
@@ -729,42 +726,41 @@ class VNLABatch():
             remaining_ix = np.nonzero(self.sample_probs)[0]
             self.sample_probs = np.abs(self.samp_bias - (np.array(self.traj_len_estimates_flat) / np.max(self.traj_len_estimates_flat)))
             self.sample_probs[remaining_ix] = 0
-            new = np.random.choice(a=len(self.data), size=self.batch_size - len(remaining_ix), p=self.sample_probs)
+            new = np.random.choice(a=len(self.data), size=self.batch_size - len(remaining_ix), p=self.sample_probs, replace=False)
             self.sampled_ix = np.hstack((remaining, new))
             assert self.sampled_ix.shape = (self.batch_size, )
         else:
-            self.sampled_ix = np.random.choice(a=len(self.data), size=self.batch_size, p=self.sample_probs)
+            self.sampled_ix = np.random.choice(a=len(self.data), size=self.batch_size, p=self.sample_probs, replace=False)
             self.sample_probs[self.sampled_ix] = 0
 
         self.ix += self.batch_size
         self.ix = self.ix % len(self.data)
-        self.batch = self.data[self.sampled_ix]
+        self.batch = self.data[self.sampled_ix] 
 
-    # def _next_minibatch(self):
-
-    #     '''put the next batch of data into self.batch from self.data'''
-    #     if self.ix == 0:
-    #         self.random.shuffle(self.data)
-    #     batch = self.data[self.ix:self.ix+self.batch_size]
-    #     # if the batch runs out of data pt
-    #     if len(batch) < self.batch_size:
-    #         # full dataset - batch
-    #         remaining_data = self.data[:self.ix]
-    #         # new ix
-    #         self.ix = self.batch_size - len(batch)
-    #         # sample from remaining data
-    #         self.random.shuffle(remaining_data)
-    #         batch_add = remaining_data[:self.ix]
-    #         # shuffle existing batch as well
-    #         self.random.shuffle(batch)
-    #         # update full dataset
-    #         self.data = remaining_data + batch
-    #         # batch for training
-    #         batch = batch + batch_add
-    #         assert len(batch) == self.batch_size
-    #     else:
-    #         self.ix += self.batch_size
-    #     self.batch = batch
+    def _next_minibatch(self):
+        '''put the next batch of data into self.batch from self.data'''
+        if self.ix == 0:
+            self.random.shuffle(self.data)
+        batch = self.data[self.ix:self.ix+self.batch_size]
+        # if the batch runs out of data pt
+        if len(batch) < self.batch_size:
+            # full dataset - batch
+            remaining_data = self.data[:self.ix]
+            # new ix
+            self.ix = self.batch_size - len(batch)
+            # sample from remaining data
+            self.random.shuffle(remaining_data)
+            batch_add = remaining_data[:self.ix]
+            # shuffle existing batch as well
+            self.random.shuffle(batch)
+            # update full dataset
+            self.data = remaining_data + batch
+            # batch for training
+            batch = batch + batch_add
+            assert len(batch) == self.batch_size
+        else:
+            self.ix += self.batch_size
+        self.batch = batch
 
     def reset_epoch(self):
         '''start a new epoch. 
