@@ -7,3 +7,8 @@ verbal_hard_original.json
 build/
 **/build_py35
 **/build_py36
+tasks/VNLA/notebook/
+tasks/VNLA/notebook/*
+tasks/VNLA/output/
+tasks/VNLA/philly_yaml_archive/
+
