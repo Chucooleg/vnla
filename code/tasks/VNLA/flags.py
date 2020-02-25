@@ -124,8 +124,8 @@ def make_parser():
         help='DATA_DIR/<path> that points to a text file with room types. ')
 
    # data suffix
-   parser.add_argument('-data_suffix', type=int,
-        help='data suffix on (1) or off (0)')  
+   parser.add_argument('-data_suffix', type=str,
+        help='data suffix')  
 
    # tensorboard
    parser.add_argument('-plot_to_philly', type=int,
