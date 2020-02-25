@@ -707,7 +707,7 @@ class VNLABatch():
                 new_item['instruction'] = instr
                 self.data.append(new_item)
 
-        assert len(self.data) == len(traj_len_estimates_flat)
+        assert len(self.data) == len(self.traj_len_estimates_flat)
         self.reset_epoch()
 
         if self.split is not None:
@@ -716,12 +716,18 @@ class VNLABatch():
 
     def _next_minibatch(self):
         '''put the next batch of data into self.batch from self.data'''
+
+        # TODO REDO there's no such thing as an epoch!
+
         if self.ix == 0:
-            self.sample_probs = np.ones(len(self.data))
+            # normaliza trajectory lengths
+            # then sample with abs(1 - t), abs(0.98 - t), ... abs(0.1 - t)
+            # favor shorter tasks in the beginning
+            self.sample_probs = np.abs(self.samp_bias - (np.array(self.traj_len_estimates_flat) / np.max(self.traj_len_estimates_flat)))
 
         if np.sum(self.sample_probs) < self.batch_size:
             remaining_ix = np.nonzero(self.sample_probs)[0]
-            self.sample_probs = np.ones(len(self.data))
+            self.sample_probs = np.abs(self.samp_bias - (np.array(self.traj_len_estimates_flat) / np.max(self.traj_len_estimates_flat)))
             self.sample_probs[remaining_ix] = 0
             new = np.random.choice(a=len(self.data), size=self.batch_size - len(remaining_ix), p=self.sample_probs)
             self.sampled_ix = np.hstack((remaining, new))
@@ -730,6 +736,8 @@ class VNLABatch():
             self.sampled_ix = np.random.choice(a=len(self.data), size=self.batch_size, p=self.sample_probs)
             self.sample_probs[self.sampled_ix] = 0
 
+        self.ix += self.batch_size
+        self.ix = self.ix % len(self.data)
         self.batch = self.data[self.sampled_ix]
 
     # def _next_minibatch(self):
