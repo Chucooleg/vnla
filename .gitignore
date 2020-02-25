@@ -25,3 +25,4 @@ memory_sim_track.py
 *_archive.sh
 .ptconfig
 mtrand.pyx
+.ipynb_checkpoints
