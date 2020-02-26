@@ -5,7 +5,7 @@ target:
   # which virtual cluster you belong to (msrlabs, etc.). Everyone has access to "msrlabs".
   vc: msrlabs
   # physical cluster to use (cam, gcr, rr1, rr2) or Azure clusters (eu1, eu2, etc.)
-  cluster: eu2
+  cluster: eu1
 
 environment:
   image: philly/jobs/test/pytorch:pytorch1.2.0-py36-mattersim
@@ -46,6 +46,12 @@ code:
 # list of jobs to run, we run 2 jobs in this example
 jobs:
   # name must be unique across the jobs
+- name: debug
+  sku: G1
+  command:
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_5775" "debug" "configs/experiment.json" -data_suffix small_ten_goals_anylength -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.5 -batch_size 100 -train_batch_size 100 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 10000 -log_every 1000 -plot_to_philly 0 -seed 42
+
+
 - name: data_5775_heads_2_0.5_batch_size_100_train_batch_size_100
   sku: G1
   command:
