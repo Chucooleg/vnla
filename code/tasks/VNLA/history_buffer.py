@@ -5,6 +5,7 @@ import pickle
 from collections import defaultdict
 import numpy as np
 import os
+import torch
 
 
 def nested_defaultdict():
@@ -185,8 +186,8 @@ class HistoryBuffer(object):
             weights : np.array shape(t_len, )
         '''
         q_ground_truths = np.array([torch.min(self._indexed_data[key]['q_values_target'][t]).data.item() for t in range(1, t_len)])
-        q_ground_truths = q_ground_truths / np.max(q_ground_truths)  # normalize
-        weights = np.abs(samp_bias - q_ground_truths)
+        q_ground_truths /= np.sum(q_ground_truths)  # normalize tp between 0 and 1
+        weights = np.abs(samp_bias - q_ground_truths) / np.sum(np.abs(samp_bias - q_ground_truths))
         return weights
 
     def sample_minibatch(self, batch_size, samp_bias, sort_by_gt=False):
@@ -216,7 +217,7 @@ class HistoryBuffer(object):
         # Sample timesteps
         # do not sample from t=0 at <start> state
         if sort_by_gt:
-            sampled_timesteps = [np.random.choice(a=np.arange(1, t_len), size=1, p=self._make_sampling_weights(key, t_len, samp_bias))  for key, t_len in zip(sampled_iter_instr_key_pair, traj_lens)]
+            sampled_timesteps = [np.random.choice(a=np.arange(1, t_len), p=self._make_sampling_weights(key, t_len, samp_bias))  for key, t_len in zip(sampled_iter_instr_key_pair, traj_lens)]
         else:
             sampled_timesteps = [np.random.randint(low=1, high=t_len) for t_len in traj_lens]
 

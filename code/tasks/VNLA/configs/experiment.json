@@ -8,7 +8,6 @@
     "img_features"          : "img_features/ResNet-152-imagenet.tsv",
     "data_suffix"           : "",
     "eval_data_suffix"      : "",
-    "sort_by_groud_truth"   : 0,
 
 
     "interaction_mode"      : "none_agent",
@@ -42,6 +41,13 @@
     "decay_beta_every"      : 1000,
     "min_history_to_learn"  : 5000,
     "num_recent_frames"     : 4,
+
+
+    "sort_by_ground_truth"   : 0,
+    "start_samp_bias"       : 1.0,
+    "start_samp_bias_decay" : 5000,
+    "samp_bias_decay_rate"  : 0.9,
+    "decay_samp_bias_every" : 1000,
 
 
     "max_buffer_size"       : 100000,

@@ -22,8 +22,6 @@ def make_parser():
         help='name of the custom data for training e.g. ask_nav_train_[data_suffix].json')  
     parser.add_argument('-eval_data_suffix', type=str,
         help='name of the custom data for validation/eval e.g. ask_nav_val_[data_suffix].json')  
-    parser.add_argument('-sort_by_groud_truth', type=str,
-        help='1/0. Whether to sort training data by ground truth distance-to-go')  
 
     # Vocab (not in master config)
     parser.add_argument('-external_main_vocab', type=str,
@@ -99,6 +97,18 @@ def make_parser():
         help='aggrevate: minimum history buffer size before training can start')
     parser.add_argument('-num_recent_frames', type=int,
         help='aggrevate: number of steps in recent history for LSTM unfold through, before predicting q-values for current time steps')      
+
+    # Sort by groundtruth parameters
+    parser.add_argument('-sort_by_ground_truth', type=str,
+        help='1/0. Whether to sort training data by ground truth distance-to-go') 
+    parser.add_argument('-start_samp_bias', type=float,
+        help='sampling bias to start with, between 0.0 and 1.0')
+    parser.add_argument('-start_samp_bias_decay', type=int,
+        help='minimum number of iterations before sampling bias decay')
+    parser.add_argument('-samp_bias_decay_rate', type=float,
+        help='exponential decay rate for sampling bias, between 0.0 and 1.0')
+    parser.add_argument('-decay_samp_bias_every', type=int,
+        help='number of iterations between calling decay on sampling bias')
 
     # History buffer parameters
     parser.add_argument('-max_buffer_size', type=int,

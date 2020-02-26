@@ -87,7 +87,10 @@ class ValueEstimationAgent(NavigationAgent):
         self.is_eval = False
 
         # 1/0. Whether to sort training data by ground truth distance-to-go
-        self.sort_by_groud_truth = hparams.sort_by_groud_truth
+        self.sort_by_ground_truth = hparams.sort_by_ground_truth
+        self.start_samp_bias_decay = hparams.start_samp_bias_decay
+        self.decay_samp_bias_every = hparams.decay_samp_bias_every
+        self.samp_bias_decay_rate = hparams.samp_bias_decay_rate
 
     def normalize_loss_with_mask(self, batch_size, q_values_estimate_heads, q_values_target):
 
@@ -370,7 +373,7 @@ class ValueEstimationAgent(NavigationAgent):
         # Check expert roll-in prob
         assert self.beta >= 0.0 # always >= 0.0 in exponential decay
         # Check sampling bias
-        if self.sort_by_groud_truth:
+        if self.sort_by_ground_truth:
             assert self.samp_bias >= 0.0 # always >= 0.0 in exponential decay
 
         # time report
@@ -404,7 +407,7 @@ class ValueEstimationAgent(NavigationAgent):
                 
                 # Sample a minibatch from the history buffer
                 start_time = time.time()
-                sampled_training_batch = self.history_buffer.sample_minibatch(self.tr_batch_size, self.samp_bias, self.sort_by_groud_truth)
+                sampled_training_batch = self.history_buffer.sample_minibatch(self.tr_batch_size, self.samp_bias, self.sort_by_ground_truth)
                 time_report['sample_minibatch'] += time.time() - start_time
 
                 # Make predictions on training batch
@@ -442,7 +445,7 @@ class ValueEstimationAgent(NavigationAgent):
                 print('New expert roll-in probability %f' % self.beta)
 
             # Decay sampling bias
-            if hparams.sort_by_groud_truth and global_iter_idx >= self.start_samp_bias_decay and global_iter_idx % self.decay_samp_bias_every == 0:
+            if self.sort_by_ground_truth and global_iter_idx >= self.start_samp_bias_decay and global_iter_idx % self.decay_samp_bias_every == 0:
                 self.samp_bias *= self.samp_bias_decay_rate
                 print('New expert sampling bias %f' % self.samp_bias)
 

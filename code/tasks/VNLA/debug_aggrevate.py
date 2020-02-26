@@ -3,8 +3,8 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "2020223_debug_aggrevate_bootstrap"
-job_name = "bootstrap_5"
+exp_name = "2020225_debug_aggrevate_sampling_bias"
+job_name = "sampling_bias_1"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh
@@ -58,5 +58,12 @@ args['bootstrap'] = 1
 args['n_ensemble'] = 2
 args['bernoulli_probability'] = 0.9
 args['norm_loss_by_dist'] = 1
+
+args['sort_by_ground_truth'] = 1
+args['start_samp_bias'] = 1.0 # 1.0
+args['samp_bias_decay_rate'] = 0.98
+args['start_samp_bias_decay'] = 2
+args['decay_samp_bias_every'] = 2
+args['min_history_to_learn'] = 1000
 
 vs_code_debug(args)

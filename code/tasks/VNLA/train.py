@@ -571,7 +571,7 @@ def train_val(device, args_copy, seed=None):
             agent.samp_bias = ckpt['samp_bias']
         else:
             agent.beta = float(hparams.start_beta) if hasattr(hparams, "start_beta") else 1.0
-            agent.samp_bias = float(hparams.start_samp_bias) if hasattr(hparams, "sort_by_groud_truth") else None
+            agent.samp_bias = float(hparams.start_samp_bias) if hasattr(hparams, "sort_by_ground_truth") else None
 
     else:
         raise ValueError('agent definition is not clear. check navigation_objective')
