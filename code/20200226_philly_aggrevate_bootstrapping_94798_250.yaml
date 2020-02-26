@@ -1,4 +1,4 @@
-description: VNLA aggrevate experiments bootstrap 94798 250
+description: VNLA aggrevate experiments bootstrap 94798 250 RERUN
 # experiment named vnla_time_comparisons
 
 target:
@@ -46,235 +46,235 @@ code:
 # list of jobs to run, we run 2 jobs in this example
 jobs:
   # name must be unique across the jobs
-- name: data_94798_heads_2_0.5_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_heads_2_0.5_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_2_0.5_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_2_0.5_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_2_0.9_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_heads_2_0.9_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_2_0.9_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_2_0.9_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_2_1.0_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_heads_2_1.0_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_2_1.0_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_2_1.0_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_4_0.5_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_heads_4_0.5_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_4_0.5_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_4_0.5_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_4_0.9_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_heads_4_0.9_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_4_0.9_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_4_0.9_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_4_1.0_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_heads_4_1.0_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_4_1.0_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_4_1.0_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_8_0.5_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_heads_8_0.5_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_8_0.5_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_8_0.5_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_8_0.9_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_heads_8_0.9_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_8_0.9_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_8_0.9_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_8_1.0_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_heads_8_1.0_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_8_1.0_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_8_1.0_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_10_0.5_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_heads_10_0.5_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_10_0.5_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_10_0.5_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_10_0.9_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_heads_10_0.9_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_10_0.9_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_10_0.9_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_10_1.0_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_heads_10_1.0_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_10_1.0_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_10_1.0_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_2_0.5_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_heads_2_0.5_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_2_0.5_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_2_0.5_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_2_0.9_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_heads_2_0.9_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_2_0.9_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_2_0.9_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_2_1.0_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_heads_2_1.0_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_2_1.0_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_2_1.0_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_4_0.5_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_heads_4_0.5_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_4_0.5_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_4_0.5_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_4_0.9_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_heads_4_0.9_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_4_0.9_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_4_0.9_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_4_1.0_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_heads_4_1.0_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_4_1.0_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_4_1.0_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_8_0.5_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_heads_8_0.5_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_8_0.5_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_8_0.5_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_8_0.9_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_heads_8_0.9_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_8_0.9_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_8_0.9_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_8_1.0_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_heads_8_1.0_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_8_1.0_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_8_1.0_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_10_0.5_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_heads_10_0.5_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_10_0.5_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_10_0.5_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_10_0.9_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_heads_10_0.9_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_10_0.9_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_10_0.9_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_10_1.0_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_heads_10_1.0_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_10_1.0_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_10_1.0_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_2_0.5_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_heads_2_0.5_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_2_0.5_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_2_0.5_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_2_0.9_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_heads_2_0.9_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_2_0.9_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_2_0.9_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_2_1.0_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_heads_2_1.0_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_2_1.0_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_2_1.0_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 2 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_4_0.5_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_heads_4_0.5_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_4_0.5_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_4_0.5_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_4_0.9_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_heads_4_0.9_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_4_0.9_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_4_0.9_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_4_1.0_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_heads_4_1.0_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_4_1.0_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_4_1.0_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 4 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_8_0.5_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_heads_8_0.5_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_8_0.5_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_8_0.5_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_8_0.9_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_heads_8_0.9_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_8_0.9_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_8_0.9_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_8_1.0_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_heads_8_1.0_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_8_1.0_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_8_1.0_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 8 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_10_0.5_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_heads_10_0.5_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_10_0.5_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_10_0.5_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.5 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_10_0.9_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_heads_10_0.9_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_10_0.9_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_10_0.9_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 0.9 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_heads_10_1.0_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_heads_10_1.0_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_heads_10_1.0_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_heads_10_1.0_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 1 -n_ensemble 10 -bernoulli_probability 1.0 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_nobootstrap_batch_size_250_train_batch_size_256
+- name: rerun_data_94798_nobootstrap_batch_size_250_train_batch_size_256
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_nobootstrap_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 0 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_nobootstrap_batch_size_250_train_batch_size_256" "configs/experiment.json" -data_suffix original -bootstrap 0 -batch_size 250 -train_batch_size 256 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_nobootstrap_batch_size_250_train_batch_size_512
+- name: rerun_data_94798_nobootstrap_batch_size_250_train_batch_size_512
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_nobootstrap_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 0 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_nobootstrap_batch_size_250_train_batch_size_512" "configs/experiment.json" -data_suffix original -bootstrap 0 -batch_size 250 -train_batch_size 512 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
 
 
-- name: data_94798_nobootstrap_batch_size_250_train_batch_size_1024
+- name: rerun_data_94798_nobootstrap_batch_size_250_train_batch_size_1024
   sku: G1
   command:
-  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "data_94798_nobootstrap_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 0 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42
+  - cd tasks/VNLA/scripts/ && bash train_experiments.sh "20200226_philly_aggrevate_bootstrapping_94798_250" "rerun_data_94798_nobootstrap_batch_size_250_train_batch_size_1024" "configs/experiment.json" -data_suffix original -bootstrap 0 -batch_size 250 -train_batch_size 1024 -loss_function l2 -lr 0.0001 -beta_decay_rate 0.8 -min_history_to_learn 5000 -save_every 5000 -log_every 5000 -plot_to_philly 0 -seed 42

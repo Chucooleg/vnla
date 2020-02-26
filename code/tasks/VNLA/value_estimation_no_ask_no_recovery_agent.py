@@ -267,18 +267,19 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         q_values_target = self.get_tr_variable_by_t(tr_key_pairs, tr_timesteps, 'q_values_target')
 
         # -----------------------------------------------------------------
-        # Compute mean and variance among heads for every task and every view angle
-        # shape (batch_size, 36)
-        q_values_tr_estimate_variance, _ = torch.var_mean(q_values_tr_estimate_heads, dim=2)
-        assert q_values_tr_estimate_variance.shape == (batch_size, self.num_viewIndex)
+        if self.bootstrap:
+            # Compute mean and variance among heads for every task and every view angle
+            # shape (batch_size, 36)
+            q_values_tr_estimate_variance, _ = torch.var_mean(q_values_tr_estimate_heads, dim=2)
+            assert q_values_tr_estimate_variance.shape == (batch_size, self.num_viewIndex)
 
-        # Estimate uncertainty
-        # shape (batch_size,)
-        q_values_tr_uncertainty = torch.empty(batch_size, dtype=torch.float, device=self.device)
-        for i in range(batch_size):
-            no_mask_idx = torch.nonzero(q_values_target[i] != 1e9).squeeze(-1)
-            assert len(no_mask_idx.shape) == 1 and no_mask_idx.shape[0] <= self.num_viewIndex
-            q_values_tr_uncertainty[i] = torch.mean(q_values_tr_estimate_variance[i][no_mask_idx])
+            # Estimate uncertainty
+            # shape (batch_size,)
+            q_values_tr_uncertainty = torch.empty(batch_size, dtype=torch.float, device=self.device)
+            for i in range(batch_size):
+                no_mask_idx = torch.nonzero(q_values_target[i] != 1e9).squeeze(-1)
+                assert len(no_mask_idx.shape) == 1 and no_mask_idx.shape[0] <= self.num_viewIndex
+                q_values_tr_uncertainty[i] = torch.mean(q_values_tr_estimate_variance[i][no_mask_idx])
         # -----------------------------------------------------------------
         # Compute q-value loss
         start_time = time.time()
