@@ -86,6 +86,14 @@ class ValueEstimationAgent(NavigationAgent):
         # Compute losses if not eval (i.e. training)
         self.is_eval = False
 
+    def normalize_uncertainty(self, batch_size, q_values_rollout_uncertainty):
+        '''
+        # batch_size : scalar
+        # q_values_rollout_uncertainty shape (batch_size,). with nan values in it because some ob(s) have ended.
+        '''
+        valid_indices = torch.nonzero(~torch.isnan(q_values_rollout_uncertainty)).squeeze()
+        return torch.mean(q_values_rollout_uncertainty[valid_indices])
+
     def normalize_loss_with_mask(self, batch_size, q_values_estimate_heads, q_values_target):
 
         assert q_values_estimate_heads.shape == (batch_size, self.num_viewIndex, self.n_ensemble)

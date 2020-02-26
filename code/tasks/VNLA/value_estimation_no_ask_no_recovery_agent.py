@@ -76,6 +76,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         self.losses = [] # to accumulate more all types of losses (nav, ask, value,...)
         self.loss_types = ['value_losses']
         self.value_losses = []
+        self.uncertainties = []
 
     def _populate_agent_state_to_obs(self, obs, ended):
         """modify obs in-place (but env is not modified)
@@ -99,6 +100,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         iter_value_loss_avg = self.value_loss.item() / traj_len
         self.value_losses.append(iter_value_loss_avg)
 
+        iter_uncertainty_avg = self.uncertainty.item() / traj_len
+        self.uncertainties.append(iter_uncertainty_avg)
+
     def _compute_loss_rollout(self, global_iter_idx=None, traj_len=1.0):
         '''computed once at the end of every sampled mini-batch from history buffer'''
 
@@ -113,6 +117,9 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         iter_value_loss_avg = self.rollout_value_loss.item() / traj_len
         self.value_losses.append(iter_value_loss_avg)
+
+        iter_uncertainty_avg = self.rollout_uncertainty.item() / traj_len
+        self.uncertainties.append(iter_uncertainty_avg)
 
     def pred_training_batch(self, training_batch, global_iter_idx, output_res=False):
         '''
@@ -255,15 +262,31 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
         time_report['decode_training_batch_frontier'] += time.time() - start_time
         # -----------------------------------------------------------------
-        # Compute q-value loss
-        start_time = time.time()
         # Get q_values_target from history buffer
         # tensor shape (batch_size, self.num_viewIndex)
         q_values_target = self.get_tr_variable_by_t(tr_key_pairs, tr_timesteps, 'q_values_target')
+
+        # -----------------------------------------------------------------
+        # Compute mean and variance among heads for every task and every view angle
+        # shape (batch_size, 36)
+        q_values_tr_estimate_variance, _ = torch.var_mean(q_values_tr_estimate_heads, dim=2)
+        assert q_values_tr_estimate_variance.shape == (batch_size, self.num_viewIndex)
+
+        # Estimate uncertainty
+        # shape (batch_size,)
+        q_values_tr_uncertainty = torch.empty(batch_size, dtype=torch.float, device=self.device)
+        for i in range(batch_size):
+            no_mask_idx = torch.nonzero(q_values_target[i] != 1e9).squeeze(-1)
+            assert len(no_mask_idx.shape) == 1 and no_mask_idx.shape[0] <= self.num_viewIndex
+            q_values_tr_uncertainty[i] = torch.mean(q_values_tr_estimate_variance[i][no_mask_idx])
+        # -----------------------------------------------------------------
+        # Compute q-value loss
+        start_time = time.time()
         # Compute scalar loss
         if self.bootstrap:
             self.value_loss = self.normalize_loss_with_mask( 
                 batch_size, q_values_tr_estimate_heads, q_values_target)
+            self.uncertainty = self.normalize_uncertainty(batch_size, q_values_tr_uncertainty)
         else:
             self.value_loss = self.normalize_loss( 
                 batch_size, q_values_tr_estimate, q_values_target, ref=False)
@@ -288,7 +311,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 training_batch_results[i]['agent_values_estimate'] = agent_tr_estimate_list[i]
             time_report['save_training_batch_results'] += time.time() - start_time
 
-        print ("finished training from history buffer. self.value_loss = {}".format(self.value_loss))
+        print ("finished training from history buffer. self.value_loss = {}, self.uncertainty={}".format(self.value_loss, self.uncertainty))
 
         # total time report
         time_report['total_training_batch_time'] += time.time() - pred_start_time
@@ -411,7 +434,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         # Initialize nav loss to be accumulated across batch
         if compute_rollout_loss:
             self.rollout_value_loss = 0
-            self.rollout_value_ref_loss = 0    
+            self.rollout_value_ref_loss = 0
+            self.rollout_uncertainty = 0 
 
         # Initialize rotation actions for env (i.e. batch of simulators)
         # each element is a list of max_macro_action_seq_len tuples
@@ -672,7 +696,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     for i in range(batch_size):
                         no_mask_idx = torch.nonzero(q_values_target[i] != 1e9).squeeze(-1)
                         assert len(no_mask_idx.shape) == 1 and no_mask_idx.shape[0] <= self.num_viewIndex
-                        q_values_rollout_uncertainty[i] = torch.var(q_values_rollout_estimate_variance[i][no_mask_idx])
+                        q_values_rollout_uncertainty[i] = torch.mean(q_values_rollout_estimate_variance[i][no_mask_idx])
+
                 else:
                     # Reshape q-value estimates tensor back to 
                     # shape (batch_size, self.num_viewIndex=36)
@@ -714,6 +739,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 # scalar
                 self.rollout_value_loss += self.normalize_loss(batch_size, q_values_rollout_estimate, q_values_target, ref=False)
                 self.rollout_value_ref_loss += self.normalize_loss(batch_size, q_values_rollout_estimate, q_values_target, ref=True)
+                self.rollout_uncertainty += self.normalize_uncertainty(batch_size, q_values_rollout_uncertainty)
+                # torch.mean(q_values_rollout_uncertainty)
                 time_report['compute_rollout_value_loss_with_critierion'] += time.time() - start_time
 
             # Translate chosen macro-rotations to env actions
@@ -873,6 +900,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             print ("{} rollout reference value {} loss = {}".format(
                 'eval' if self.is_eval else 'training', self.loss_function_ref_str,
                 self.rollout_value_ref_loss/timestep))
+            print ("{} rollout uncertainty = {}".format(
+                'eval' if self.is_eval else 'training', self.rollout_uncertainty/timestep))
             # if eval under training conditions to report validation loss
             if self.is_eval:
                 self._compute_loss_rollout(global_iter_idx, traj_len=episode_len*1.0)
