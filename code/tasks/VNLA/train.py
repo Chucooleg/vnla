@@ -7,6 +7,7 @@ from torch import optim
 import torch.nn.functional as F
 
 import os
+import sys
 import time
 import numpy as np
 import pandas as pd
@@ -85,7 +86,12 @@ def save(path, model, optimizer, iter, best_metrics, train_env, history_buffer, 
             'history_buffer'  : history_buffer,
             'beta'            : beta
         }
-    torch.save(ckpt, path)
+    while True:
+        try:
+            torch.save(ckpt, path)
+            break
+        except:
+            pass
 
 def load(path, device, args_copy):
     global hparams
@@ -211,12 +217,17 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             SW.add_scalar('expert rollin - beta', agent.beta, iter)
 
             # Report time for rollout and backprop
-            with open(hparams.time_report_path, "a") as f:
-                f.write("\n\nbatch_size {}, train_batch_size {}\n".format(hparams.batch_size, hparams.train_batch_size))
-                for time_key, time_val in sorted(list(time_report.items()), key=lambda x: x[1], reverse=True):
-                    report_line = "Train {} time = {}".format(time_key, time_val)
-                    f.write(report_line + "\n")
-                    print(report_line)
+            while True:
+                try:
+                    with open(hparams.time_report_path, "a") as f:
+                        f.write("\n\nbatch_size {}, train_batch_size {}\n".format(hparams.batch_size, hparams.train_batch_size))
+                        for time_key, time_val in sorted(list(time_report.items()), key=lambda x: x[1], reverse=True):
+                            report_line = "Train {} time = {}".format(time_key, time_val)
+                            f.write(report_line + "\n")
+                            print(report_line)
+                    break
+                except:
+                    pass
 
             # Report per `interval` agent rollout losses
             # Main training loss -- summed all loss types
