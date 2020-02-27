@@ -4,7 +4,7 @@ from train import vs_code_debug
 
 # from train_experiments.sh
 exp_name = "2020226_aggrevate_sampling_bias"
-job_name = "sampling_bias_1"
+job_name = "sampling_bias_2"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh
@@ -60,7 +60,7 @@ args['n_ensemble'] = 2
 args['bernoulli_probability'] = 0.9
 args['norm_loss_by_dist'] = 1
 
-args['sort_by_ground_truth'] = 1
+args['sort_by_ground_truth'] = 0
 args['start_samp_bias'] = 1.0 # 1.0
 args['samp_bias_decay_rate'] = 0.98
 args['start_samp_bias_decay'] = 1000
