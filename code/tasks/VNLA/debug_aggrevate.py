@@ -4,7 +4,7 @@ from train import vs_code_debug
 
 # from train_experiments.sh
 exp_name = "2020226_debug_aggrevate_bootstrap"
-job_name = "bootstrap_6_l2"
+job_name = "bootstrap_8_l2"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh
@@ -36,8 +36,8 @@ args['batch_size'] = 100
 args['train_batch_size'] = 100
 args['start_beta'] = 1.0 # 1.0
 args['beta_decay_rate'] = 0.80
-args['start_beta_decay'] = 5
-args['decay_beta_every'] = 5
+args['start_beta_decay'] = 2
+args['decay_beta_every'] = 2
 args['min_history_to_learn'] = 500
 args['lr'] = 1e-4
 args['loss_function'] = 'l2'
