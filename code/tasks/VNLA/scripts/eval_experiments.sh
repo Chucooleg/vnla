@@ -25,7 +25,7 @@ mkdir -p $PT_TENSORBOARD_DIR
 # command="python -u -m torch.utils.bottleneck train.py ..."
 # command="python -u -m cProfile -o $PT_EXP_DIR/restats train.py ..."
 # command="python -u -m cProfile -o $PT_EXP_DIR/restats train.py -exp $exp_name -job $job_name -config $config_file $extras"
-command="python -u -m pdb -c continue train.py -exp $exp_name -job $job_name -config $config_file -multi_seed_eval 1 -load_path $load_path -eval_data_suffix $eval_data_suffix"
+command="python -u train.py -exp $exp_name -job $job_name -config $config_file -multi_seed_eval 1 -load_path $load_path -eval_data_suffix $eval_data_suffix"
 
 echo $command
 $command
