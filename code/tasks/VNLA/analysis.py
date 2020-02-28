@@ -1080,3 +1080,39 @@ class PlotUtils(object):
         fig.tight_layout()
         return ax
 
+    @classmethod
+    def dosomething(cls, data, num_bins, action_type):
+        """
+        Arguments:
+            :param data: an OutputData data object.
+            :num_bins: int. how fine we want to split data by entropy.
+            :action_type: string. "nav_final", "nav_initial"
+        """
+        teacher_targets_flattened, agent_argmaxes_flattened, agent_entropies_flattened, timesteps_flattened = cls.flatten_targets_argmaxes_entropies_timesteps(data, action_type=action_type)
+
+        # bin data
+        bin_cuts_by_ent_range = np.linspace(0, np.max(agent_entropies_flattened), num_bins)
+        bin_cuts_by_ranking = np.linspace(0, agent_entropies_flattened.shape[0], num_bins)
+
+        # rank each decision by entropy, ascending
+        # [6502, 3877, 6918, ..., 9141, 1136, 3298]
+        ent_ranked_indices = np.argsort(agent_entropies_flattened)
+        # [0,0,0,1,1,1,2,2,2, ..... ,10, 10, 10]
+
+
+        
+        ent_ranked_indices_bins = np.digitize(ent_ranked_indices, bin_cuts_by_ranking)
+        # [10, 4, 5, 0, 0, 1, 4, 5, .....]
+        ent_bin_assignments = np.empty(agent_entropies_flattened.shape[0], dtype=np.int)
+        for i in range(agent_entropies_flattened.shape[0]):
+            ent_bin_assignments[ent_ranked_indices[i]] = ent_ranked_indices_bins[i]
+
+        # determine correct or incorrect action prediction
+        correct = (teacher_targets_flattened == agent_argmaxes_flattened).astype('float')
+        ranking_bin_average = np.array([np.mean(correct[ent_ranked_indices_bins == i]) for i in range(num_bins)])
+
+
+
+        return ranking_bin_average, correct
+
+
