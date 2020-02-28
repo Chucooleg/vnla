@@ -114,7 +114,6 @@ class ValueEstimationAgent(NavigationAgent):
 
             # Apply mask and Normalize
             # tensor scalar
-            # import pdb; pdb.set_trace()
             value_loss_heads[h] = torch.sum(value_loss_h * bootstrap_mask * not_ended_mask) / torch.sum(bootstrap_mask * not_ended_mask)
 
         return torch.mean(value_loss_heads)

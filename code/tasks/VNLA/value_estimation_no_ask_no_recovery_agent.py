@@ -690,22 +690,21 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # shape (batch_size, 36, n_ensemble)
                     q_values_rollout_estimate_heads = q_values_rollout_estimate_heads.transpose(0,1)
 
-                    # Compute mean and variance among heads for every task and every view angle
+                    # Compute mean and variance across heads
                     # shape (batch_size, 36)
                     q_values_rollout_estimate_variance, q_values_rollout_estimate = torch.var_mean(q_values_rollout_estimate_heads, dim=2)
                     assert q_values_rollout_estimate.shape == (batch_size, self.num_viewIndex)
                     assert q_values_rollout_estimate_variance.shape == (batch_size, self.num_viewIndex)
 
-                    # Estimate uncertainty
+                    # Estimate uncertainty across viewing angles
                     # shape (batch_size,)
                     q_values_rollout_uncertainty = torch.empty(batch_size, dtype=torch.float, device=self.device)
                     for i in range(batch_size):
                         no_mask_idx = torch.nonzero(q_values_target[i] != 1e9).squeeze(-1)
                         assert len(no_mask_idx.shape) == 1 and no_mask_idx.shape[0] <= self.num_viewIndex
                         q_values_rollout_uncertainty[i] = torch.mean(q_values_rollout_estimate_variance[i][no_mask_idx])
-
                 else:
-                    # Reshape q-value estimates tensor back to 
+                    # Reshape q-value estimates tensor back to q_val    
                     # shape (batch_size, self.num_viewIndex=36)
                     # .t() expects 2-D tensor
                     q_values_rollout_estimate = q_values_rollout_estimate.t()

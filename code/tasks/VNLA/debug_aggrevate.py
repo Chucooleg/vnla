@@ -3,8 +3,8 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "2020226_debug_aggrevate_bootstrap"
-job_name = "bootstrap_8_l2"
+exp_name = "2020227_debug_aggrevate_bootstrap"
+job_name = "bootstrap_check_uncertainty_calculation"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh
