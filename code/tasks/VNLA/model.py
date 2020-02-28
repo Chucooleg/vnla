@@ -353,8 +353,19 @@ class RegressorSingleHead(nn.Module):
         super(RegressorSingleHead, self).__init__()
         assert not hparams.bootstrap
         self.device = device
+        self.num_q_predictor_layers = hparams.num_q_predictor_layers
+
+        sequence = []
+        curr_hidden_size = hparams.hidden_size
+        for i in range(self.num_q_predictor_layers - 1):
+            # Intermediate Full-Connected-Layer
+            sequence.append(nn.Linear(curr_hidden_size, int(curr_hidden_size/2)))
+            sequence.append(nn.ReLU())
+            sequence.append(nn.Dropout(p=hparams.dropout_ratio))
+            curr_hidden_size = int(curr_hidden_size/2)
         # Q-value regressor output dim is 1
-        self.q_predictor = nn.Linear(hparams.hidden_size, 1)   
+        sequence.append(nn.Linear(curr_hidden_size, 1))
+        self.q_predictor = nn.Sequential(*tuple(sequence))
 
     def forward(self, new_h, alpha, new_cov, h_tilde, view_index_mask):
         '''run LSTM to decode q-value for a particular view'''    
@@ -362,12 +373,14 @@ class RegressorSingleHead(nn.Module):
         # Predict q-value -- cost
         # tensor shape (batch_size, 1) -> (batch_size,)
         q_value = self.q_predictor(h_tilde).squeeze(-1)
+
+        assert q_value.shape == (h_tilde.shape[0], )
         if view_index_mask is not None:
             # tensor shape (batch_size,)
             q_value.data.masked_fill_(view_index_mask, 1e9)
 
         return new_h, alpha, q_value, new_cov
- 
+
 
 class RegressorMultiHead(nn.Module): 
 
@@ -377,19 +390,38 @@ class RegressorMultiHead(nn.Module):
         assert hparams.n_ensemble > 0
         self.device = device
         self.n_ensemble = hparams.n_ensemble
-        # Q-value regressor output dim is 1
-        self.q_predictors = nn.ModuleList([nn.Linear(hparams.hidden_size, 1) for _ in range(self.n_ensemble)])  
+        self.num_q_predictor_layers = hparams.num_q_predictor_layers
+
+        q_predictors = []
+        for  h in range(self.n_ensemble):
+            sequence = []
+            curr_hidden_size = hparams.hidden_size
+            for i in range(self.num_q_predictor_layers - 1):
+                # Intermediate Full-Connected-Layer
+                sequence.append(nn.Linear(curr_hidden_size, int(curr_hidden_size/2)))
+                sequence.append(nn.ReLU())
+                sequence.append(nn.Dropout(p=hparams.dropout_ratio))
+                curr_hidden_size = int(curr_hidden_size/2) 
+            # Q-value regressor output dim is 1
+            sequence.append(nn.Linear(curr_hidden_size, 1))
+            # Append sequence as a head to head list
+            q_predictors.append(nn.Sequential(*tuple(sequence)))
+
+        self.q_predictors = nn.ModuleList(q_predictors)
 
     def forward(self, new_h, alpha, new_cov, h_tilde, view_index_mask):
         '''run LSTM to decode q-value for a particular view'''   
 
-        # Predict q-values -- cost
+        # Initialize tensor to store q-values
         # tensor shape (batch_size, n_ensemble)
         q_value_heads = torch.empty(h_tilde.shape[0], self.n_ensemble, dtype=torch.float, device=self.device)
 
-        for h, predictor_head in enumerate(self.q_predictors):
+        # Use heads to make q-value predictions
+        for h, q_predictor in enumerate(self.q_predictors):
             # tensor shape (batch_size, )
-            q_value_heads[:, h] = predictor_head(h_tilde).squeeze(-1)
+            q_value_heads[:, h] = q_predictor(h_tilde).squeeze(-1)
+        assert q_value_heads.shape == (h_tilde.shape[0], self.n_ensemble)
+
         # --------
         # view_index_mask has shape (batch_size, )
         if view_index_mask is not None:
@@ -397,6 +429,7 @@ class RegressorMultiHead(nn.Module):
             q_value_heads.data.masked_fill_(view_index_mask.view(-1, 1), 1e9)
             assert q_value_heads.shape == (h_tilde.shape[0], self.n_ensemble)
         # --------
+
         return new_h, alpha, q_value_heads, new_cov
 
 

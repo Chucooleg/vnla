@@ -148,7 +148,9 @@ def make_parser():
     parser.add_argument('-max_input_length', type=int,
         help='max input length for language input tokens.') 
     parser.add_argument('-num_lstm_layers', type=int,
-        help='number of lstm layers.') 
+        help='number of lstm layers.')
+    parser.add_argument('-num_q_predictor_layers', type=int,
+        help='number of ffc layers for q-value predictor.') 
     parser.add_argument('-hidden_size', type=int,
         help='hidden size for LSTM cell.') 
     parser.add_argument('-coverage_size', type=int,

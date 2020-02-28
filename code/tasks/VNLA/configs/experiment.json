@@ -72,6 +72,7 @@
     "ask_embed_size"        : 32,
     "max_input_length"      : 50,
     "num_lstm_layers"       : 1,
+    "num_q_predictor_layers": 1,
     "hidden_size"           : 512,
     "coverage_size"         : 10,
     "bidirectional"         : false,
