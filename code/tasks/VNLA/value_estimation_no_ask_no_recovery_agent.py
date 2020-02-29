@@ -688,11 +688,25 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                 if self.bootstrap:
                     # shape (batch_size, 36, n_ensemble)
-                    q_values_rollout_estimate_heads = q_values_rollout_estimate_heads.transpose(0,1)
+                    q_values_rollout_estimate_heads = q_values_rollout_estimate_heads.transpose(0, 1)
 
-                    # Compute mean and variance across heads
-                    # shape (batch_size, 36)
-                    q_values_rollout_estimate_variance, q_values_rollout_estimate = torch.var_mean(q_values_rollout_estimate_heads, dim=2)
+                    if self.sample_head:
+                        # Compute variance across heads
+                        # tensor shape (batch_size, 36)
+                        q_values_rollout_estimate_variance = torch.var(q_values_rollout_estimate_heads, dim=2)
+                        assert q_values_rollout_estimate_variance.shape == (batch_size, self.num_viewIndex)
+                        # sample a head for each example in batch
+                        # tensor shape (batch_size, self.num_viewIndex, 1)
+                        choices = torch.randint(0, self.n_ensemble, (batch_size,), device=self.device).view(-1, 1).repeat(1, self.num_viewIndex).unsqueeze(-1)
+                        assert choices.shape == (batch_size, self.num_viewIndex, 1)
+                        # tensor shape (batch_size, 36)
+                        q_values_rollout_estimate = q_values_rollout_estimate_heads.gather(2, choices).squeeze(-1)
+                        assert q_values_rollout_estimate.shape == (batch_size, self.num_viewIndex)
+                    else:
+                        # Compute mean and variance across heads
+                        # shape (batch_size, 36), shape (batch_size, 36)
+                        q_values_rollout_estimate_variance, q_values_rollout_estimate = torch.var_mean(q_values_rollout_estimate_heads, dim=2)
+
                     assert q_values_rollout_estimate.shape == (batch_size, self.num_viewIndex)
                     assert q_values_rollout_estimate_variance.shape == (batch_size, self.num_viewIndex)
 

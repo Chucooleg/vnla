@@ -80,6 +80,7 @@
 
 
     "bootstrap"             : 0,
+    "sample_head"           : 0,
     "n_ensemble"            : 10,
     "bernoulli_probability" : 0.9,
 

@@ -3,8 +3,8 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "2020228_debug_aggrevate_bootstrap_deep_head"
-job_name = "bootstrap_on_deep_head_4_layers"
+exp_name = "2020228_debug_aggrevate_bootstrap_sample_deep_head"
+job_name = "sample_deep_head"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh
@@ -57,8 +57,8 @@ args['data_suffix'] = 'small_ten_goals_short'
 args['bootstrap'] = 1
 args['n_ensemble'] = 4
 args['bernoulli_probability'] = 0.9
-args['norm_loss_by_dist'] = 0
 
 args['num_q_predictor_layers'] = 4
+args['sample_head'] = 1
 
 vs_code_debug(args)

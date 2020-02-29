@@ -62,6 +62,7 @@ class NavigationAgent(BaseAgent):
 
         # bootstrap params
         self.bootstrap = hparams.bootstrap
+        self.sample_head = hparams.sample_head
         self.n_ensemble = hparams.n_ensemble
         self.bernoulli_probability = hparams.bernoulli_probability
         if self.bootstrap:
