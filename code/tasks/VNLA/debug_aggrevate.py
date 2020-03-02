@@ -3,8 +3,8 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "2020229_debug_aggrevate_bootstrap"
-job_name = "try_nograd_rollout"
+exp_name = "20200302_debug_aggrevate_bootstrap"
+job_name = "debug_voting_2"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh
