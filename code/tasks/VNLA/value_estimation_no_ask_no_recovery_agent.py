@@ -287,8 +287,10 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         start_time = time.time()
         # Compute scalar loss
         if self.bootstrap:
+            # tensor shape (batch_size, self.n_ensemble)
+            bootstrap_masks = self.get_tr_bootstrap_masks_by_t(tr_key_pairs, tr_timesteps)
             self.value_loss = self.normalize_loss_with_mask( 
-                batch_size, q_values_tr_estimate_heads, q_values_target)
+                batch_size, q_values_tr_estimate_heads, q_values_target, bootstrap_masks)
             self.uncertainty = self.normalize_uncertainty(batch_size, q_values_tr_uncertainty)
         else:
             self.value_loss = self.normalize_loss( 

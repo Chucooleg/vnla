@@ -4,7 +4,7 @@ from train import vs_code_debug
 
 # from train_experiments.sh
 exp_name = "20200302_debug_aggrevate_bootstrap"
-job_name = "debug_voting_2"
+job_name = "debug_offbootstrap"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/experiment.json"
 
 # from scripts/define_vars.sh
@@ -54,7 +54,7 @@ args['data_suffix'] = 'small_ten_goals_short'
 # args['data_suffix'] = 'small_three_houses_single_goal_short'
 # args['data_suffix'] = 'original'
 
-args['bootstrap'] = 1
+args['bootstrap'] = 0
 args['n_ensemble'] = 4
 args['bernoulli_probability'] = 0.9
 

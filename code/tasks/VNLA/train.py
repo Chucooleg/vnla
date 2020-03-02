@@ -571,7 +571,7 @@ def train_val(device, args_copy, seed=None):
         if ckpt is not None:
             agent.history_buffer = ckpt['history_buffer']
         else:
-            agent.history_buffer = HistoryBuffer(hparams)
+            agent.history_buffer = HistoryBuffer(hparams, device)
 
         # Initialize / Load expert rollin probability beta for agent
         if ckpt is not None:

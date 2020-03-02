@@ -5,6 +5,7 @@ import pickle
 from collections import defaultdict
 import numpy as np
 import os
+import torch
 
 
 def nested_defaultdict():
@@ -17,10 +18,12 @@ class HistoryBuffer(object):
     History Buffer for training value estimation agents
     '''
 
-    def __init__(self, hparams):
+    def __init__(self, hparams, device):
+
+        self.device = device
         
         # Stored data format
-        # (instr_id, global_iter_idx) : {viewpointIndex:[], scan:'', instruction: [], feature: [], action: [], q_values_target: [], ... etc}
+        # (instr_id, global_iter_idx) : {viewpointIndex:[], scan:'', instruction: [], feature: [], action: [], q_values_target: [], bootstrap_mask: [], ... etc}
         self._indexed_data = defaultdict(nested_defaultdict)
 
         # Use this to remove earliest experience when buffer is full
@@ -35,6 +38,12 @@ class HistoryBuffer(object):
         # max storage limit -- number of examples
         self._curr_buffer_size = 0
         self.max_buffer_size = hparams.max_buffer_size
+
+        # bernoulli mask prob
+        self.bootstrap = hparams.bootstrap
+        if self.bootstrap:
+            self.n_ensemble = hparams.n_ensemble
+            self.bernoulli_probability = hparams.bernoulli_probability
 
     def __len__(self):
         return len(self._indexed_data)
@@ -68,7 +77,8 @@ class HistoryBuffer(object):
                 'action' : self._indexed_data[key]['action'],
                 'view_index_mask_indices' : self._indexed_data[key]['view_index_mask_indices'],
                 'viewix_actions_map' : self._indexed_data[key]['viewix_actions_map'],
-                'q_values_target' : self._indexed_data[key]['q_values_target']
+                'q_values_target' : self._indexed_data[key]['q_values_target'],
+                'bootstrap_mask' : self._indexed_data[key]['bootstrap_mask']
                 }
 
         info_file_path = os.path.join(dir_path, 'history_buffer_info.pickle')
@@ -96,15 +106,14 @@ class HistoryBuffer(object):
         self._curr_buffer_size = info_dict['_curr_buffer_size']
         self.max_buffer_size = info_dict['max_buffer_size']
             
-        for key in self._instr_iter_keys:
-            self._indexed_data[key]['viewpointIndex'] = data_dict[key]['viewpointIndex']
-            self._indexed_data[key]['scan'] = data_dict[key]['scan']
+        for key in self._instr_iter_keys:  
             self._indexed_data[key]['instruction'] = data_dict[key]['instruction']
             self._indexed_data[key]['feature'] = data_dict[key]['feature']
             self._indexed_data[key]['action'] = data_dict[key]['action']
             self._indexed_data[key]['view_index_mask_indices'] = data_dict[key]['view_index_mask_indices']
             self._indexed_data[key]['viewix_actions_map'] = data_dict[key]['viewix_actions_map']
             self._indexed_data[key]['q_values_target'] = data_dict[key]['q_values_target']
+            self._indexed_data[key]['bootstrap_mask'] = data_dict[key]['bootstrap_mask']
 
     def remove_earliest_experience(self, batch_size):
         '''Remove earliest iterations of experiences from buffer, until we have room to add the next batch.'''
@@ -134,10 +143,7 @@ class HistoryBuffer(object):
         if self._curr_buffer_size + batch_size >= self.max_buffer_size:
             self.remove_earliest_experience(batch_size)
 
-        try:
-            assert not self.is_full()
-        except:
-            print("debug")
+        assert not self.is_full()
 
         # Write experience to buffer
         for experience in experience_batch:
@@ -166,6 +172,10 @@ class HistoryBuffer(object):
             # Append target
             self._indexed_data[key]['q_values_target'].append(experience['q_values_target'])
 
+            # Append bootstrap mask
+            bootstrap_mask = torch.bernoulli(torch.ones(self.n_ensemble, dtype=torch.float, device=self.device) * self.bernoulli_probability) if self.bootstrap else None
+            self._indexed_data[key]['bootstrap_mask'].append(bootstrap_mask)
+    
             # Build global_iter_idx to instr_id map
             self._iter_instr_map[experience['global_iter_idx']].add(experience['instr_id'])
             # Build set of keys for sampling
@@ -195,7 +205,7 @@ class HistoryBuffer(object):
 
         # Debug
         if 1 in traj_lens or 0 in traj_lens:
-            print ("debug")
+            raise ValueError('Should not sample time step 0 or 1')
 
         # Sample timesteps
         # do not sample from t=0 at <start> state

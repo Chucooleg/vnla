@@ -69,7 +69,6 @@ class ValueEstimationAgent(NavigationAgent):
         self.env_action_tup_size = 3
 
         # Initialize History Buffer
-        # self.history_buffer = HistoryBuffer(hparams)
         self.min_history_to_learn = hparams.min_history_to_learn
 
         # Set expert rollin prob, decayed in training
@@ -82,7 +81,7 @@ class ValueEstimationAgent(NavigationAgent):
         self.loss = 0.0
 
         # Only for computing validation losses under training conditions
-        self.allow_cheat = False  
+        self.allow_cheat = False
         # Compute losses if not eval (i.e. training)
         self.is_eval = False
 
@@ -94,10 +93,11 @@ class ValueEstimationAgent(NavigationAgent):
         valid_indices = torch.nonzero(~torch.isnan(q_values_rollout_uncertainty)).squeeze()
         return torch.mean(q_values_rollout_uncertainty[valid_indices])
 
-    def normalize_loss_with_mask(self, batch_size, q_values_estimate_heads, q_values_target):
+    def normalize_loss_with_mask(self, batch_size, q_values_estimate_heads, q_values_target, bootstrap_masks):
 
         assert q_values_estimate_heads.shape == (batch_size, self.num_viewIndex, self.n_ensemble)
         assert q_values_target.shape == (batch_size, self.num_viewIndex)
+        assert bootstrap_masks.shape == (batch_size, self.n_ensemble)
 
         # tensor shape (self.n_ensemble, )
         value_loss_heads = torch.empty(self.n_ensemble, dtype=torch.float, device=self.device)
@@ -106,7 +106,7 @@ class ValueEstimationAgent(NavigationAgent):
 
             # Sample a mask -> 1 means the head can see the example
             # tensor shape (batch_size,)
-            bootstrap_mask = torch.bernoulli(torch.ones(batch_size, dtype=torch.float, device=self.device) * self.bernoulli_probability)
+            bootstrap_mask = bootstrap_masks[:, h]
 
             # Compute loss
             # tensor shape (batch_size, ), tensor shape (batch_size, )
@@ -117,6 +117,30 @@ class ValueEstimationAgent(NavigationAgent):
             value_loss_heads[h] = torch.sum(value_loss_h * bootstrap_mask * not_ended_mask) / torch.sum(bootstrap_mask * not_ended_mask)
 
         return torch.mean(value_loss_heads)
+
+    # def normalize_loss_with_mask(self, batch_size, q_values_estimate_heads, q_values_target):
+
+    #     assert q_values_estimate_heads.shape == (batch_size, self.num_viewIndex, self.n_ensemble)
+    #     assert q_values_target.shape == (batch_size, self.num_viewIndex)
+
+    #     # tensor shape (self.n_ensemble, )
+    #     value_loss_heads = torch.empty(self.n_ensemble, dtype=torch.float, device=self.device)
+
+    #     for h in range(self.n_ensemble):
+
+    #         # Sample a mask -> 1 means the head can see the example
+    #         # tensor shape (batch_size,)
+    #         bootstrap_mask = torch.bernoulli(torch.ones(batch_size, dtype=torch.float, device=self.device) * self.bernoulli_probability)
+
+    #         # Compute loss
+    #         # tensor shape (batch_size, ), tensor shape (batch_size, )
+    #         value_loss_h, not_ended_mask = self._normalize_loss_across_viewing_angles(batch_size, q_values_estimate_heads[:,:,h], q_values_target, ref=False)
+
+    #         # Apply mask and Normalize
+    #         # tensor scalar
+    #         value_loss_heads[h] = torch.sum(value_loss_h * bootstrap_mask * not_ended_mask) / torch.sum(bootstrap_mask * not_ended_mask)
+
+    #     return torch.mean(value_loss_heads)
 
     def _normalize_loss_across_viewing_angles(self, batch_size, q_values_estimate, q_values_target, ref=False):
         '''
@@ -206,6 +230,23 @@ class ValueEstimationAgent(NavigationAgent):
         mask = (seq_tensor == padding_idx)
 
         return seq_tensor, mask, seq_lengths
+
+    def get_tr_bootstrap_masks_by_t(self, tr_key_pairs, tr_timesteps):
+        '''
+        Extract bernoulli mask from history buffer
+        Arguments:
+            tr_key_pairs: list of len(batch_size) tuples, each (instr_id, global_iter_idx).
+            tr_timesteps: list of len(batch_size) integers, each indicate sampled timestep
+        '''
+        # Create container to hold training masks
+        # tensor shape (batch_size, self.n_ensemble)
+        bootstrap_masks = torch.empty(len(tr_key_pairs), self.n_ensemble, dtype=torch.float, device=self.device)
+        
+        # Fill container with masks extracted from history buffer
+        for i, (key_pair, timestep) in enumerate(zip(tr_key_pairs, tr_timesteps)):
+            bootstrap_masks[i, :] = self.history_buffer[key_pair]['bootstrap_mask'][timestep]
+
+        return bootstrap_masks
 
     def get_tr_variable_by_t(self, tr_key_pairs, tr_timesteps, var_name):
         '''
