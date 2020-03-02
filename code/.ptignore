@@ -11,4 +11,6 @@ tasks/VNLA/notebook/
 tasks/VNLA/notebook/*
 tasks/VNLA/output/
 tasks/VNLA/philly_yaml_archive/
-
+tasks/VNLA/philly_yaml_archive/*
+analysis.py
+phillytools/

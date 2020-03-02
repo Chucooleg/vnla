@@ -390,7 +390,8 @@ class ValueEstimationAgent(NavigationAgent):
             # Rollout the agent
             # History is added to buffer within this rollout() call
             # See subclass implementation
-            traj, iter_time_report_rollout = self.rollout(global_iter_idx)
+            with torch.no_grad():
+                traj, iter_time_report_rollout = self.rollout(global_iter_idx)
 
             # Keep time for the rollout processes
             for key in iter_time_report_rollout.keys():

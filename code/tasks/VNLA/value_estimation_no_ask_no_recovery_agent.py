@@ -690,7 +690,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # shape (batch_size, 36, n_ensemble)
                     q_values_rollout_estimate_heads = q_values_rollout_estimate_heads.transpose(0, 1)
 
-                    if self.sample_head:
+                    if self.sample_head and (not self.is_eval):
                         # Compute variance across heads
                         # tensor shape (batch_size, 36)
                         q_values_rollout_estimate_variance = torch.var(q_values_rollout_estimate_heads, dim=2)
