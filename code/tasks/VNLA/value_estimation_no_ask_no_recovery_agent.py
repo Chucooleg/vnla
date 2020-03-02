@@ -509,7 +509,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
         timestep = 1
         while timestep <= episode_len:
 
-            # print ("time step = {}".format(timestep))
+            # Sample head `K`
+            active_head = np.random.randint(self.n_ensemble)
 
             # Modify obs in-place to indicate if any ob has 'ended'
             start_time = time.time()
@@ -603,7 +604,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
             else:
 
-                # ------- LSTM unfold through recent history (j frames)
+                # -------------- LSTM unfold through recent history (j frames)
                 # Purpose: only to get the last decoder_h and cov
                 decode_hist_start_time = time.time()
 
@@ -630,7 +631,7 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                 time_report['decode_history'] += time.time() - decode_hist_start_time
 
-                # ------- LSTM unfold one step further at pano sphere
+                # -------------- LSTM unfold one step further at pano sphere
                 decode_frontier_start_time = time.time()
 
                 # Initialize tensor to store q-value estimates
@@ -686,26 +687,25 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
 
                     time_report['decode_frontier_decoder_forward'] += time.time() - frontier_decode_time
 
+                # -------------- Compute Uncertainty
+
+                # Compute Variance, Mean/Sample q-value among heads (if bootstrap)
                 if self.bootstrap:
                     # shape (batch_size, 36, n_ensemble)
                     q_values_rollout_estimate_heads = q_values_rollout_estimate_heads.transpose(0, 1)
 
-                    if self.sample_head and (not self.is_eval):
+                    if self.is_eval:
+                        # Compute variance and mean of q-value across heads
+                        # shape (batch_size, 36), shape (batch_size, 36)
+                        q_values_rollout_estimate_variance, q_values_rollout_estimate = torch.var_mean(q_values_rollout_estimate_heads, dim=2)
+                    else: 
+                        # Training mode
                         # Compute variance across heads
                         # tensor shape (batch_size, 36)
                         q_values_rollout_estimate_variance = torch.var(q_values_rollout_estimate_heads, dim=2)
-                        assert q_values_rollout_estimate_variance.shape == (batch_size, self.num_viewIndex)
-                        # sample a head for each example in batch
-                        # tensor shape (batch_size, self.num_viewIndex, 1)
-                        choices = torch.randint(0, self.n_ensemble, (batch_size,), device=self.device).view(-1, 1).repeat(1, self.num_viewIndex).unsqueeze(-1)
-                        assert choices.shape == (batch_size, self.num_viewIndex, 1)
+                        # Continue to rollout with head k in the episode
                         # tensor shape (batch_size, 36)
-                        q_values_rollout_estimate = q_values_rollout_estimate_heads.gather(2, choices).squeeze(-1)
-                        assert q_values_rollout_estimate.shape == (batch_size, self.num_viewIndex)
-                    else:
-                        # Compute mean and variance across heads
-                        # shape (batch_size, 36), shape (batch_size, 36)
-                        q_values_rollout_estimate_variance, q_values_rollout_estimate = torch.var_mean(q_values_rollout_estimate_heads, dim=2)
+                        q_values_rollout_estimate = q_values_rollout_estimate_heads[:, :, active_head]             
 
                     assert q_values_rollout_estimate.shape == (batch_size, self.num_viewIndex)
                     assert q_values_rollout_estimate_variance.shape == (batch_size, self.num_viewIndex)
@@ -724,30 +724,51 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     q_values_rollout_estimate = q_values_rollout_estimate.t()
 
                 time_report['decode_frontier'] += time.time() - decode_frontier_start_time
-                # -------
 
+                # -------------- Select Next Action
                 agent_select_start_time = time.time()
 
-                # Select the best view direction determined by expert
-                # tensor shape (batch_size, ), gradient detached
-                best_view_ix = self.argmax(-q_values_rollout_estimate)
+                # Voting for next action -- if bootstrap eval
+                if self.bootstrap and self.is_eval:
+                    # TODO voting
+
+                    # Each head vote for their argmin viewing angle
+                    # tensor shape (batch_size, self.n_ensemble)
+                    votes = torch.stack([self.argmax(-q_values_rollout_estimate_heads[:, :, h]) for h in range(self.n_ensemble)], dim=1)
+                    assert votes.shape == (batch_size, self.n_ensemble)
+
+                    # Find majority vote and a matching head
+                    # tensor shape (batch_size, ), # tensor shape (batch_size, )  
+                    best_view_ix, best_view_h = torch.mode(votes)
+                    assert best_view_ix.shape == best_view_h.shape == (batch_size, )
+
+                    # end_estimated
+                    bestview)h= best_view_h.view(-1, 1).repeat(1, self.num_viewIndex).unsqueeze(-1) # TODO
+                    
+
+                    
+
+                else:
+                    # Select the best view direction determined by expert
+                    # tensor shape (batch_size, ), gradient detached
+                    best_view_ix = self.argmax(-q_values_rollout_estimate)
+
+                    # Compute end markers
+                    # (end after upcoming rotation and step-forward)
+                    # array shape (batch_size,)
+                    end_estimated = (torch.min(q_values_rollout_estimate, dim=1)[0] <= self.agent_end_criteria).cpu().data.numpy()
+                    assert end_estimated.shape[0] == batch_size
+
+                # Select the macro-rotation associated with the best view direction
                 # tensor shape (1, batch_size, self.max_macro_action_seq_len)
                 best_view_ix_tiled = best_view_ix.view(-1, 1).repeat(1, viewix_actions_map.shape[2]).unsqueeze(0)
                 assert best_view_ix_tiled.shape == (1, batch_size, self.max_macro_action_seq_len)
-
-                # Select the macro-rotation associated with the best view direction
-                # only rotation or <ignore>
-                # tensor shape (batch_size, max_macro_action_seq_len)
+                # tensor shape (batch_size, max_macro_action_seq_len), only rotation or <ignore>
                 a_t =  viewix_actions_map.gather(0, best_view_ix_tiled).squeeze()
                 assert a_t.shape == (batch_size, self.max_macro_action_seq_len)
 
-                # Compute end markers
-                # (end after upcoming rotation and step-forward)
-                # array shape (batch_size,)
-                end_estimated = (torch.min(q_values_rollout_estimate, dim=1)[0] <= self.agent_end_criteria).cpu().data.numpy()
-                assert end_estimated.shape[0] == batch_size
-
                 time_report['select_agent_macro_action'] += time.time() - agent_select_start_time
+                # -------
 
             time_report['compute_next_nav_by_feedback'] += time.time() - start_time
             # ----------------------------

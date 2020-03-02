@@ -361,7 +361,6 @@ class RegressorSingleHead(nn.Module):
             # Intermediate Full-Connected-Layer
             sequence.append(nn.Linear(curr_hidden_size, int(curr_hidden_size/2)))
             sequence.append(nn.ReLU())
-            sequence.append(nn.Dropout(p=hparams.dropout_ratio))
             curr_hidden_size = int(curr_hidden_size/2)
         # Q-value regressor output dim is 1
         sequence.append(nn.Linear(curr_hidden_size, 1))
@@ -400,7 +399,6 @@ class RegressorMultiHead(nn.Module):
                 # Intermediate Full-Connected-Layer
                 sequence.append(nn.Linear(curr_hidden_size, int(curr_hidden_size/2)))
                 sequence.append(nn.ReLU())
-                sequence.append(nn.Dropout(p=hparams.dropout_ratio))
                 curr_hidden_size = int(curr_hidden_size/2) 
             # Q-value regressor output dim is 1
             sequence.append(nn.Linear(curr_hidden_size, 1))

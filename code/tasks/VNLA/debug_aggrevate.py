@@ -59,6 +59,5 @@ args['n_ensemble'] = 4
 args['bernoulli_probability'] = 0.9
 
 args['num_q_predictor_layers'] = 4
-args['sample_head'] = 1
 
 vs_code_debug(args)

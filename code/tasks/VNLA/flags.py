@@ -163,8 +163,6 @@ def make_parser():
     # bootstrap parameters
     parser.add_argument('-bootstrap', type=int,
         help='bootstrap on (1) or off (0)')
-    parser.add_argument('-sample_head', type=int,
-        help='sample one head\'s q-value (1) or take mean q-value among heads (0)')
     parser.add_argument('-n_ensemble', type=int,
         help='number of bootstrap heads')
     parser.add_argument('-bernoulli_probability', type=float,
