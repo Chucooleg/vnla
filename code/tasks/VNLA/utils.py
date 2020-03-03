@@ -82,12 +82,22 @@ class Tokenizer(object):
                 self.word_to_index[word] = i
         self.split_by_spaces = split_by_spaces
 
+        DATA_DIR = os.getenv('PT_DATA_DIR')
+        with open(os.path.join(DATA_DIR, 'semantics/asknav_tr_object_shuffle_lookup.json')) as f:
+            self.shuffled_object_phrase_lookup = json.load(f)
+
+
     def split_sentence(self, sentence):
+
+        # SWAP OUT THE OBJECT PHRASE HERE
+        obj_phrase = sentence.split(" in ")[0].split("find ")[1]
+        new_sentence = sentence.replace(obj_phrase, self.shuffled_object_phrase_lookup[obj_phrase])
+
         if self.split_by_spaces:
-            return sentence.split()
+            return new_sentence.split()
 
         toks = []
-        for word in [s.strip().lower() for s in self.SENTENCE_SPLIT_REGEX.split(sentence.strip()) if len(s.strip()) > 0]:
+        for word in [s.strip().lower() for s in self.SENTENCE_SPLIT_REGEX.split(new_sentence.strip()) if len(s.strip()) > 0]:
             # Break up any words containing punctuation only, e.g. '!?', unless
             # it is multiple full stops e.g. '..'
             if all(c in string.punctuation for c in word) and not all(c in '.' for c in word):
