@@ -393,7 +393,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
             'expert_rollin_bool': 0 if self.is_eval else expert_rollin_bool,
 
             # bootstrapping
-            'agent_q_values_uncertainty': [], 
+            'agent_q_values_uncertainty': [],
+            'agent_q_values_votes': [],
         } for ob in obs]
         time_report['initial_setup_initialize_traj_bookkeeping'] += time.time() - start_time
 
@@ -837,6 +838,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                 q_values_rollout_estimate_list = q_values_rollout_estimate.data.tolist()
                 if self.bootstrap:
                     q_values_rollout_uncertainty_list = q_values_rollout_uncertainty.data.tolist()
+                    if self.is_eval:
+                        votes_list = votes.data.tolist()
             time_report['prepare_tensors_for_saving'] += time.time() - start_time
 
             # Initialize new experience_batch_t
@@ -892,7 +895,8 @@ class ValueEstimationNoAskNoRecoveryAgent(ValueEstimationAgent):
                     # bootstrapping
                     if self.bootstrap:
                         traj[i]['agent_q_values_uncertainty'].append(None if expert_rollin_bool else q_values_rollout_uncertainty_list[i])
-            time_report['write_experience_batch'] += time.time() - start_time  
+                        traj[i]['agent_q_values_votes'].append(None if (expert_rollin_bool or not self.is_eval) else votes_list[i])
+            time_report['write_experience_batch'] += time.time() - start_time
 
             if use_hist_buffer:
                 # Write experience to history buffer

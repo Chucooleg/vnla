@@ -87,7 +87,7 @@ class BaseAgent(object):
                             'teacher_cost_togo', 'teacher_cost_stepping',
                             # value estimation no ask no recovery agent
                             # multihead
-                            'agent_q_values_uncertainty'
+                            'agent_q_values_uncertainty', 'agent_q_values_votes'
                             ]:
 
                             if k in tr:
