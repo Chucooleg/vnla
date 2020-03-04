@@ -127,10 +127,10 @@ class VNLABatch():
             key = (item['start_region_name'], item['end_region_name'])
         return key
 
-    def encode(self, instr):
+    def encode(self, instr, swap_object):
         if self.tokenizer is None:
             sys.exit('No tokenizer!')
-        return self.tokenizer.encode_sentence(instr)
+        return self.tokenizer.encode_sentence(instr, swap_object)
 
     def load_data(self, data):
         self.data = []

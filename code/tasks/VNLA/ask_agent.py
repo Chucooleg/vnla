@@ -90,9 +90,9 @@ class AskAgent(BaseAgent):
     def n_output_ask_actions():
         return len(AskAgent.ask_actions) - 2
 
-    def _make_batch(self, obs):
+    def _make_batch(self, obs, swap_object):
         ''' Make a variable for a batch of input instructions. '''
-        seq_tensor = np.array([self.env.encode(ob['instruction']) for ob in obs])
+        seq_tensor = np.array([self.env.encode(ob['instruction'], swap_object) for ob in obs])
 
         seq_lengths = np.argmax(seq_tensor == padding_idx, axis=1)
 
@@ -375,6 +375,7 @@ class AskAgent(BaseAgent):
     def test(self, env, feedback, use_dropout=False, allow_cheat=False):
         ''' Evaluate once on each instruction in the current environment '''
 
+        self.training = False
         self.allow_cheat = allow_cheat
         self.is_eval = not allow_cheat
         self._setup(env, feedback)
@@ -387,6 +388,7 @@ class AskAgent(BaseAgent):
     def train(self, env, optimizer, n_iters, feedback, idx):
         ''' Train for a given number of iterations '''
 
+        self.training = True
         self.is_eval = False
         self._setup(env, feedback)
         self.model.train()

@@ -87,11 +87,15 @@ class Tokenizer(object):
             self.shuffled_object_phrase_lookup = json.load(f)
 
 
-    def split_sentence(self, sentence):
+    def split_sentence(self, sentence, swap_object=False):
+
+        # print ("Sentence {}".format(sentence))
 
         # SWAP OUT THE OBJECT PHRASE HERE
         obj_phrase = sentence.split(" in ")[0].split("find ")[1]
-        new_sentence = sentence.replace(obj_phrase, self.shuffled_object_phrase_lookup[obj_phrase])
+        new_sentence = sentence.replace(obj_phrase, self.shuffled_object_phrase_lookup[obj_phrase]) if swap_object else sentence
+
+        # print ("New Sentence {}".format(new_sentence))
 
         if self.split_by_spaces:
             return new_sentence.split()
@@ -106,7 +110,7 @@ class Tokenizer(object):
                 toks.append(word)
         return toks
 
-    def encode_sentence(self, sentence, encoding_length=None, reverse=True, eos=True, to_numpy=True):
+    def encode_sentence(self, sentence, swap_object=False, encoding_length=None, reverse=True, eos=True, to_numpy=True):
         if len(self.word_to_index) == 0:
             sys.exit('Tokenizer has no vocab')
 
@@ -115,7 +119,7 @@ class Tokenizer(object):
         if isinstance(sentence, list):
             sent_split = sentence
         else:
-            sent_split = self.split_sentence(sentence)
+            sent_split = self.split_sentence(sentence, swap_object)
 
         if reverse:
             sent_split = sent_split[::-1]

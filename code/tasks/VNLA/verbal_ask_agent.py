@@ -118,8 +118,11 @@ class VerbalAskAgent(AskAgent):
                 random_ask_positions[i] = self.random.sample(
                     range(ob['traj_len']), ob['max_queries'])
 
+        # Whether to swap objects
+        swap_object = self.training
+
         # Index initial command
-        seq, seq_mask, seq_lengths = self._make_batch(obs)
+        seq, seq_mask, seq_lengths = self._make_batch(obs, swap_object)
 
         # Roll-out bookkeeping
         traj = [{
@@ -280,7 +283,7 @@ class VerbalAskAgent(AskAgent):
                 # Update observations
                 obs = self.env.get_obs()
                 # Make new batch with new instructions
-                seq, seq_mask, seq_lengths = self._make_batch(obs)
+                seq, seq_mask, seq_lengths = self._make_batch(obs, swap_object)
                 # Re-encode with new instructions
                 ctx, _ = self.model.encode(seq, seq_lengths)
                 # Make new coverage vectors
