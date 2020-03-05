@@ -92,8 +92,7 @@ class Tokenizer(object):
         # print ("Sentence {}".format(sentence))
 
         # SWAP OUT THE OBJECT PHRASE HERE
-        obj_phrase = sentence.split(" in ")[0].split("find ")[1]
-        new_sentence = sentence.replace(obj_phrase, self.shuffled_object_phrase_lookup[obj_phrase]) if swap_object else sentence
+        new_sentence = "the the the the the the" if swap_object else sentence
 
         # print ("New Sentence {}".format(new_sentence))
 
