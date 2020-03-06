@@ -375,6 +375,9 @@ class AskAgent(BaseAgent):
     def test(self, env, feedback, use_dropout=False, allow_cheat=False):
         ''' Evaluate once on each instruction in the current environment '''
 
+        # print ("running testing use_dropout = {}, allow_cheat = {}".format(use_dropout, allow_cheat))
+        # import pdb; pdb.set_trace()
+
         self.training = False
         self.allow_cheat = allow_cheat
         self.is_eval = not allow_cheat

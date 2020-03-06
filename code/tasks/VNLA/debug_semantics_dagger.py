@@ -3,8 +3,8 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "20200304_debug_dagger_swap_objects"
-job_name = "debug_2"
+exp_name = "20200305_debug_dagger_swap_objects"
+job_name = "debug_1"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/verbal_hard.json"
 
 # from scripts/define_vars.sh
@@ -36,8 +36,8 @@ args['batch_size'] = 100
 
 # args['lr'] = 1e-3
 
-args['save_every'] = 100 # 50
-args['log_every'] = 100  # 50
+args['save_every'] = 10 # 50
+args['log_every'] = 10  # 50
 args['plot_to_philly'] = 0
 
 # args['dropout_ratio'] = 0.5

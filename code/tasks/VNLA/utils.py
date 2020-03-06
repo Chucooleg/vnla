@@ -116,10 +116,15 @@ class Tokenizer(object):
 
         encoding = []
 
+        print (sentence)
+
         if isinstance(sentence, list):
             sent_split = sentence
         else:
             sent_split = self.split_sentence(sentence, swap_object)
+
+        print (sent_split)
+        print (" ")
 
         if reverse:
             sent_split = sent_split[::-1]
