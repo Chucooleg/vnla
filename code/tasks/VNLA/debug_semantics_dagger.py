@@ -3,7 +3,7 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "20200305_debug_dagger_swap_objects"
+exp_name = "20200307_debug_dagger_swap_objects"
 job_name = "debug_1"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/verbal_hard.json"
 
