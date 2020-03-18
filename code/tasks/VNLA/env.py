@@ -252,4 +252,108 @@ class VNLABatch():
         return self._get_obs()
 
 
+class VNLABuildPretrainBatch():
+
+    def __init__(self, hparams, split=None, from_train_env=None):
+        self.env = EnvBatch(
+            from_train_env=from_train_env.env if from_train_env is not None else None,
+            img_features=hparams.img_features, batch_size=hparams.batch_size)
+
+        self.split = split
+        self.batch_size = hparams.batch_size
+        # self.max_episode_length = hparams.max_episode_length
+
+        if self.split is not None:
+            print ("Using env split = {}".format(self.split))
+            self._load_raw_data(load_datasets(
+                splits=[split], 
+                path=hparams.data_path, 
+                prefix='asknav', 
+                suffix=hparams.data_suffix if hasattr(hparams, 'data_suffix') else ''))
+
+     def reset_epoch(self):
+        self.ix = 0   
+
+    def _load_raw_data(self, data):
+        # 1. Load entire training dataset.
+        self.raw_data = []
+        self.raw_traj_lens = []
+        self.scans = set()
+        for item in data:
+            self.scans.add(item['scan'])
+            for i in range(len(item['trajectories'])):
+                self.raw_traj_lens.append(len(item['trajectories'][i]))
+                new_items = dict(item)
+                # one instruction can have more than one gold trajectory
+                new_item['instr_id'] = '%s_%d' % (item['path_id'], i)
+                new_item['instruction'] = new_item['instructions'][0]
+                del new_item['instructions']
+                new_item['trajectory'] = new_item['trajectories'][i]
+                del new_item['trajectories']
+                self.raw_data.append(new_item)
+        # 2. Sort training dataset by trajectory length.
+        self.sorted_indices = np.argsort(self.raw_traj_lens)
+
+        self.reset_epoch()
+
+        if self.split is not None:
+            print('VNLABuildPretrainBatch loaded with %d instructions, using split: %s' % (
+                len(self.raw_data), self.split))
+
+    def _next_raw_minibatch(self):
+        '''
+        Return a minibatch to build pretraining lookup. No shuffling.
+        '''
+        batch_indices = self.sorted_indices[self.ix:self.ix+self.batch_size]
+        if len(batch_indices) < self.batch_size:
+            self.ix = self.batch_size - len(batch_indices)
+            batch_indices += self.sorted_indices[:self.ix]
+        else:
+            self.ix += self.batch_size
+        self.batch = [self.raw_data[idx] for idx in batch_indices]
+        self.traj_lens = [self.raw_traj_lens[idx] for idx in batch_indices]
+
+    def _get_obs(self):
+        obs = []
+        gold_trajs = []
+        for i, (feature, state) in enumerate(self.env.getStates()):
+            item = self.batch[i]
+            obs.append({
+                'instr_id' : item['instr_id'],
+                'scan' : state.scanId,
+                'point': state.location.point,
+                'viewpoint' : state.location.viewpointId,
+                'viewIndex' : state.viewIndex,
+                'heading' : state.heading,
+                'elevation' : state.elevation,
+                'feature' : feature,
+                'step' : state.step,
+                'navigableLocations' : state.navigableLocations,
+                'instruction' : self.instructions[i],
+                'goal_viewpoints' : [path[-1] for path in item['paths']],
+                'init_viewpoint' : item['paths'][0][0],
+            })
+            obs[-1]['traj_len'] = self.traj_lens[i]
+            gold_trajs.append(item['trajectory'])  # append a list of sim level actions
+            # if 'instr_encoding' in item:
+            #     obs[-1]['instr_encoding'] = item['instr_encoding']
+        return obs, gold_trajs
+
+    def reset(self):
+        ''' Load a new minibatch / episodes. '''
+        self._next_raw_minibatch()
+
+        scanIds = [item['scan'] for item in self.batch]
+        viewpointIds = [item['paths'][0][0] for item in self.batch]
+        headings = [item['heading'] for item in self.batch]
+        self.instructions = [item['instruction'] for item in self.batch]
+        self.env.newEpisodes(scanIds, viewpointIds, headings)
+        return self._get_obs()
+
+    def step(self, actions):
+        self.env.makeActions(actions)
+        return self._get_obs()
+
+    def get_obs(self):
+        return self._get_obs()
 
