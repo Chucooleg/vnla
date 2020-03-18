@@ -261,7 +261,6 @@ class VNLABuildPretrainBatch():
 
         self.split = split
         self.batch_size = hparams.batch_size
-        # self.max_episode_length = hparams.max_episode_length
 
         if self.split is not None:
             print ("Using env split = {}".format(self.split))
@@ -283,7 +282,7 @@ class VNLABuildPretrainBatch():
             self.scans.add(item['scan'])
             for i in range(len(item['trajectories'])):
                 self.raw_traj_lens.append(len(item['trajectories'][i]))
-                new_items = dict(item)
+                new_item = dict(item)
                 # one instruction can have more than one gold trajectory
                 new_item['instr_id'] = '%s_%d' % (item['path_id'], i)
                 new_item['instruction'] = new_item['instructions'][0]
@@ -307,7 +306,7 @@ class VNLABuildPretrainBatch():
         batch_indices = self.sorted_indices[self.ix:self.ix+self.batch_size]
         if len(batch_indices) < self.batch_size:
             self.ix = self.batch_size - len(batch_indices)
-            batch_indices += self.sorted_indices[:self.ix]
+            batch_indices = np.append(batch_indices, self.sorted_indices[:self.ix])
         else:
             self.ix += self.batch_size
         self.batch = [self.raw_data[idx] for idx in batch_indices]
@@ -335,8 +334,7 @@ class VNLABuildPretrainBatch():
             })
             obs[-1]['traj_len'] = self.traj_lens[i]
             gold_trajs.append(item['trajectory'])  # append a list of sim level actions
-            # if 'instr_encoding' in item:
-            #     obs[-1]['instr_encoding'] = item['instr_encoding']
+
         return obs, gold_trajs
 
     def reset(self):
@@ -357,3 +355,30 @@ class VNLABuildPretrainBatch():
     def get_obs(self):
         return self._get_obs()
 
+
+class VNLAPretrainBatch():
+
+    def __init__(self, hparams):
+        self.env = EnvBatch(
+            from_train_env=None,
+            img_features=hparams.img_features, batch_size=hparams.batch_size)
+
+        self.batch_size = hparams.batch_size
+        self.window_size = hparams.window_size
+
+    def _load_data(self):
+        # Load pretrain train and val datasets into memory
+
+    def _next_tr_minibatch(self):
+        # sample 100 instr_ids
+
+        # sample half of them for swapping
+
+        # for each instr_id that swap is on
+            # sample a window
+            # sample a position, swap the (vertex id, viewix) tuple
+
+        # return ob_windows, swapped_boolean, swap_pos
+
+    def _next_val_minibatch
+    

@@ -33,13 +33,14 @@ class BuildPretrainDataAgent():
         '''Write pretrain lookup data to json file'''
         looped = False
         for d in pretrain_data:
-            if d['instr_id'] in self.outputs:
+            if d['instr_id'] in self.results:
                 looped = True
                 break
             else:
                 self.results[d['instr_id']] = {
                     'scan':         d['scan'],
                     'instr_id':     d['instr_id'],
+                    'instruction':  d['instruction'],
                     'trajectory':   d['trajectory'],  # [(0,0,0), (1,0,0), (0,1,0), ...]
                     'agent_path':   d['agent_path']   # [(viewpoint, viewIndex), ...]
                 }
@@ -57,6 +58,7 @@ class BuildPretrainDataAgent():
         pretrain_data = [{
             'scan': ob['scan'],
             'instr_id': ob['instr_id'],
+            'instruction': ob['instruction'],
             'trajectory': [(0,0,0)],
             'agent_path': [(ob['viewpoint'], ob['viewIndex'])],
         } for ob in obs]
@@ -99,6 +101,7 @@ class BuildPretrainDataAgent():
             looped = self._collect_pretrain_data(pretrain_data)
             if looped:
                 print('Rolled-out {} trajectories.'.format(len(self.results.keys())))
+                print('breaking the loop.')
                 break
         agent.write_results()
 
@@ -123,10 +126,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-config_file', type=str,
         help='configuration file')
-    parser.add_argument('-n_iters', type=str,
-        help='Number of iterations')
-    parser.add_argument('-data_suffix', type=str,
-        help='data suffix')
     args = parser.parse_args()
 
     # Read configuration from a json file
