@@ -125,6 +125,8 @@ if __name__ == '__main__':
         help='configuration file')
     parser.add_argument('-n_iters', type=str,
         help='Number of iterations')
+    parser.add_argument('-data_suffix', type=str,
+        help='data suffix')
     args = parser.parse_args()
 
     # Read configuration from a json file

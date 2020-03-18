@@ -1,5 +1,6 @@
 {
     "data_dir"           : "asknav",
+    "data_suffix"        : "original",
     "img_features"       : "img_features/ResNet-152-imagenet.tsv",
     "batch_size"         : 100,
     "n_iters"            : 1000

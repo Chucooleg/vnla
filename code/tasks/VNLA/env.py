@@ -271,7 +271,7 @@ class VNLABuildPretrainBatch():
                 prefix='asknav', 
                 suffix=hparams.data_suffix if hasattr(hparams, 'data_suffix') else ''))
 
-     def reset_epoch(self):
+    def reset_epoch(self):
         self.ix = 0   
 
     def _load_raw_data(self, data):
