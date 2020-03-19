@@ -358,27 +358,121 @@ class VNLABuildPretrainBatch():
 
 class VNLAPretrainBatch():
 
-    def __init__(self, hparams):
+    def __init__(self, hparams, split=None):
         self.env = EnvBatch(
             from_train_env=None,
             img_features=hparams.img_features, batch_size=hparams.batch_size)
 
+        self.random = random
+        self.random.seed(hparams.seed)
+
         self.batch_size = hparams.batch_size
         self.window_size = hparams.window_size
+        self.split = split
+        self.train_mode = self.split not in ('val_seen', 'val_unseen')
+
+        if split is not None:
+            self.data_path = hparams.data_path.replace('.json', '_{}.json'.format(split))
+        else:
+            self.data_path = hparams.data_path
+
+        self.ix = 0
 
     def _load_data(self):
         # Load pretrain train and val datasets into memory
+        with open(self.data_path, 'r') as f:
+            self.data = json.load(f)
 
-    def _next_tr_minibatch(self):
-        # sample 100 instr_ids
+    def reset_epoch():
+        self.ix == 0
 
-        # sample half of them for swapping
+    def _sample_swap_pos(d):
+        # pick a position k within window to swap
+        # image feature for position k will be swapped with that of k+1
+        traj_len = len(d['trajectory'])
+        swap_pos = np.random.choice(min(traj_len-1, 8-1))
+        return swap_pos
 
-        # for each instr_id that swap is on
-            # sample a window
-            # sample a position, swap the (vertex id, viewix) tuple
+    def _sample_window_pos(d):
+        # sample a window of size 8 or max traj length
+        traj_len = len(d['trajectory'])
+        if traj_len <= 8:
+            return (0, traj_len-1)
+        else:
+            start_pos = np.random.choice(traj_len-8+1)
+            end_pos = start_pos + 8 - 1
+            return (start_pos, end_pos)
+        
+    def _sample_frame(batch_data):
+        # sample windows and swap pos for all datapoints
+        for (i,d) in enumerate(batch_data):
+            batch_data[i]['win_start_pos'], batch_data[i]['win_end_pos'] = sample_window_pos(d)
+            swap_bool = np.random.binomial(1, 0.5)
+            if swap_bool:
+                batch_data[i]['swap_pos'] = sample_swap_pos(d)
+            else:
+                batch_data[i]['swap_pos'] = None
+        return batch_data
+
+    def _next_minibatch(self):
+        '''grab next minibatch, sample window and swap pos if training'''
+        if self.ix = 0:
+            self.random.shuffle(self.data)
+            print ("Shuffle, setting data ix at 0.")
+        batch = self.data[self.ix:self.ix+self.batch_size]
+        if len(batch) < self.batch_size:
+            self.random.shuffle(self.data)
+            self.ix = self.batch_size - len(batch)
+            batch += self.data[:self.ix]
+        else:
+            self.ix += self.batch_size
+
+        if self.train_mode:
+            batch = self._sample_frame(batch)
+        self.batch = batch
+
+    def generate_next_minibatch(d):
+        '''generate a window of env actions, a window of (vertex, viewix), gold swapped boolean'''
+
+        # TODO start some containers
+
+
+
+        for (i,d) in self.batch:
+
+            # a sequence of [(0,0,0), (0,0,1),...]
+            env_action_window = d['trajectory'][d['win_start_pos']:d['win_end_pos']+1]
+            # a sequence of [(vertex, viewix), (vertex, viewix),...]
+            vertex_viewix_window = d['agent_path'][d['win_start_pos']:d['win_end_pos']+1]
+            assert len(env_action_window) == len(vertex_viewix_window)
+
+            # Swap (vertex, viewix) of pos k with k+1
+            swap_pos = d['swap_pos']
+            if swap_ops is not None:
+                swapped = True
+                vertex_viewix_pos_k = vertex_viewix_window[d['swap_pos']]
+                vertex_viewix_window[d['swap_pos']] = vertex_viewix_window[d['swap_pos']+1]
+                vertex_viewix_window[d['swap_pos']+1] = vertex_viewix_pos_k
+
+            # pad short windows back to 8
+            ct = 0
+            while len(env_action_window) < 8:
+                if ct % 2:
+                    env_action_window.insert(0, env_action_window[0])
+                    vertex_viewix_window.insert(0, vertex_viewix_window[0])
+                else:
+                    env_action_window.insert(-1, env_action_window[-1])
+                     vertex_viewix_window.insert(-1, vertex_viewix_window[-1])
+                ct += 1
+
+            # look up the image feature vector
+            f_t = self.feature[]  # TODO!
+
+            
+
+            # make everything into numpy arrays
 
         # return ob_windows, swapped_boolean, swap_pos
 
-    def _next_val_minibatch
+    def _next_val_minibatch(self):
     
