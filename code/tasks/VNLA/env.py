@@ -358,9 +358,9 @@ class VNLABuildPretrainBatch():
 
 class VNLAPretrainBatch():
 
-    def __init__(self, hparams, split=None):
+    def __init__(self, hparams, split=None, from_train_env=None):
         self.env = EnvBatch(
-            from_train_env=None,
+            from_train_env=from_train_env.env if from_train_env is not None else None,
             img_features=hparams.img_features, batch_size=hparams.batch_size)
 
         self.random = random
@@ -371,10 +371,9 @@ class VNLAPretrainBatch():
         self.split = split
         self.train_mode = self.split not in ('val_seen', 'val_unseen')
 
+        self.data_path = os.path.join(hparams.data_path, 'asknav_pretrain_lookup.json')
         if split is not None:
-            self.data_path = hparams.data_path.replace('.json', '_{}.json'.format(split))
-        else:
-            self.data_path = hparams.data_path
+            self.data_path = self.data_path.replace('.json', '_{}.json'.format(split))
 
         self.ix = 0
 
@@ -431,15 +430,19 @@ class VNLAPretrainBatch():
             batch = self._sample_frame(batch)
         self.batch = batch
 
-    def generate_next_minibatch(d):
-        '''generate a window of env actions, a window of (vertex, viewix), gold swapped boolean'''
+    def generate_next_minibatch(self):
+        '''generate a window of env actions, a window of image features, gold swapped boolean, list of instr_ids'''
 
-        # TODO start some containers
-
-
+        a_t = np.empty((self.batch_size, 8, 3), dtype=np.float32)
+        f_t = np.empty((self.batch_size, 8, 2048), dtype=np.float32)
+        swapped_target = np.zeros(self.batch_size, dtype=np.float32)
+        instr_ids = []
 
         for (i,d) in self.batch:
 
+            instr_ids.append(d['instr_id'])
+
+            # Extract window
             # a sequence of [(0,0,0), (0,0,1),...]
             env_action_window = d['trajectory'][d['win_start_pos']:d['win_end_pos']+1]
             # a sequence of [(vertex, viewix), (vertex, viewix),...]
@@ -449,12 +452,12 @@ class VNLAPretrainBatch():
             # Swap (vertex, viewix) of pos k with k+1
             swap_pos = d['swap_pos']
             if swap_ops is not None:
-                swapped = True
+                swapped_target[i] = 1
                 vertex_viewix_pos_k = vertex_viewix_window[d['swap_pos']]
                 vertex_viewix_window[d['swap_pos']] = vertex_viewix_window[d['swap_pos']+1]
                 vertex_viewix_window[d['swap_pos']+1] = vertex_viewix_pos_k
 
-            # pad short windows back to 8
+            # Pad short windows back to 8
             ct = 0
             while len(env_action_window) < 8:
                 if ct % 2:
@@ -464,15 +467,12 @@ class VNLAPretrainBatch():
                     env_action_window.insert(-1, env_action_window[-1])
                      vertex_viewix_window.insert(-1, vertex_viewix_window[-1])
                 ct += 1
+            assert len(env_action_window) == len(vertex_viewix_window) == 8
+            a_t[i] = np.array(env_action_window)
 
-            # look up the image feature vector
-            f_t = self.feature[]  # TODO!
-
+            # Lookup the image feature vector
+            for j in range(8):
+                long_id = d['scan'] + '_' + vertex_viewix_window[j][0]
+                f_t[i][j] = self.env.features[long_id][vertex_viewix_window[j][1], :]
             
-
-            # make everything into numpy arrays
-
-        # return ob_windows, swapped_boolean, swap_pos
-
-    def _next_val_minibatch(self):
-    
+        return a_t, f_t, swapped_target, instr_ids

@@ -595,3 +595,15 @@ class AttentionSeq2SeqModel(nn.Module):
 
     def decode_nav(self, *args, **kwargs):
             return self.decoder(False, *args, **kwargs)
+
+
+class SwapClassifier(nn.Module):
+
+    def __init__(self, hparams, device):
+
+        super(SwapClassifier, self).__init__()
+
+        self.device = device
+
+    def forward(self):
+        pass
