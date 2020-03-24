@@ -598,12 +598,65 @@ class AttentionSeq2SeqModel(nn.Module):
 
 
 class SwapClassifier(nn.Module):
-
+    '''
+    https://github.com/lemonhu/RE-CNN-pytorch/blob/master/model/net.py
+    https://github.com/lemonhu/RE-CNN-pytorch/blob/master/train.py
+    '''
     def __init__(self, hparams, device):
 
         super(SwapClassifier, self).__init__()
-
+        
         self.device = device
+        self.input_window_size = 8
+        self.feature_dim = 2048
+        self.action_dim = 3
+        self.kernel_sizes = [3, 4, 5]
+        self.num_filters = 100
 
-    def forward(self):
-        pass
+        self.convs = nn.ModuleList([nn.Conv2d(in_channels=1,
+                                              # 100
+                                              out_channels=num_filters,
+                                              # (3/4/5, 2048 + 3)
+                                              kernel_size=(kernel_size, self.feature_dim + self.action_dim),
+                                              padding=0
+                                             ) for kernel_size in self.kernel_sizes])
+
+        self.dropout = nn.Dropout(p=hparams.dropout_ratio)
+
+        # output layer
+        filter_dim = len(self.kernel_sizes) * self.num_filters
+        self.linear = nn.Linear(filter_dim, 1)
+        
+    def conv_block(self, x, conv_layer):
+        '''x shape (batch_size x 1 x batch_max_len x feature_dim)'''
+        assert len(x.shape) == 4 and x.shape[1] == 1 and x.shape[2] == self.input_window_size and x.shape[3] == (self.feature_dim + self.action_dim)
+        # shape (batch_size, num_filter, 8 - kernel_size + 1, 1)
+        x = conv_layer(x)
+        # shape (batch_size, num_filter, 8 - kernel_size + 1, 1)
+        x = F.relu(x)
+        # shape (batch_size, num_filter, 8 - kernel_size + 1)
+        x = x.squeeze(3)
+        # shape (batch_size, num_filter)
+        x = F.max_pool1d(x, kernel_size=x.shape[2]).squeeze(2)
+        return x
+
+    def forward(self, img_feature, action_tuple):
+        '''
+        img_feature: shape (batch_size, 8, 2048)
+        action_tuple: shape (batch_size, 8, 3)
+        '''
+        batch_size = img_feature.shape[0]
+        # shape (batch_size, 1, batch_max_len, 2048 + 3)
+        x = torch.cat([img_feature, action_tuple], dim=2).unsqueeze(1)
+        # shape (batch_size, len(self.kernel_sizes) * self.num_filters)
+        x = torch.cat([self.conv_block(x, conv_layer) for conv_layer in self.convs], dim=1)
+        assert x.shape == (batch_size, len(self.kernel_sizes) * self.num_filters)
+        # shape (batch_size, len(self.kernel_sizes) * self.num_filters)
+        x = self.dropout(x)
+        # logits shape (batch_size,)
+        x = self.linear(x).squeeze(1)
+        assert x.shape == (batch_size,)
+        return x
+
+
+class SwapClassifierResNet(nn.Module):

@@ -4,6 +4,7 @@ import sys
 from collections import defaultdict
 import networkx as nx
 import numpy as np
+from sklearn.metrics import roc_auc_score
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -140,6 +141,63 @@ class Evaluation(object):
             score_summary['room_success_rate'] = float(sum(self.scores['room_successes'])) / \
                 len(self.scores['room_successes'])
         return score_summary, self.scores, is_success
+
+
+class SwapEvaluation(object):
+
+    def __init__(self, hparams, split, data_path):
+        self.split = split
+
+        self.data_path = os.path.join(hparams.data_path, 'asknav_pretrain_lookup_{}.json'.format(split))
+
+        self.load_instr_ids()
+
+    def load_instr_ids(self):
+        '''load the validation dataset'''
+        with open(self.data_path, 'r') as f:
+            data = json.load(f)
+        self.instr_ids = [item['instr_id'] for item in data]
+
+    def _sigmoid(self, x):
+        return 1.0 / (1 + np.exp(-x)) 
+
+    def score(self, output_file):
+        '''Return an overall accuracy and number of datapoints'''
+        instr_ids = set(self.instr_ids)
+        self.pred_probs = []
+        self.targets = []
+
+        with open(output_file, 'r') as f:
+            output = json.load(f)
+            for item in output:
+                if item['instr_id'] in instr_ids:
+                    instr_ids.remove(item['instr_id'])
+                    self.pred_probs.append(self._sigmoid(item['logit']))
+                    self.targets.append(item['target'])
+        
+        assert len(instr_ids) == 0 'Missing %d of %d instruction ids from %s - not in %s'\
+                       % (len(instr_ids), len(self.instr_ids), ",".join(self.split), output_file)
+
+        self.pred_probs = np.array(self.pred_probs)
+        self.targets = np.array(self.targets)
+        # scalar
+        auc = roc_auc_score(y_true=self.targets, y_score=self.pred_probs)
+        thresholded_labs = self.pred_probs > 0.5
+        accuracy = np.mean(thresholded_labs == self.targets)
+
+        return auc, accuracy, len(self.pred_probs), self.pred_probs, self.targets
+
+
+def compute_auc(res):
+    '''
+    res : dictionary. res['preds'][env_name] gives an (N, ) array of prediction prob. res['tars'][env_name] gives an (N, ) array of prediction targets. 
+
+    Returns: scalar auc value
+    '''
+    y_score = np.hstack(res['preds']['val_seen'], res['preds']['val_unseen'])
+    y_true = np.hstack(res['tars']['val_seen'], res['tars']['val_unseen'])
+    assert y_score.shape == y_true.shape
+    return roc_auc_score(y_true=y_true, y_score=y_score)
 
 
 

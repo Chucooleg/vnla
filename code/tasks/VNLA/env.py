@@ -452,7 +452,7 @@ class VNLAPretrainBatch():
             # Swap (vertex, viewix) of pos k with k+1
             swap_pos = d['swap_pos']
             if swap_ops is not None:
-                swapped_target[i] = 1
+                swapped_target[i] = 1.0
                 vertex_viewix_pos_k = vertex_viewix_window[d['swap_pos']]
                 vertex_viewix_window[d['swap_pos']] = vertex_viewix_window[d['swap_pos']+1]
                 vertex_viewix_window[d['swap_pos']+1] = vertex_viewix_pos_k

@@ -6,7 +6,7 @@ from env import VNLAPretrainBatch
 from policy_pretrainer import PolicyPretrainer
 from tensorboardX import SummaryWriter
 from model import SwapClassifier
-from eval import SwapEvaluation
+from eval import SwapEvaluation, compute_auc
 
 def set_path():
 
@@ -100,7 +100,8 @@ def train(train_env, val_envs, trainer, model, optimizer, start_iter, end_iter, 
             metrics = defaultdict(dict)
             should_save_ckpt = []
 
-        metrics = {}
+        metrics = defaultdict(dict)
+        res = defaultdict(dict)
 
         # Run valiation
         for env_name, (env, evaluator) in val_envs.items():
@@ -113,22 +114,24 @@ def train(train_env, val_envs, trainer, model, optimizer, start_iter, end_iter, 
 
             trainer.results_path = os.path.join(hparams.exp_dir, '%s_%s_for_eval.json' % (hparams.model_prefix, env_name))
             trainer.write_results()
-            accuracy, num_pts = evaluator.score(trainer.results_path)
+            auc, accuracy, num_pts, preds, tars = evaluator.score(trainer.results_path)
 
             SW.add_scalar('{} accuracy per {} iters'.format(env_name, hparams.log_every ), accuracy, iter)
 
-            metrics[env_name] = (accuracy, num_pts)
+            metrics['auc'][env_name] = auc
+            metrics['accuracy'][env_name] = (accuracy, num_pts)
 
-            if not eval_mode and metrics[env_name][0] > best_metrics[env_name]:
+            res['preds'][env_name] = preds
+            res['tars'][env_name] = tars
+
+            if not eval_mode and metrics['auc'][env_name] > best_metrics[env_name]:
                 should_save_ckpt.append(env_name)
-                best_metrics[env_name] = metrics[env_name][0]
+                best_metrics[env_name] = metrics['auc'][env_name]
                 print('best %s success rate %.3f' % (env_name, best_metrics[env_name]))
 
         if not eval_mode:
-            combined_metric = (metrics['val_seen'][0] * metrics['val_seen'][1] + metrics['val_unseen'][0] * metrics['val_unseen'][1]) / \
-                ((metrics['val_seen'][1] + metrics['val_unseen'][1]) * 1.0)
-            assert combined_metric == combined_metric
-            assert combined_metric > 0
+            combined_metric = compute_auc(res)
+            assert combined_metric == combined_metric and combined_metric > 0.0
             if combined_metric > best_metrics['combined']:
                 best_metrics['combined'] = combined_metric
                 print ('best combined accuracy %.3f' % combined_metric)

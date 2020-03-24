@@ -11,7 +11,7 @@ class PolicyPretrainer():
         self.load_path = hparams.load_path
         self.model = model
         self.device = device
-        self.loss_criterion = nn.CrossEntropyLoss()
+        self.loss_criterion = nn.BCEWithLogitsLoss()
 
     def _setup(self, env):
         self.env = env
@@ -31,7 +31,7 @@ class PolicyPretrainer():
 
             # numpy shape (batch_size, 8, 3), float32
             # numpy shape (batch_size, 8, 2048), float32
-            # numpy shape (batch_size, ), int32
+            # numpy shape (batch_size, ), float32
             # list length batch_size
             a_t, f_t, swapped_target, _ = self.env.generate_next_minibatch()
 
@@ -41,10 +41,11 @@ class PolicyPretrainer():
             swapped_target = torch.from_numpy(swapped_target).to(self.device)
 
             # model make prediction
-            logits = self.model(a_t, f_t)
+            # shape (batch_size,)
+            logit = self.model(f_t, a_t)
 
             # make self.loss
-            self.loss = self.loss_criterion(logits, swapped_target)
+            self.loss = self.loss_criterion(logit, swapped_target)
 
             # backprop
             self.loss.backward()
@@ -69,8 +70,8 @@ class PolicyPretrainer():
                 a_t = torch.from_numpy(a_t).to(self.device)
                 f_t = torch.from_numpy(f_t).to(self.device)
                 swapped_target_t = torch.from_numpy(swapped_target).to(self.device)
-                logits = self.model(a_t, f_t)
-                self.loss = self.loss_criterion(logits, swapped_target_t)
+                logit = self.model(f_t, a_t)
+                self.loss = self.loss_criterion(logit, swapped_target_t)
                 self._compute_loss()
 
                 for i, instr_id in enumerate(instr_ids):
@@ -78,11 +79,21 @@ class PolicyPretrainer():
                         looped = True
                     else:
                         self.results[instr_id] = {
-                            'logits': logits[i],
+                            'logit': logit[i].item(),
                             'target': swapped_target[i]
                         }
                 if looped:
                     break
 
     def write_results(self):
+        output = []
+        for k, v in self.results.items():
+            item = { 'instr_id' : k }
+            item.update(v)
+            output.append(item)
         
+        with open(self.results_path, 'w') as f:
+            try:
+                json.dump(output, f)
+            except:
+                import ipdb; ipdb.set_trace()
