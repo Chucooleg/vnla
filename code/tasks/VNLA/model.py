@@ -83,6 +83,7 @@ class EncoderLSTM(nn.Module):
         # except Exception:
         #     pass  
 
+        # (1, 100, 512), (1, 100, 512)
         state = (self.encoder2decoder(state[0]), self.encoder2decoder(state[1]))
         # https://pytorch.org/docs/stable/notes/faq.html
         ctx, lengths = pad_packed_sequence(enc_h, batch_first=True, total_length=total_length)
@@ -90,6 +91,7 @@ class EncoderLSTM(nn.Module):
 
         # Unsort outputs
         _, backward_index_map = forward_index_map.sort(0, False)
+        # shape (100, 8, 512) (batch_size, sequence length, hidden_size)
         ctx = ctx[backward_index_map]
 
         return ctx, state
@@ -615,7 +617,7 @@ class SwapClassifier(nn.Module):
 
         self.convs = nn.ModuleList([nn.Conv2d(in_channels=1,
                                               # 100
-                                              out_channels=num_filters,
+                                              out_channels=self.num_filters,
                                               # (3/4/5, 2048 + 3)
                                               kernel_size=(kernel_size, self.feature_dim + self.action_dim),
                                               padding=0
@@ -656,7 +658,182 @@ class SwapClassifier(nn.Module):
         # logits shape (batch_size,)
         x = self.linear(x).squeeze(1)
         assert x.shape == (batch_size,)
+
         return x
 
 
-class SwapClassifierResNet(nn.Module):
+class ConvLayers(nn.Module):
+    '''
+    https://github.com/lemonhu/RE-CNN-pytorch/blob/master/model/net.py
+    https://github.com/lemonhu/RE-CNN-pytorch/blob/master/train.py
+    '''
+    def __init__(self, hparams, device):
+
+        super(ConvLayers, self).__init__()
+        
+        self.device = device
+        self.input_window_size = 8
+        self.feature_dim = 2048
+        self.action_dim = 3
+        self.kernel_sizes = hparams.kernel_sizes
+        self.num_filters = hparams.num_filters
+        self.hidden_size = hparams.hidden_size
+        self.include_actions = hparams.include_actions
+
+        self.convs = nn.ModuleList([nn.Conv2d(in_channels=1,
+                                              # 100
+                                              out_channels=self.num_filters,
+                                              # (3/4/5, 2048 + 3) or (3/4/5, 2048)
+                                              kernel_size=(kernel_size, self.feature_dim + self.action_dim) if self.include_actions else (kernel_size, self.feature_dim),
+                                              padding=0
+                                             ) for kernel_size in self.kernel_sizes])
+
+        self.dropout = nn.Dropout(p=hparams.dropout_ratio)
+
+        # output layer
+        filter_dim = len(self.kernel_sizes) * self.num_filters
+        self.linear = nn.Linear(filter_dim, self.hidden_size)
+        
+    def conv_block(self, x, conv_layer):
+        '''x shape (batch_size x 1 x batch_max_len x feature_dim)'''
+        if self.include_actions:
+            assert len(x.shape) == 4 and x.shape[1] == 1 and x.shape[2] == self.input_window_size and x.shape[3] == (self.feature_dim + self.action_dim)
+        else:
+            assert len(x.shape) == 4 and x.shape[1] == 1 and x.shape[2] == self.input_window_size and x.shape[3] == (self.feature_dim)
+        # shape (batch_size, num_filter, 8 - kernel_size + 1, 1)
+        x = conv_layer(x)
+        # shape (batch_size, num_filter, 8 - kernel_size + 1, 1)
+        x = F.relu(x)
+        # shape (batch_size, num_filter, 8 - kernel_size + 1)
+        x = x.squeeze(3)
+        # shape (batch_size, num_filter)
+        x = F.max_pool1d(x, kernel_size=x.shape[2]).squeeze(2)
+        return x
+
+    def forward(self, img_feature, action_tuple):
+        '''
+        img_feature: shape (batch_size, 8, 2048)
+        action_tuple: shape (batch_size, 8, 3)
+        '''
+        batch_size = img_feature.shape[0]
+        if self.include_actions:
+            # shape (batch_size, 1, window len, 2048 + 3)
+            x = torch.cat([img_feature, action_tuple], dim=2).unsqueeze(1)
+            assert x.shape == (batch_size, 1, self.input_window_size, self.feature_dim + self.action_dim) 
+        else:
+            # shape (batch_size, 1, window len, 2048)
+            x = img_feature.unsqueeze(1)
+            assert x.shape == (batch_size, 1, self.input_window_size, self.feature_dim)          
+        # shape (batch_size, len(self.kernel_sizes) * self.num_filters)
+        x = torch.cat([self.conv_block(x, conv_layer) for conv_layer in self.convs], dim=1)
+        assert x.shape == (batch_size, len(self.kernel_sizes) * self.num_filters)
+        # shape (batch_size, len(self.kernel_sizes) * self.num_filters)
+        x = self.dropout(x)
+        # logits shape (batch_size,)
+        x = self.linear(x).squeeze(1)
+        assert x.shape == (batch_size, self.hidden_size)
+        return x
+
+class SwapClassifierHead(nn.Module):
+    '''
+    https://github.com/lemonhu/RE-CNN-pytorch/blob/master/model/net.py
+    https://github.com/lemonhu/RE-CNN-pytorch/blob/master/train.py
+    '''
+    def __init__(self, hparams, device):
+
+        super(SwapClassifierHead, self).__init__()
+        
+        self.device = device
+        self.dropout = nn.Dropout(p=hparams.dropout_ratio)
+        self.hidden_size = hparams.hidden_size
+
+        # output layer
+        filter_dim = self.hidden_size
+        self.linear = nn.Linear(filter_dim, 1)
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+        assert x.shape[1] == self.hidden_size
+        # shape (batch_size 100, self.hidden_size 512)
+        x = self.dropout(x)
+        # logits shape (batch_size,)
+        x = self.linear(x).squeeze(1)
+        assert x.shape == (batch_size,)
+        return x
+
+class ConvolutionalNavModel(nn.Module):
+    def __init__(self, hparams, device):
+        super(ConvolutionalNavModel, self).__init__()
+
+        self.decoder = ConvLayers(hparams, device).to(device)
+        self.swap_classifier = SwapClassifierHead(hparams, device).to(device)
+
+    def decode(self, *args, **kwargs):
+        return self.decoder(*args, **kwargs)
+
+    def forward(self, img_feature, action_tuple):
+        '''
+        image_feature : tensor shape (batch_size, 8, 2048)
+        action_tuple : tensor shape (batch_size, 8, 3)
+        ctx : encoding of each token in input language instructions. shape (batch_size, sequence length, hidden_size)
+        seq_mask : 
+        '''
+        # shape (batch_size, hidden_size)
+        # e.g. (100, 512)
+        conv_activations = self.decoder(img_feature, action_tuple)
+        # shape (batch_size, )
+        return self.swap_classifier(conv_activations)
+
+
+class ConvolutionalAttentionNavModel(nn.Module):
+    def __init__(self, vocab_size, hparams, device):
+        super(ConvolutionalAttentionNavModel, self).__init__()
+
+        assert hparams.include_language == True
+
+        enc_hidden_size = hparams.hidden_size // 2 \
+            if hparams.bidirectional else hparams.hidden_size
+        self.encoder = EncoderLSTM(vocab_size,
+                                hparams.word_embed_size,
+                                enc_hidden_size,
+                                padding_idx,
+                                hparams.dropout_ratio,
+                                device,
+                                bidirectional=hparams.bidirectional,
+                                num_layers=hparams.num_lstm_layers).to(device)
+
+        self.decoder = ConvLayers(hparams, device).to(device)
+
+        self.attention_layer = Attention(hparams.hidden_size,
+            coverage_dim=hparams.coverage_size
+            if hasattr(hparams, 'coverage_size') else None).to(device)
+
+        self.swap_classifier = SwapClassifierHead(hparams, device).to(device)
+
+    def encode(self, *args, **kwargs):
+        return self.encoder(*args, **kwargs)
+
+    def decode(self, *args, **kwargs):
+        return self.decoder(*args, **kwargs)
+
+    def forward(self, img_feature, action_tuple, ctx, ctx_mask, cov=None):
+        '''
+        image_feature : tensor shape (batch_size, 8, 2048)
+        action_tuple : tensor shape (batch_size, 8, 3)
+        ctx : encoding of each token in input language instructions. shape (batch_size, sequence length, hidden_size)
+        ctx_mask : 
+        '''
+        # shape (batch_size, hidden_size)
+        # e.g. (100, 512)
+        conv_activations = self.decoder(img_feature, action_tuple)
+
+        # TODO Need to set up cov dim and main code
+        # h_tilde should have shape (batch_size, hidden_size)
+        # e.g. (100, 512)
+        h_tilde, alpha, new_cov = self.attention_layer(conv_activations, ctx, ctx_mask, cov=cov)
+
+        # Classify if swapped
+        # logit shape (batch_size, )
+        logit = self.swap_classifier(h_tilde)
+        
+        return logit, new_cov

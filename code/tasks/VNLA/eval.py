@@ -174,12 +174,13 @@ class SwapEvaluation(object):
                     instr_ids.remove(item['instr_id'])
                     self.pred_probs.append(self._sigmoid(item['logit']))
                     self.targets.append(item['target'])
-        
-        assert len(instr_ids) == 0 'Missing %d of %d instruction ids from %s - not in %s'\
-                       % (len(instr_ids), len(self.instr_ids), ",".join(self.split), output_file)
+
+        assert len(instr_ids) == 0, 'Missing %d of %d instruction ids from %s - not in %s' \
+                       % (len(instr_ids), len(self.instr_ids), self.split, output_file)
 
         self.pred_probs = np.array(self.pred_probs)
         self.targets = np.array(self.targets)
+
         # scalar
         auc = roc_auc_score(y_true=self.targets, y_score=self.pred_probs)
         thresholded_labs = self.pred_probs > 0.5
@@ -194,8 +195,8 @@ def compute_auc(res):
 
     Returns: scalar auc value
     '''
-    y_score = np.hstack(res['preds']['val_seen'], res['preds']['val_unseen'])
-    y_true = np.hstack(res['tars']['val_seen'], res['tars']['val_unseen'])
+    y_score = np.hstack([res['preds']['val_seen'], res['preds']['val_unseen']])
+    y_true = np.hstack([res['tars']['val_seen'], res['tars']['val_unseen']])
     assert y_score.shape == y_true.shape
     return roc_auc_score(y_true=y_true, y_score=y_score)
 

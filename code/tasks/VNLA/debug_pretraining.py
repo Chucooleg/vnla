@@ -1,11 +1,11 @@
 import os
 import sys
-from train import vs_code_debug
+from pretrain_policy import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "20200324"
-job_name = "debug_ctx_shape"
-config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/verbal_hard.json"
+exp_name = "20200325_debug_pretraining"
+job_name = "swap_classifier_image_frames_only"
+config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/pretrain_data.json"
 
 # from scripts/define_vars.sh
 # always local
@@ -30,23 +30,21 @@ args['exp_name'] = exp_name
 args['job_name'] = job_name
 
 # extras here!
-args['n_iters'] = 5000
+args['n_iters'] = 200000
 
 args['batch_size'] = 100
 
 # args['lr'] = 1e-3
 
-args['save_every'] = 100 # 50
-args['log_every'] = 100  # 50
+args['save_every'] = 1000 # 50
+args['log_every'] = 1000  # 50
 args['plot_to_philly'] = 0
 
 # args['dropout_ratio'] = 0.5
 
 args['seed'] = 42
 
-args['no_ask'] = 0
-
-# args['data_suffix'] = "small_three_houses_single_goal_short"
-args['data_suffix'] = "original"
+args['include_language'] = False
+args['include_actions'] = False
 
 vs_code_debug(args)

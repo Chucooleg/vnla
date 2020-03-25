@@ -10,6 +10,8 @@ import random
 import networkx as nx
 from collections import defaultdict
 import scipy.stats
+from utils import padding_idx
+import torch
 
 # sys.path.append('../../build/')
 sys.path.append('/opt/MatterSim/build/')
@@ -358,22 +360,28 @@ class VNLABuildPretrainBatch():
 
 class VNLAPretrainBatch():
 
-    def __init__(self, hparams, split=None, from_train_env=None):
+    def __init__(self, hparams, device, split=None, tokenizer=None, from_train_env=None):
         self.env = EnvBatch(
             from_train_env=from_train_env.env if from_train_env is not None else None,
             img_features=hparams.img_features, batch_size=hparams.batch_size)
 
         self.random = random
         self.random.seed(hparams.seed)
+        self.device = device
 
         self.batch_size = hparams.batch_size
-        self.window_size = hparams.window_size
+        self.window_size = 8
         self.split = split
-        self.train_mode = self.split not in ('val_seen', 'val_unseen')
+        self.train_mode = 'val' not in self.split
+        self.max_input_length = hparams.max_input_length
+
+        self.tokenizer = tokenizer
 
         self.data_path = os.path.join(hparams.data_path, 'asknav_pretrain_lookup.json')
         if split is not None:
             self.data_path = self.data_path.replace('.json', '_{}.json'.format(split))
+
+        self._load_data()
 
         self.ix = 0
 
@@ -382,17 +390,17 @@ class VNLAPretrainBatch():
         with open(self.data_path, 'r') as f:
             self.data = json.load(f)
 
-    def reset_epoch():
-        self.ix == 0
+    def reset_epoch(self):
+        self.ix = 0
 
-    def _sample_swap_pos(d):
+    def _sample_swap_pos(self, d):
         # pick a position k within window to swap
         # image feature for position k will be swapped with that of k+1
         traj_len = len(d['trajectory'])
         swap_pos = np.random.choice(min(traj_len-1, 8-1))
         return swap_pos
 
-    def _sample_window_pos(d):
+    def _sample_window_pos(self, d):
         # sample a window of size 8 or max traj length
         traj_len = len(d['trajectory'])
         if traj_len <= 8:
@@ -402,20 +410,20 @@ class VNLAPretrainBatch():
             end_pos = start_pos + 8 - 1
             return (start_pos, end_pos)
         
-    def _sample_frame(batch_data):
+    def _sample_frame(self, batch_data):
         # sample windows and swap pos for all datapoints
         for (i,d) in enumerate(batch_data):
-            batch_data[i]['win_start_pos'], batch_data[i]['win_end_pos'] = sample_window_pos(d)
+            batch_data[i]['win_start_pos'], batch_data[i]['win_end_pos'] = self._sample_window_pos(d)
             swap_bool = np.random.binomial(1, 0.5)
             if swap_bool:
-                batch_data[i]['swap_pos'] = sample_swap_pos(d)
+                batch_data[i]['swap_pos'] = self._sample_swap_pos(d)
             else:
                 batch_data[i]['swap_pos'] = None
         return batch_data
 
     def _next_minibatch(self):
         '''grab next minibatch, sample window and swap pos if training'''
-        if self.ix = 0:
+        if self.ix == 0:
             self.random.shuffle(self.data)
             print ("Shuffle, setting data ix at 0.")
         batch = self.data[self.ix:self.ix+self.batch_size]
@@ -428,17 +436,43 @@ class VNLAPretrainBatch():
 
         if self.train_mode:
             batch = self._sample_frame(batch)
+
         self.batch = batch
+
+    def _encode(self, instr):
+        if self.tokenizer is None:
+            sys.exit('No tokenizer!')
+        return self.tokenizer.encode_sentence(instr)
+
+    def _make_instruction_seq(self):
+        seq_tensor = np.array([self._encode(d['instruction']) for d in self.batch])
+
+        seq_lengths = np.argmax(seq_tensor == padding_idx, axis=1)
+
+        max_length = max(seq_lengths)
+        assert max_length <= self.max_input_length
+
+        seq_tensor = torch.from_numpy(seq_tensor).long().to(self.device)[:, :max_length]
+        seq_lengths = torch.from_numpy(seq_lengths).long().to(self.device)   
+
+        mask = (seq_tensor == padding_idx)
+        return seq_tensor, mask, seq_lengths
 
     def generate_next_minibatch(self):
         '''generate a window of env actions, a window of image features, gold swapped boolean, list of instr_ids'''
 
+        self._next_minibatch()
+
         a_t = np.empty((self.batch_size, 8, 3), dtype=np.float32)
         f_t = np.empty((self.batch_size, 8, 2048), dtype=np.float32)
         swapped_target = np.zeros(self.batch_size, dtype=np.float32)
+
+        # 0th dimension is batch_size
+        seq, seq_mask, seq_lengths = self._make_instruction_seq()
+
         instr_ids = []
 
-        for (i,d) in self.batch:
+        for (i,d) in enumerate(self.batch):
 
             instr_ids.append(d['instr_id'])
 
@@ -451,7 +485,7 @@ class VNLAPretrainBatch():
 
             # Swap (vertex, viewix) of pos k with k+1
             swap_pos = d['swap_pos']
-            if swap_ops is not None:
+            if swap_pos is not None:
                 swapped_target[i] = 1.0
                 vertex_viewix_pos_k = vertex_viewix_window[d['swap_pos']]
                 vertex_viewix_window[d['swap_pos']] = vertex_viewix_window[d['swap_pos']+1]
@@ -465,7 +499,7 @@ class VNLAPretrainBatch():
                     vertex_viewix_window.insert(0, vertex_viewix_window[0])
                 else:
                     env_action_window.insert(-1, env_action_window[-1])
-                     vertex_viewix_window.insert(-1, vertex_viewix_window[-1])
+                    vertex_viewix_window.insert(-1, vertex_viewix_window[-1])
                 ct += 1
             assert len(env_action_window) == len(vertex_viewix_window) == 8
             a_t[i] = np.array(env_action_window)
@@ -474,5 +508,5 @@ class VNLAPretrainBatch():
             for j in range(8):
                 long_id = d['scan'] + '_' + vertex_viewix_window[j][0]
                 f_t[i][j] = self.env.features[long_id][vertex_viewix_window[j][1], :]
-            
-        return a_t, f_t, swapped_target, instr_ids
+
+        return a_t, f_t, swapped_target, instr_ids, seq, seq_mask, seq_lengths

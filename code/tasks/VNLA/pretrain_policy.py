@@ -1,12 +1,28 @@
-import os
-import sys
-import numpy as np
+from __future__ import division
+
 import torch
+import torch.nn as nn
+from torch.autograd import Variable
+from torch import optim
+import torch.nn.functional as F
+
+import os
+import time
+import sys
+import json
+import numpy as np
+from argparse import Namespace
+from pprint import pprint
+import torch
+from collections import defaultdict
 from env import VNLAPretrainBatch
 from policy_pretrainer import PolicyPretrainer
 from tensorboardX import SummaryWriter
-from model import SwapClassifier
+from model import ConvolutionalNavModel, ConvolutionalAttentionNavModel
 from eval import SwapEvaluation, compute_auc
+from flags_pretrain import make_parser
+from utils import read_vocab,write_vocab,build_vocab,Tokenizer,padding_idx,timeSince
+
 
 def set_path():
 
@@ -30,17 +46,19 @@ def set_path():
     hparams.data_path = os.path.join(DATA_DIR, hparams.data_dir)  # $PT_DATA_DIR/pretrain/
     hparams.img_features = os.path.join(DATA_DIR, hparams.img_features)
 
+    hparams.vocab_path = os.path.join(DATA_DIR, 'asknav')  # $PT_DATA_DIR/asknav/
+
     # where to checkpoint
     hparams.load_path = hparams.load_path if hasattr(hparams, 'load_path') and \
         hparams.load_path is not None else \
         os.path.join(hparams.exp_dir, '%s_last.ckpt' % hparams.model_prefix) 
     
-def load(path):
-    ckpt = torch.load(path, map_location=self.device)
+def load(path, device):
+    ckpt = torch.load(path, map_location=device)
     hparams = ckpt['hparams']
 
     # overwrite hparams by args
-    for flags in var(args):
+    for flag in vars(args):
         value = getattr(args, flag)
         if value is not None:
             setattr(hparams, flag, value)
@@ -50,8 +68,8 @@ def load(path):
 
 def save(path, model, optimizer, iter, best_metrics, train_env):
     ckpt = {
-        'mode_state_dict':  model.state_dict()
-        'optim_state_dict': optimizer.state_dict()
+        'model_state_dict':  model.state_dict(),
+        'optim_state_dict': optimizer.state_dict(),
         'hparams':          hparams,
         'iter':             iter,
         'best_metrics':     best_metrics,
@@ -72,16 +90,17 @@ def setup(seed=None):
 
 def train(train_env, val_envs, trainer, model, optimizer, start_iter, end_iter, best_metrics, eval_mode):
 
+    SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
+    start = time.time()
+
     if not eval_mode:
         print('Training with with lr = %f' % optimizer.param_groups[0]['lr'])
-
-    SW = SummaryWriter(hparams.tensorboard_dir, flush_secs=30)
-
+    
     for idx in range(start_iter, end_iter, hparams.log_every):
         # An iter is a batch
 
         interval = min(hparams.log_every, end_iter - idx) # An interval is a number of batches
-        iter = idx + interval
+        iter = idx + interval # iter index at the end of this interval
 
         # Train for log_every iteration
         if eval_mode:
@@ -95,6 +114,7 @@ def train(train_env, val_envs, trainer, model, optimizer, start_iter, end_iter, 
 
             loss_str = '\n * train loss: %.4f' % train_loss_avg
 
+            # -ve log likelihood
             SW.add_scalar('train loss per {} iters'.format(hparams.log_every), train_loss_avg, iter)
 
             metrics = defaultdict(dict)
@@ -110,6 +130,7 @@ def train(train_env, val_envs, trainer, model, optimizer, start_iter, end_iter, 
             val_loss_avg = np.average(trainer.losses)
             loss_str += '\n * %s loss: %.4f' % (env_name, val_loss_avg)
 
+            # -ve log likelihood
             SW.add_scalar('{} loss per {} iters'.format(env_name, hparams.log_every), val_loss_avg, iter)
 
             trainer.results_path = os.path.join(hparams.exp_dir, '%s_%s_for_eval.json' % (hparams.model_prefix, env_name))
@@ -117,6 +138,7 @@ def train(train_env, val_envs, trainer, model, optimizer, start_iter, end_iter, 
             auc, accuracy, num_pts, preds, tars = evaluator.score(trainer.results_path)
 
             SW.add_scalar('{} accuracy per {} iters'.format(env_name, hparams.log_every ), accuracy, iter)
+            SW.add_scalar('{} AUC per {} iters'.format(env_name, hparams.log_every ), auc, iter)
 
             metrics['auc'][env_name] = auc
             metrics['accuracy'][env_name] = (accuracy, num_pts)
@@ -180,8 +202,13 @@ def train_val(device, seed=None):
     # Setup seed and read vocab
     setup(seed=seed)
 
+    # Set up vocab and tokenizer TODO
+    train_vocab_path = os.path.join(hparams.vocab_path, 'train_vocab.txt')
+    vocab = read_vocab([train_vocab_path])
+    tok = Tokenizer(vocab=vocab, encoding_length=hparams.max_input_length)
+
     # Create training environment
-    train_env = VNLAPretrainBatch(hparams, split='train')
+    train_env = VNLAPretrainBatch(hparams, device, split='train', tokenizer=tok)
 
     # Create validation environments
     val_splits = ['val_seen', 'val_unseen']
@@ -193,12 +220,15 @@ def train_val(device, seed=None):
             val_splits = ['val_seen']
         end_iter = start_iter + hparams.log_every
 
-    val_envs = { split: (VNLAPretrainBatch(hparams, split=split, tokenizer=tok,
-        from_train_env=train_env),
-        SwapEvaluation(hparams, [split], hparams.data_path)) for split in val_splits}
+    val_envs = { split: (
+        VNLAPretrainBatch(hparams, device, split=split, tokenizer=tok, from_train_env=train_env),
+        SwapEvaluation(hparams, split, hparams.data_path)) for split in val_splits}
 
     # Build model
-    model = SwapClassifier(hparams, device)
+    if hparams.include_language:
+        model = ConvolutionalAttentionNavModel(len(vocab), hparams, device)
+    else:
+        model = ConvolutionalNavModel(hparams, device)
 
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
         weight_decay=hparams.weight_decay)
@@ -221,7 +251,7 @@ def train_val(device, seed=None):
     print('')
     print(model)
 
-    # Initializa trainer
+    # Initialize trainer
     trainer = PolicyPretrainer(model, hparams, device)
 
     # Train
@@ -233,9 +263,7 @@ if __name__ == '__main__':
     os.environ['PT_DATA_DIR'] = '/home/hoyeung/blob_matterport3d/'
 
     # load hparams
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-config_file', type=str,
-        help='configuration file')
+    parser = make_parser()
     args = parser.parse_args()
 
     # Read configuration from a json file
