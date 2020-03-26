@@ -599,86 +599,22 @@ class AttentionSeq2SeqModel(nn.Module):
             return self.decoder(False, *args, **kwargs)
 
 
-class SwapClassifier(nn.Module):
-    '''
-    https://github.com/lemonhu/RE-CNN-pytorch/blob/master/model/net.py
-    https://github.com/lemonhu/RE-CNN-pytorch/blob/master/train.py
-    '''
-    def __init__(self, hparams, device):
-
-        super(SwapClassifier, self).__init__()
-        
-        self.device = device
-        self.input_window_size = 8
-        self.feature_dim = 2048
-        self.action_dim = 3
-        self.kernel_sizes = [3, 4, 5]
-        self.num_filters = 100
-
-        self.convs = nn.ModuleList([nn.Conv2d(in_channels=1,
-                                              # 100
-                                              out_channels=self.num_filters,
-                                              # (3/4/5, 2048 + 3)
-                                              kernel_size=(kernel_size, self.feature_dim + self.action_dim),
-                                              padding=0
-                                             ) for kernel_size in self.kernel_sizes])
-
-        self.dropout = nn.Dropout(p=hparams.dropout_ratio)
-
-        # output layer
-        filter_dim = len(self.kernel_sizes) * self.num_filters
-        self.linear = nn.Linear(filter_dim, 1)
-        
-    def conv_block(self, x, conv_layer):
-        '''x shape (batch_size x 1 x batch_max_len x feature_dim)'''
-        assert len(x.shape) == 4 and x.shape[1] == 1 and x.shape[2] == self.input_window_size and x.shape[3] == (self.feature_dim + self.action_dim)
-        # shape (batch_size, num_filter, 8 - kernel_size + 1, 1)
-        x = conv_layer(x)
-        # shape (batch_size, num_filter, 8 - kernel_size + 1, 1)
-        x = F.relu(x)
-        # shape (batch_size, num_filter, 8 - kernel_size + 1)
-        x = x.squeeze(3)
-        # shape (batch_size, num_filter)
-        x = F.max_pool1d(x, kernel_size=x.shape[2]).squeeze(2)
-        return x
-
-    def forward(self, img_feature, action_tuple):
-        '''
-        img_feature: shape (batch_size, 8, 2048)
-        action_tuple: shape (batch_size, 8, 3)
-        '''
-        batch_size = img_feature.shape[0]
-        # shape (batch_size, 1, batch_max_len, 2048 + 3)
-        x = torch.cat([img_feature, action_tuple], dim=2).unsqueeze(1)
-        # shape (batch_size, len(self.kernel_sizes) * self.num_filters)
-        x = torch.cat([self.conv_block(x, conv_layer) for conv_layer in self.convs], dim=1)
-        assert x.shape == (batch_size, len(self.kernel_sizes) * self.num_filters)
-        # shape (batch_size, len(self.kernel_sizes) * self.num_filters)
-        x = self.dropout(x)
-        # logits shape (batch_size,)
-        x = self.linear(x).squeeze(1)
-        assert x.shape == (batch_size,)
-
-        return x
-
-
 class ConvLayers(nn.Module):
     '''
     https://github.com/lemonhu/RE-CNN-pytorch/blob/master/model/net.py
     https://github.com/lemonhu/RE-CNN-pytorch/blob/master/train.py
     '''
     def __init__(self, hparams, device):
-
         super(ConvLayers, self).__init__()
-        
+
         self.device = device
-        self.input_window_size = 8
-        self.feature_dim = 2048
-        self.action_dim = 3
+        self.input_window_size = hparams.input_window_size
+        self.feature_dim = hparams.img_feature_size
+        self.action_dim = 3 # action tuple has length 3, e.g. (0,1,0)
         self.kernel_sizes = hparams.kernel_sizes
         self.num_filters = hparams.num_filters
         self.hidden_size = hparams.hidden_size
-        self.include_actions = hparams.include_actions
+        self.include_actions = hparams.conv_include_actions
 
         self.convs = nn.ModuleList([nn.Conv2d(in_channels=1,
                                               # 100
@@ -691,8 +627,7 @@ class ConvLayers(nn.Module):
         self.dropout = nn.Dropout(p=hparams.dropout_ratio)
 
         # output layer
-        filter_dim = len(self.kernel_sizes) * self.num_filters
-        self.linear = nn.Linear(filter_dim, self.hidden_size)
+        self.filter_dim = len(self.kernel_sizes) * self.num_filters
         
     def conv_block(self, x, conv_layer):
         '''x shape (batch_size x 1 x batch_max_len x feature_dim)'''
@@ -716,6 +651,7 @@ class ConvLayers(nn.Module):
         action_tuple: shape (batch_size, 8, 3)
         '''
         batch_size = img_feature.shape[0]
+        # Concat the features
         if self.include_actions:
             # shape (batch_size, 1, window len, 2048 + 3)
             x = torch.cat([img_feature, action_tuple], dim=2).unsqueeze(1)
@@ -723,37 +659,39 @@ class ConvLayers(nn.Module):
         else:
             # shape (batch_size, 1, window len, 2048)
             x = img_feature.unsqueeze(1)
-            assert x.shape == (batch_size, 1, self.input_window_size, self.feature_dim)          
+            assert x.shape == (batch_size, 1, self.input_window_size, self.feature_dim)
+        # Run 1-D convolutions and concat the activations into a long vector
         # shape (batch_size, len(self.kernel_sizes) * self.num_filters)
         x = torch.cat([self.conv_block(x, conv_layer) for conv_layer in self.convs], dim=1)
         assert x.shape == (batch_size, len(self.kernel_sizes) * self.num_filters)
-        # shape (batch_size, len(self.kernel_sizes) * self.num_filters)
-        x = self.dropout(x)
-        # logits shape (batch_size,)
-        x = self.linear(x).squeeze(1)
-        assert x.shape == (batch_size, self.hidden_size)
         return x
 
+
 class SwapClassifierHead(nn.Module):
-    '''
-    https://github.com/lemonhu/RE-CNN-pytorch/blob/master/model/net.py
-    https://github.com/lemonhu/RE-CNN-pytorch/blob/master/train.py
-    '''
+    
     def __init__(self, hparams, device):
 
         super(SwapClassifierHead, self).__init__()
-        
+
         self.device = device
         self.dropout = nn.Dropout(p=hparams.dropout_ratio)
         self.hidden_size = hparams.hidden_size
+        self.kernel_sizes = hparams.kernel_sizes
+        self.num_filters = hparams.num_filters
+        self.include_language = hparams.include_language
 
         # output layer
-        filter_dim = self.hidden_size
-        self.linear = nn.Linear(filter_dim, 1)
+        if self.include_language:
+            self.input_dim = self.hidden_size
+        else:
+            self.input_dim = len(self.kernel_sizes) * self.num_filters
+        
+        # binary classification
+        self.linear = nn.Linear(self.input_dim, 1)        
 
     def forward(self, x):
         batch_size = x.shape[0]
-        assert x.shape[1] == self.hidden_size
+        assert x.shape[1] == self.input_dim
         # shape (batch_size 100, self.hidden_size 512)
         x = self.dropout(x)
         # logits shape (batch_size,)
@@ -761,15 +699,41 @@ class SwapClassifierHead(nn.Module):
         assert x.shape == (batch_size,)
         return x
 
-class ConvolutionalNavModel(nn.Module):
+
+class ActionClassifierHead(nn.Module):
+
+    def __init__(self, agent_class, hparams, device):
+
+        super(ActionClassifierHead, self).__init__()
+
+        self.device = device
+        self.dropout = nn.Dropout(p=hparams.dropout_ratio)
+        self.hidden_size = hparams.hidden_size
+        self.kernel_sizes = hparams.kernel_sizes
+        self.num_filters = hparams.num_filters
+        self.num_classes = agent_class.n_output_nav_actions()
+
+        # binary classification
+        self.linear = nn.Linear(self.hidden_size, self.num_classes)        
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+        assert x.shape[1] == self.input_dim
+        # shape (batch_size 100, self.hidden_size 512)
+        x = self.dropout(x)
+        # logits shape (batch_size, num_classes)
+        x = self.linear(x)
+        assert x.shape == (batch_size, self.num_classes)
+        return x
+
+
+# Without Language
+class ConvolutionalSwapModel(nn.Module):
     def __init__(self, hparams, device):
-        super(ConvolutionalNavModel, self).__init__()
+        super(ConvolutionalSwapModel, self).__init__()
 
-        self.decoder = ConvLayers(hparams, device).to(device)
+        self.conv_layers = ConvLayers(hparams, device).to(device)
         self.swap_classifier = SwapClassifierHead(hparams, device).to(device)
-
-    def decode(self, *args, **kwargs):
-        return self.decoder(*args, **kwargs)
 
     def forward(self, img_feature, action_tuple):
         '''
@@ -778,18 +742,26 @@ class ConvolutionalNavModel(nn.Module):
         ctx : encoding of each token in input language instructions. shape (batch_size, sequence length, hidden_size)
         seq_mask : 
         '''
-        # shape (batch_size, hidden_size)
-        # e.g. (100, 512)
-        conv_activations = self.decoder(img_feature, action_tuple)
+        # shape (batch_size, len(kernel_sizes) * num_filters)
+        # e.g. (100, 300)
+        x = self.conv_layers(img_feature, action_tuple)
         # shape (batch_size, )
-        return self.swap_classifier(conv_activations)
+        x = self.swap_classifier(x)
+        return x
 
 
-class ConvolutionalAttentionNavModel(nn.Module):
+# With Language
+class ConvolutionalAttentionSwapModel(nn.Module):
     def __init__(self, vocab_size, hparams, device):
-        super(ConvolutionalAttentionNavModel, self).__init__()
+        super(ConvolutionalAttentionSwapModel, self).__init__()
 
         assert hparams.include_language == True
+        self.input_window_size = hparams.input_window_size
+        self.kernel_sizes = hparams.kernel_sizes
+        self.num_filters = hparams.num_filters
+        self.hidden_size = hparams.hidden_size
+        self.action_dim = 3 # action tuple has length 3, e.g. (0,1,0)
+        self.conv_include_action = hparams.conv_include_action
 
         enc_hidden_size = hparams.hidden_size // 2 \
             if hparams.bidirectional else hparams.hidden_size
@@ -802,19 +774,21 @@ class ConvolutionalAttentionNavModel(nn.Module):
                                 bidirectional=hparams.bidirectional,
                                 num_layers=hparams.num_lstm_layers).to(device)
 
-        self.decoder = ConvLayers(hparams, device).to(device)
+        self.conv_layers = ConvLayers(hparams, device).to(device)
 
-        self.attention_layer = Attention(hparams.hidden_size,
+        if self.conv_include_action:
+            self.pre_attn_layer = nn.Linear(len(self.kernel_sizes) * self.num_filters, self.hidden_size, bias=False).to(device)
+        else:
+            self.pre_attn_layer = nn.Linear((len(self.kernel_sizes) * self.num_filters) + (self.input_window_size * self.action_dim), self.hidden_size, bias=False).to(device)
+
+        self.attention_layer = Attention(self.hidden_size,
             coverage_dim=hparams.coverage_size
             if hasattr(hparams, 'coverage_size') else None).to(device)
 
-        self.swap_classifier = SwapClassifierHead(hparams, device).to(device)
+        self.swap_classifier = SwapClassifierHead(hparams, device).to(device)  
 
     def encode(self, *args, **kwargs):
         return self.encoder(*args, **kwargs)
-
-    def decode(self, *args, **kwargs):
-        return self.decoder(*args, **kwargs)
 
     def forward(self, img_feature, action_tuple, ctx, ctx_mask, cov=None):
         '''
@@ -823,17 +797,111 @@ class ConvolutionalAttentionNavModel(nn.Module):
         ctx : encoding of each token in input language instructions. shape (batch_size, sequence length, hidden_size)
         ctx_mask : 
         '''
+        # Pass through convolutions
+        # shape (batch_size, len(kernel_sizes) * num_filters)
+        # e.g. (100, 300)
+        x = self.conv_layers(img_feature, action_tuple)
+
+        # Project to attention space
         # shape (batch_size, hidden_size)
         # e.g. (100, 512)
-        conv_activations = self.decoder(img_feature, action_tuple)
+        x = self.pre_attn_layer(x)
 
-        # TODO Need to set up cov dim and main code
+        # Apply attention with coverage
         # h_tilde should have shape (batch_size, hidden_size)
         # e.g. (100, 512)
         h_tilde, alpha, new_cov = self.attention_layer(conv_activations, ctx, ctx_mask, cov=cov)
 
-        # Classify if swapped
+        # Apply dropout and Classify whether images were swapped
         # logit shape (batch_size, )
         logit = self.swap_classifier(h_tilde)
         
-        return logit, new_cov
+        return logit, new_cov          
+
+
+class ConvolutionalAttentionNavModel(nn.Module):
+    def __init__(self, vocab_size, hparams, device):
+        super(ConvolutionalAttentionNavModel, self).__init__()
+
+        assert hparams.include_language == True
+        self.input_window_size = hparams.input_window_size
+        self.kernel_sizes = hparams.kernel_sizes
+        self.num_filters = hparams.num_filters
+        self.hidden_size = hparams.hidden_size
+        self.action_dim = 3 # action tuple has length 3, e.g. (0,1,0)
+        self.conv_include_action = hparams.conv_include_action
+
+        enc_hidden_size = hparams.hidden_size // 2 \
+            if hparams.bidirectional else hparams.hidden_size
+        self.encoder = EncoderLSTM(vocab_size,
+                                hparams.word_embed_size,
+                                enc_hidden_size,
+                                padding_idx,
+                                hparams.dropout_ratio,
+                                device,
+                                bidirectional=hparams.bidirectional,
+                                num_layers=hparams.num_lstm_layers).to(device)
+
+        if 'verbal' in hparams.advisor:
+            agent_class = VerbalAskAgent
+        elif hparams.advisor == 'direct':
+            agent_class = AskAgent
+        else:
+            sys.exit('%s advisor not supported' % hparams.advisor)
+
+        self.conv_layers = ConvLayers(hparams, device).to(device)
+        
+        if self.conv_include_action:
+            # 300
+            self.pre_attn_layer = nn.Linear(len(self.kernel_sizes) * self.num_filters, self.hidden_size, bias=False).to(device)
+        else:
+            # 300 + 24
+            self.pre_attn_layer = nn.Linear((len(self.kernel_sizes) * self.num_filters) + (self.input_window_size * self.action_dim), self.hidden_size, bias=False).to(device)
+
+        self.attention_layer = Attention(self.hidden_size,
+            coverage_dim=hparams.coverage_size
+            if hasattr(hparams, 'coverage_size') else None).to(device)
+
+        self.action_classifier = ActionClassifierHead(agent_class, hparams, device).to(device)  
+               
+    def encode(self, *args, **kwargs):
+        return self.encoder(*args, **kwargs)
+
+    def forward(self, img_feature, action_tuple, ctx, ctx_mask, cov=None):
+        '''
+        image_feature : tensor shape (batch_size, 8, 2048)
+        action_tuple : tensor shape (batch_size, 8, 3)
+        ctx : encoding of each token in input language instructions. shape (batch_size, sequence length, hidden_size)
+        ctx_mask : 
+        '''
+        # Pass through convolutions
+        # shape (batch_size, len(kernel_sizes) * num_filters)
+        # e.g. (100, 300)
+        x = self.conv_layers(img_feature, action_tuple)
+
+        if not self.conv_include_action:
+            # shape (batch_size, input_window_length * 3)
+            # e.g. (100, 8 * 3)
+            flattened_actions = action_tuple.view(batch_size, -1)
+            assert flattened_actions.shape == (batch_size, (self.input_window_size * self.action_dim))
+            # shape (batch_size, len(kernel_sizes) * num_filters + input_window_length * 3)
+            # e.g. (100, 300 + 8 * 3)
+            x = torch.concat([x, flattened_actions], dim=1)
+            assert x.shape == (batch_size, (len(self.kernel_sizes) * self.num_filters) + (self.input_window_size * self.action_dim))
+
+        # Project to attention space
+        # shape (batch_size, hidden_size)
+        # e.g. (100, 512)
+        x = self.pre_attn_layer(x)
+        assert x.shape == (batch_size, self.hidden_size)
+
+        # Apply attention with coverage
+        # h_tilde should have shape (batch_size, hidden_size)
+        # e.g. (100, 512)
+        h_tilde, alpha, new_cov = self.attention_layer(conv_activations, ctx, ctx_mask, cov=cov)
+
+        # Apply dropout and Classify whether images were swapped
+        # logit shape (batch_size, 6)
+        logits = self.action_classifier(h_tilde)
+        
+        return logits, new_cov                  

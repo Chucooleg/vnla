@@ -18,7 +18,7 @@ from collections import defaultdict
 from env import VNLAPretrainBatch
 from policy_pretrainer import PolicyPretrainer
 from tensorboardX import SummaryWriter
-from model import ConvolutionalNavModel, ConvolutionalAttentionNavModel
+from model import ConvolutionalSwapModel, ConvolutionalAttentionSwapModel
 from eval import SwapEvaluation, compute_auc
 from flags_pretrain import make_parser
 from utils import read_vocab,write_vocab,build_vocab,Tokenizer,padding_idx,timeSince
@@ -226,9 +226,9 @@ def train_val(device, seed=None):
 
     # Build model
     if hparams.include_language:
-        model = ConvolutionalAttentionNavModel(len(vocab), hparams, device)
+        model = ConvolutionalAttentionSwapModel(len(vocab), hparams, device)
     else:
-        model = ConvolutionalNavModel(hparams, device)
+        model = ConvolutionalSwapModel(hparams, device)
 
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
         weight_decay=hparams.weight_decay)

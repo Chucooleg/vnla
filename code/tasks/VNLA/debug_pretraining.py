@@ -4,7 +4,7 @@ from pretrain_policy import vs_code_debug
 
 # from train_experiments.sh
 exp_name = "20200325_debug_pretraining"
-job_name = "swap_classifier_image_frames_only"
+job_name = "no_action_no_language"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/pretrain_data.json"
 
 # from scripts/define_vars.sh
@@ -45,6 +45,6 @@ args['plot_to_philly'] = 0
 args['seed'] = 42
 
 args['include_language'] = False
-args['include_actions'] = False
+args['conv_include_actions'] = False
 
 vs_code_debug(args)
