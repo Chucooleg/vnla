@@ -47,7 +47,6 @@
     "conv_include_actions" : false,
     "num_filters"        : 100,
     "kernel_sizes"       : [3,4,5],
-    "conv_include_action": false,
     "load_pretrained"    : false,
     "finetune"           : false,
     "pretrained_path"    : "",

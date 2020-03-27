@@ -3,8 +3,8 @@ import sys
 from train import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "20200326_debug_main"
-job_name = "debug_main_agent_7"
+exp_name = "20200327_debug_main"
+job_name = "debug_main_agent_1"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/verbal_hard.json"
 
 # from scripts/define_vars.sh
@@ -49,9 +49,6 @@ args['no_ask'] = 1
 # args['data_suffix'] = "small_three_houses_single_goal_short"
 args['data_suffix'] = "original"
 
-args['conv_include_action'] = False
-args['model_name'] = 'ConvolutionalStateNavModel'
-
 # OK
 # args['model_name'] = 'ConvolutionalStateNavModel'
 # args['load_pretrained'] = True
@@ -65,15 +62,17 @@ args['model_name'] = 'ConvolutionalStateNavModel'
 # args['pretrained_path'] = '/home/hoyeung/blob_experiments/output_local/20200326_pretraining/no_language_no_action/20200326_pretraining_last.ckpt'
 
 # OK
-# args['model_name'] = 'ConvolutionalStateNavModel'
-# args['load_pretrained'] = True
-# args['finetune'] = False
-# args['pretrained_path'] = '/home/hoyeung/blob_experiments/output_local/20200326_pretraining/no_language_include_action/20200326_pretraining_last.ckpt'
-
-
-args['model_name'] = 'ConvolutionalAttentionNavModel'
+args['conv_include_actions'] = True
+args['model_name'] = 'ConvolutionalStateNavModel'
 args['load_pretrained'] = True
 args['finetune'] = False
-args['pretrained_path'] = '/home/hoyeung/blob_experiments/output_local/20200326_pretraining/no_language_no_action/20200326_pretraining_combined.ckpt'
+args['pretrained_path'] = '/home/hoyeung/blob_experiments/output_local/20200326_pretraining/no_language_include_action/20200326_pretraining_last.ckpt'
+
+
+# args['conv_include_actions'] = False
+# args['model_name'] = 'ConvolutionalAttentionNavModel'
+# args['load_pretrained'] = True
+# args['finetune'] = False
+# args['pretrained_path'] = '/home/hoyeung/blob_experiments/output_local/20200326_pretraining/no_language_no_action/20200326_pretraining_combined.ckpt'
 
 vs_code_debug(args)

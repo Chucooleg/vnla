@@ -615,7 +615,7 @@ class ConvLayers(nn.Module):
         self.kernel_sizes = hparams.kernel_sizes
         self.num_filters = hparams.num_filters
         self.hidden_size = hparams.hidden_size
-        self.include_actions = hparams.conv_include_action
+        self.include_actions = hparams.conv_include_actions
 
         self.convs = nn.ModuleList([nn.Conv2d(in_channels=1,
                                               # 100
@@ -765,7 +765,7 @@ class ConvolutionalAttentionSwapModel(nn.Module):
         self.num_filters = hparams.num_filters
         self.hidden_size = hparams.hidden_size
         self.action_dim = 3 # action tuple has length 3, e.g. (0,1,0)
-        self.conv_include_action = hparams.conv_include_action
+        self.conv_include_actions = hparams.conv_include_actions
 
         enc_hidden_size = hparams.hidden_size // 2 \
             if hparams.bidirectional else hparams.hidden_size
@@ -780,7 +780,7 @@ class ConvolutionalAttentionSwapModel(nn.Module):
 
         self.conv_layers = ConvLayers(hparams, device).to(device)
 
-        if self.conv_include_action:
+        if self.conv_include_actions:
             self.pre_attn_layer = nn.Linear(len(self.kernel_sizes) * self.num_filters, self.hidden_size, bias=False).to(device)
         else:
             self.pre_attn_layer = nn.Linear((len(self.kernel_sizes) * self.num_filters) + (self.input_window_size * self.action_dim), self.hidden_size, bias=False).to(device)
@@ -806,7 +806,7 @@ class ConvolutionalAttentionSwapModel(nn.Module):
         # e.g. (100, 300)
         x = self.conv_layers(img_feature, action_tuple)
 
-        if not self.conv_include_action:
+        if not self.conv_include_actions:
             # shape (batch_size, input_window_length * 3)
             # e.g. (100, 8 * 3)
             flattened_actions = action_tuple.view(-1, (self.input_window_size * self.action_dim))
@@ -842,7 +842,7 @@ class ConvolutionalAttentionNavModel(nn.Module):
         self.num_filters = hparams.num_filters
         self.hidden_size = hparams.hidden_size
         self.action_dim = 3 # action tuple has length 3, e.g. (0,1,0)
-        self.conv_include_action = hparams.conv_include_action
+        self.conv_include_actions = hparams.conv_include_actions
 
         enc_hidden_size = hparams.hidden_size // 2 \
             if hparams.bidirectional else hparams.hidden_size
@@ -864,7 +864,7 @@ class ConvolutionalAttentionNavModel(nn.Module):
 
         self.conv_layers = ConvLayers(hparams, device).to(device)
         
-        if self.conv_include_action:
+        if self.conv_include_actions:
             # 300
             self.pre_attn_layer = nn.Linear(len(self.kernel_sizes) * self.num_filters, self.hidden_size, bias=False).to(device)
         else:
@@ -892,7 +892,7 @@ class ConvolutionalAttentionNavModel(nn.Module):
         # e.g. (100, 300)
         x = self.conv_layers(img_feature, action_tuple)
 
-        if not self.conv_include_action:
+        if not self.conv_include_actions:
             # shape (batch_size, input_window_length * 3)
             # e.g. (100, 8 * 3)
             flattened_actions = action_tuple.view(-1, (self.input_window_size * self.action_dim))
@@ -931,7 +931,7 @@ class ConvolutionalStateNavModel(nn.Module):
         self.num_filters = hparams.num_filters
         self.hidden_size = hparams.hidden_size
         self.action_dim = 3 # action tuple has length 3, e.g. (0,1,0)
-        self.conv_include_action = hparams.conv_include_action
+        self.conv_include_actions = hparams.conv_include_actions
 
         enc_hidden_size = hparams.hidden_size // 2 \
             if hparams.bidirectional else hparams.hidden_size
@@ -953,7 +953,7 @@ class ConvolutionalStateNavModel(nn.Module):
 
         self.conv_layers = ConvLayers(hparams, device).to(device)
         
-        if self.conv_include_action:
+        if self.conv_include_actions:
             # 300 + 512
             self.pre_classifier_layer = nn.Linear((len(self.kernel_sizes) * self.num_filters) + (self.hidden_size), self.hidden_size, bias=False).to(device)
         else:
@@ -983,7 +983,7 @@ class ConvolutionalStateNavModel(nn.Module):
         # e.g. (100, 300)
         x = self.conv_layers(img_feature, action_tuple)
 
-        if not self.conv_include_action:
+        if not self.conv_include_actions:
             # shape (batch_size, input_window_length * 3)
             # e.g. (100, 8 * 3)
             flattened_actions = action_tuple.view(-1, (self.input_window_size * self.action_dim))
@@ -995,7 +995,7 @@ class ConvolutionalStateNavModel(nn.Module):
 
         # Project to hidden space
         x = torch.cat([x, state[0].squeeze(0)], dim=1)
-        if self.conv_include_action: 
+        if self.conv_include_actions: 
             # (100, 300 + 512)
             assert x.shape == (batch_size, (len(self.kernel_sizes) * self.num_filters) + self.hidden_size)
         else:

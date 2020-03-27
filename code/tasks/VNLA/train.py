@@ -72,11 +72,21 @@ def save(path, model, optimizer, iter, best_metrics, train_env):
             'data_idx'        : train_env.ix,
             'vocab'           : train_env.tokenizer.vocab
         }
-    torch.save(ckpt, path)
+    while True:
+        try:
+            torch.save(ckpt, path)
+            break
+        except:
+            pass
 
 def load(path, device):
     global hparams
-    ckpt = torch.load(path, map_location=device)
+    while True:
+        try:
+            ckpt = torch.load(path, map_location=device)
+            break
+        except:
+            pass
     hparams = ckpt['hparams']
 
     # Overwrite hparams by args
