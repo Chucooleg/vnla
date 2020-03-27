@@ -155,6 +155,7 @@ def train(train_env, val_envs, trainer, model, optimizer, start_iter, end_iter, 
             combined_metric = compute_auc(res)
             assert combined_metric == combined_metric and combined_metric > 0.0
             if combined_metric > best_metrics['combined']:
+                should_save_ckpt.append('combined')
                 best_metrics['combined'] = combined_metric
                 print ('best combined accuracy %.3f' % combined_metric)
 
@@ -204,7 +205,11 @@ def train_val(device, seed=None):
 
     # Set up vocab and tokenizer TODO
     train_vocab_path = os.path.join(hparams.vocab_path, 'train_vocab.txt')
-    vocab = read_vocab([train_vocab_path])
+    if 'verbal' in hparams.advisor:
+        subgoal_vocab_path = os.path.join(hparams.vocab_path, hparams.subgoal_vocab)
+        vocab = read_vocab([train_vocab_path, subgoal_vocab_path])
+    else:
+        vocab = read_vocab([train_vocab_path])
     tok = Tokenizer(vocab=vocab, encoding_length=hparams.max_input_length)
 
     # Create training environment

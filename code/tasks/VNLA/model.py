@@ -85,6 +85,7 @@ class EncoderLSTM(nn.Module):
 
         # (1, 100, 512), (1, 100, 512)
         state = (self.encoder2decoder(state[0]), self.encoder2decoder(state[1]))
+
         # https://pytorch.org/docs/stable/notes/faq.html
         ctx, lengths = pad_packed_sequence(enc_h, batch_first=True, total_length=total_length)
         ctx = self.drop(ctx)
@@ -614,7 +615,7 @@ class ConvLayers(nn.Module):
         self.kernel_sizes = hparams.kernel_sizes
         self.num_filters = hparams.num_filters
         self.hidden_size = hparams.hidden_size
-        self.include_actions = hparams.conv_include_actions
+        self.include_actions = hparams.conv_include_action
 
         self.convs = nn.ModuleList([nn.Conv2d(in_channels=1,
                                               # 100
@@ -716,16 +717,19 @@ class ActionClassifierHead(nn.Module):
         # binary classification
         self.linear = nn.Linear(self.hidden_size, self.num_classes)        
 
-    def forward(self, x):
-        batch_size = x.shape[0]
-        assert x.shape[1] == self.input_dim
+    def forward(self, h, logit_mask):
+        batch_size = h.shape[0]
+        assert h.shape[1] == self.hidden_size
         # shape (batch_size 100, self.hidden_size 512)
-        x = self.dropout(x)
+        h = self.dropout(h)
         # logits shape (batch_size, num_classes)
-        x = self.linear(x)
-        assert x.shape == (batch_size, self.num_classes)
-        return x
-
+        logit = self.linear(h)
+        assert logit.shape == (batch_size, self.num_classes)
+        logit.data.masked_fill_(logit_mask, -float('inf'))
+        # softmax shape (batch_size, num_classes)
+        softmax = F.softmax(logit, dim=1)
+        assert softmax.shape == (batch_size, self.num_classes)
+        return logit, softmax
 
 # Without Language
 class ConvolutionalSwapModel(nn.Module):
@@ -802,6 +806,16 @@ class ConvolutionalAttentionSwapModel(nn.Module):
         # e.g. (100, 300)
         x = self.conv_layers(img_feature, action_tuple)
 
+        if not self.conv_include_action:
+            # shape (batch_size, input_window_length * 3)
+            # e.g. (100, 8 * 3)
+            flattened_actions = action_tuple.view(-1, (self.input_window_size * self.action_dim))
+            assert flattened_actions.shape[0] == x.shape[0]
+            # shape (batch_size, len(kernel_sizes) * num_filters + input_window_length * 3)
+            # e.g. (100, 300 + 8 * 3)
+            x = torch.cat([x, flattened_actions], dim=1)
+            assert x.shape == (x.shape[0], (len(self.kernel_sizes) * self.num_filters) + (self.input_window_size * self.action_dim))
+
         # Project to attention space
         # shape (batch_size, hidden_size)
         # e.g. (100, 512)
@@ -810,7 +824,7 @@ class ConvolutionalAttentionSwapModel(nn.Module):
         # Apply attention with coverage
         # h_tilde should have shape (batch_size, hidden_size)
         # e.g. (100, 512)
-        h_tilde, alpha, new_cov = self.attention_layer(conv_activations, ctx, ctx_mask, cov=cov)
+        h_tilde, alpha, new_cov = self.attention_layer(x, ctx, ctx_mask, cov=cov)
 
         # Apply dropout and Classify whether images were swapped
         # logit shape (batch_size, )
@@ -823,7 +837,6 @@ class ConvolutionalAttentionNavModel(nn.Module):
     def __init__(self, vocab_size, hparams, device):
         super(ConvolutionalAttentionNavModel, self).__init__()
 
-        assert hparams.include_language == True
         self.input_window_size = hparams.input_window_size
         self.kernel_sizes = hparams.kernel_sizes
         self.num_filters = hparams.num_filters
@@ -867,7 +880,7 @@ class ConvolutionalAttentionNavModel(nn.Module):
     def encode(self, *args, **kwargs):
         return self.encoder(*args, **kwargs)
 
-    def forward(self, img_feature, action_tuple, ctx, ctx_mask, cov=None):
+    def forward(self, img_feature, action_tuple, state, ctx, ctx_mask, logit_mask, cov=None):
         '''
         image_feature : tensor shape (batch_size, 8, 2048)
         action_tuple : tensor shape (batch_size, 8, 3)
@@ -882,26 +895,125 @@ class ConvolutionalAttentionNavModel(nn.Module):
         if not self.conv_include_action:
             # shape (batch_size, input_window_length * 3)
             # e.g. (100, 8 * 3)
-            flattened_actions = action_tuple.view(batch_size, -1)
-            assert flattened_actions.shape == (batch_size, (self.input_window_size * self.action_dim))
+            flattened_actions = action_tuple.view(-1, (self.input_window_size * self.action_dim))
+            assert flattened_actions.shape[0] == x.shape[0]
             # shape (batch_size, len(kernel_sizes) * num_filters + input_window_length * 3)
             # e.g. (100, 300 + 8 * 3)
-            x = torch.concat([x, flattened_actions], dim=1)
-            assert x.shape == (batch_size, (len(self.kernel_sizes) * self.num_filters) + (self.input_window_size * self.action_dim))
+            x = torch.cat([x, flattened_actions], dim=1)
+            assert x.shape == (x.shape[0], (len(self.kernel_sizes) * self.num_filters) + (self.input_window_size * self.action_dim))
 
         # Project to attention space
         # shape (batch_size, hidden_size)
         # e.g. (100, 512)
         x = self.pre_attn_layer(x)
-        assert x.shape == (batch_size, self.hidden_size)
+        assert x.shape == (x.shape[0], self.hidden_size)
 
         # Apply attention with coverage
         # h_tilde should have shape (batch_size, hidden_size)
         # e.g. (100, 512)
-        h_tilde, alpha, new_cov = self.attention_layer(conv_activations, ctx, ctx_mask, cov=cov)
+        h_tilde, alpha, new_cov = self.attention_layer(x, ctx, ctx_mask, cov=cov)
 
         # Apply dropout and Classify whether images were swapped
         # logit shape (batch_size, 6)
-        logits = self.action_classifier(h_tilde)
+        logit, softmax = self.action_classifier(h_tilde, logit_mask)
         
-        return logits, new_cov                  
+        return logit, softmax, new_cov                  
+
+
+
+
+class ConvolutionalStateNavModel(nn.Module):
+    def __init__(self, vocab_size, hparams, device):
+        super(ConvolutionalStateNavModel, self).__init__()
+
+        self.input_window_size = hparams.input_window_size
+        self.kernel_sizes = hparams.kernel_sizes
+        self.num_filters = hparams.num_filters
+        self.hidden_size = hparams.hidden_size
+        self.action_dim = 3 # action tuple has length 3, e.g. (0,1,0)
+        self.conv_include_action = hparams.conv_include_action
+
+        enc_hidden_size = hparams.hidden_size // 2 \
+            if hparams.bidirectional else hparams.hidden_size
+        self.encoder = EncoderLSTM(vocab_size,
+                                hparams.word_embed_size,
+                                enc_hidden_size,
+                                padding_idx,
+                                hparams.dropout_ratio,
+                                device,
+                                bidirectional=hparams.bidirectional,
+                                num_layers=hparams.num_lstm_layers).to(device)
+
+        if 'verbal' in hparams.advisor:
+            agent_class = VerbalAskAgent
+        elif hparams.advisor == 'direct':
+            agent_class = AskAgent
+        else:
+            sys.exit('%s advisor not supported' % hparams.advisor)
+
+        self.conv_layers = ConvLayers(hparams, device).to(device)
+        
+        if self.conv_include_action:
+            # 300 + 512
+            self.pre_classifier_layer = nn.Linear((len(self.kernel_sizes) * self.num_filters) + (self.hidden_size), self.hidden_size, bias=False).to(device)
+        else:
+            # 300 + 24 + 512
+            self.pre_classifier_layer = nn.Linear((len(self.kernel_sizes) * self.num_filters) + (self.input_window_size * self.action_dim)  + (self.hidden_size), self.hidden_size, bias=False).to(device)
+
+        # self.attention_layer = Attention(self.hidden_size,
+        #     coverage_dim=hparams.coverage_size
+        #     if hasattr(hparams, 'coverage_size') else None).to(device)
+
+        self.action_classifier = ActionClassifierHead(agent_class, hparams, device).to(device)  
+               
+    def encode(self, *args, **kwargs):
+        return self.encoder(*args, **kwargs)
+
+    def forward(self, img_feature, action_tuple, state, ctx, ctx_mask, logit_mask, cov=None):
+        '''
+        img_feature : tensor shape (batch_size, 8, 2048)
+        action_tuple : tensor shape (batch_size, 8, 3)
+        ctx : encoding of each token in input language instructions. shape (batch_size, sequence length, hidden_size)
+        ctx_mask : 
+        '''
+        batch_size = img_feature.shape[0]
+
+        # Pass through convolutions
+        # shape (batch_size, len(kernel_sizes) * num_filters)
+        # e.g. (100, 300)
+        x = self.conv_layers(img_feature, action_tuple)
+
+        if not self.conv_include_action:
+            # shape (batch_size, input_window_length * 3)
+            # e.g. (100, 8 * 3)
+            flattened_actions = action_tuple.view(-1, (self.input_window_size * self.action_dim))
+            assert flattened_actions.shape[0] == x.shape[0]
+            # shape (batch_size, len(kernel_sizes) * num_filters + input_window_length * 3)
+            # e.g. (100, 300 + 8 * 3)
+            x = torch.cat([x, flattened_actions], dim=1)
+            assert x.shape == (x.shape[0], (len(self.kernel_sizes) * self.num_filters) + (self.input_window_size * self.action_dim))
+
+        # Project to hidden space
+        x = torch.cat([x, state[0].squeeze(0)], dim=1)
+        if self.conv_include_action: 
+            # (100, 300 + 512)
+            assert x.shape == (batch_size, (len(self.kernel_sizes) * self.num_filters) + self.hidden_size)
+        else:
+            # (100, 300 + 8 * 3 + 512)
+            assert x.shape == (batch_size, (len(self.kernel_sizes) * self.num_filters) + (self.input_window_size * self.action_dim) + self.hidden_size)
+
+        # shape (batch_size, hidden_size)
+        # e.g. (100, 512)
+        x = self.pre_classifier_layer(x)
+        assert x.shape == (x.shape[0], self.hidden_size)
+
+        # # Apply attention with coverage
+        # # h_tilde should have shape (batch_size, hidden_size)
+        # # e.g. (100, 512)
+        # h_tilde, alpha, new_cov = self.attention_layer(x, ctx, ctx_mask, cov=cov)
+
+        # Apply dropout and Classify whether images were swapped
+        # logit shape (batch_size, 6)
+        logit, softmax = self.action_classifier(x, logit_mask)
+        
+        return logit, softmax, None

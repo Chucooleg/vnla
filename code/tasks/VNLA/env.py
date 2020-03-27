@@ -368,11 +368,12 @@ class VNLAPretrainBatch():
         self.random = random
         self.random.seed(hparams.seed)
         self.device = device
-
+        self.img_feature_size = hparams.img_feature_size
         self.batch_size = hparams.batch_size
-        self.window_size = 8
         self.split = split
         self.train_mode = 'val' not in self.split
+        self.input_window_size = hparams.input_window_size
+        self.action_dim = 3
         self.max_input_length = hparams.max_input_length
 
         self.tokenizer = tokenizer
@@ -463,8 +464,8 @@ class VNLAPretrainBatch():
 
         self._next_minibatch()
 
-        a_t = np.empty((self.batch_size, 8, 3), dtype=np.float32)
-        f_t = np.empty((self.batch_size, 8, 2048), dtype=np.float32)
+        a_t = np.empty((self.batch_size, self.input_window_size, self.action_dim), dtype=np.float32)
+        f_t = np.empty((self.batch_size, self.input_window_size, self.img_feature_size), dtype=np.float32)
         swapped_target = np.zeros(self.batch_size, dtype=np.float32)
 
         # 0th dimension is batch_size
@@ -491,22 +492,21 @@ class VNLAPretrainBatch():
                 vertex_viewix_window[d['swap_pos']] = vertex_viewix_window[d['swap_pos']+1]
                 vertex_viewix_window[d['swap_pos']+1] = vertex_viewix_pos_k
 
-            # Pad short windows back to 8
-            ct = 0
-            while len(env_action_window) < 8:
-                if ct % 2:
-                    env_action_window.insert(0, env_action_window[0])
-                    vertex_viewix_window.insert(0, vertex_viewix_window[0])
-                else:
-                    env_action_window.insert(-1, env_action_window[-1])
-                    vertex_viewix_window.insert(-1, vertex_viewix_window[-1])
-                ct += 1
-            assert len(env_action_window) == len(vertex_viewix_window) == 8
-            a_t[i] = np.array(env_action_window)
-
-            # Lookup the image feature vector
-            for j in range(8):
+            # Pad indices at start
+            # e.g. range(8-6) = range(2) -> 0, 1
+            for j in range(self.input_window_size - len(env_action_window)):
+                a_t[i][j] = np.array([0,0,0])
+                f_t[i][j] = np.zeros(self.img_feature_size).astype('float32')
+            
+            # Lookup image feature vector
+            f_temp = np.empty((len(vertex_viewix_window), self.img_feature_size), dtype=np.float32)
+            for j in range(len(vertex_viewix_window)):
                 long_id = d['scan'] + '_' + vertex_viewix_window[j][0]
-                f_t[i][j] = self.env.features[long_id][vertex_viewix_window[j][1], :]
+                f_temp[j] = self.env.features[long_id][vertex_viewix_window[j][1], :]
+
+            # Fill up real action tuples, and image features
+            # e.g. range(2, 8) -> 2, 3, 4, 5, 6, 7
+            a_t[i][self.input_window_size - len(env_action_window): self.input_window_size] = np.array(env_action_window)
+            f_t[i][self.input_window_size - len(env_action_window): self.input_window_size] = f_temp
 
         return a_t, f_t, swapped_target, instr_ids, seq, seq_mask, seq_lengths

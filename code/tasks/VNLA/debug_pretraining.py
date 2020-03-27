@@ -3,8 +3,8 @@ import sys
 from pretrain_policy import vs_code_debug
 
 # from train_experiments.sh
-exp_name = "20200325_debug_pretraining"
-job_name = "no_action_no_language"
+exp_name = "20200326_pretraining"
+job_name = "include_language_include_action"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/pretrain_data.json"
 
 # from scripts/define_vars.sh
@@ -44,7 +44,7 @@ args['plot_to_philly'] = 0
 
 args['seed'] = 42
 
-args['include_language'] = False
-args['conv_include_actions'] = False
+args['include_language'] = True
+args['conv_include_actions'] = True
 
 vs_code_debug(args)

@@ -123,6 +123,28 @@ def make_parser():
    parser.add_argument('-room_types_path', type=str,
         help='DATA_DIR/<path> that points to a text file with room types. ')
 
+   # CNN params
+   parser.add_argument('-kernel_sizes', type=list,
+        help='kernel_sizes for CNN')
+   parser.add_argument('-num_filters', type=int,
+        help='number of filters for each kernel size for CNN')
+   parser.add_argument('-input_window_size', type=int,
+        help='input_window_size for CNN')
+   parser.add_argument('-conv_include_actions', type=int,
+        help='whether convolutions include action tuples. 1/0')
+
+   # Pretrained weights loading
+   parser.add_argument('-pretrained_path', type=str,
+        help='path to ckpt containing pretrained weights. str.')
+   parser.add_argument('-load_pretrained', type=int,
+        help='whether to load pretrained weights. 1/0')
+   parser.add_argument('-finetune', type=int,
+        help='whether finetune pretrained weights. 1/0')
+
+   # Model Name
+   parser.add_argument('-model_name', type=str,
+        help='model name like AttentionSeq2SeqModel.')
+
    # data suffix
    parser.add_argument('-data_suffix', type=str,
         help='data suffix')  

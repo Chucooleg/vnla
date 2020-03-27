@@ -73,6 +73,8 @@ class AskAgent(BaseAgent):
         self.coverage_size = hparams.coverage_size if hasattr(hparams, 'coverage_size') else None
 
         self.img_feature_size = hparams.img_feature_size
+        self.input_window_size = hparams.input_window_size
+        self.action_dim = len(self.env_actions[0])
 
     @staticmethod
     def n_input_nav_actions():
@@ -427,6 +429,7 @@ class AskAgent(BaseAgent):
 
         last_traj = []
         for iter in range(1, n_iters + 1):
+
             optimizer.zero_grad()
             traj, iter_time_keep = self.rollout(idx + iter)
             if n_iters - iter <= 10:

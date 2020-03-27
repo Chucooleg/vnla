@@ -2,6 +2,7 @@
     "seed"               : 1,
     "data_dir"           : "asknav",
     "img_features"       : "img_features/ResNet-152-imagenet.tsv",
+    "img_feature_size"   : 2048,
     "max_input_length"   : 50,
     "batch_size"         : 100,
     "max_episode_length" : 25,
@@ -41,5 +42,14 @@
     "local_run"          : 0,
     "room_types_path"    : "semantics/asknav_tr_room_types.txt",
     "plot_to_philly"     : 0,
-    "data_suffix"        : "original"
+    "data_suffix"        : "original",
+    "input_window_size"  : 8,
+    "conv_include_actions" : false,
+    "num_filters"        : 100,
+    "kernel_sizes"       : [3,4,5],
+    "conv_include_action": false,
+    "load_pretrained"    : false,
+    "finetune"           : false,
+    "pretrained_path"    : "",
+    "model_name"         : "AttentionSeq2SeqModel"
 }

@@ -20,7 +20,7 @@ from scipy import stats
 
 from utils import read_vocab,write_vocab,build_vocab,Tokenizer,padding_idx,timeSince
 from env import VNLABatch
-from model import AttentionSeq2SeqModel
+from model import AttentionSeq2SeqModel, ConvolutionalAttentionNavModel, ConvolutionalStateNavModel
 from ask_agent import AskAgent
 from verbal_ask_agent import VerbalAskAgent
 from tensorboardX import SummaryWriter
@@ -87,6 +87,10 @@ def load(path, device):
 
     set_path()
     return ckpt
+
+def load_pretrained(pretrained_path, device):
+    pretrained_ckpt = torch.load(pretrained_path, map_location=device)
+    return pretrained_ckpt
 
 def compute_ask_stats(traj):
     total_steps = 0
@@ -180,7 +184,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             train_ask_loss_avg = np.average(np.array(agent.ask_losses))
             loss_str += ', nav loss: %.4f' % train_nav_loss_avg
             loss_str += ', ask loss: %.4f' % train_ask_loss_avg
-            loss_str += compute_ask_stats(traj)
+            # loss_str += compute_ask_stats(traj)
 
             SW.add_scalar('train loss per {} iters'.format(hparams.log_every), train_loss_avg, iter)
             SW.add_scalar('train nav loss per {} iters'.format(hparams.log_every), train_nav_loss_avg, iter)
@@ -231,7 +235,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str += ', %s: %.2f' % ('oracle_error', score_summary['oracle_error'])
             loss_str += ', %s: %.2f' % ('length', score_summary['length'])
             loss_str += ', %s: %.2f' % ('steps', score_summary['steps'])
-            loss_str += compute_ask_stats(traj)
+            # loss_str += compute_ask_stats(traj)
 
             SW.add_scalar('{} nav_error per {} iters'.format(env_name, hparams.log_every), score_summary['nav_error'], iter)
             SW.add_scalar('{} oracle_error per {} iters'.format(env_name, hparams.log_every), score_summary['oracle_error'], iter)
@@ -315,6 +319,7 @@ def train_val(device, seed=None):
     ''' Train on the training set, and validate on seen and unseen splits. '''
 
     # Resume from lastest checkpoint (if any)
+    pretrained_ckpt = None
     if os.path.exists(hparams.load_path):
         print('Load model from %s' % hparams.load_path)
         ckpt = load(hparams.load_path, device)
@@ -322,6 +327,12 @@ def train_val(device, seed=None):
     else:
         if hasattr(args, 'load_path') and hasattr(args, 'eval_only') and args.eval_only:
             sys.exit('load_path %s does not exist!' % hparams.load_path)
+
+        # Load pretrained weights
+        if hparams.load_pretrained:
+            if hparams.pretrained_path == '':
+                sys.exit('pretrained_path %s does not exist!' % hparams.pretrained_path)
+            pretrained_ckpt = load_pretrained(hparams.pretrained_path, device)
         ckpt = None
         start_iter = 0
     end_iter = hparams.n_iters
@@ -358,10 +369,15 @@ def train_val(device, seed=None):
         Evaluation(hparams, [split], hparams.data_path)) for split in val_splits}
 
     # Build models
-    model = AttentionSeq2SeqModel(len(vocab), hparams, device)
+    if hparams.model_name == "AttentionSeq2SeqModel":
+        model = AttentionSeq2SeqModel(len(vocab), hparams, device)
+    elif hparams.model_name == "ConvolutionalAttentionNavModel":
+        model = ConvolutionalAttentionNavModel(len(vocab), hparams, device)
+    elif hparams.model_name == "ConvolutionalStateNavModel":
+        model = ConvolutionalStateNavModel(len(vocab), hparams, device)
 
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
-        weight_decay=hparams.weight_decay)
+    weight_decay=hparams.weight_decay)
 
     print ("device count :".format(torch.cuda.device_count()))
 
@@ -369,12 +385,32 @@ def train_val(device, seed=None):
                      'val_unseen': -1,
                      'combined'  : -1 }
 
-    # Load model parameters from a checkpoint (if any)
+    # Load model states from a checkpoint (if any)
     if ckpt is not None:
+        print ("Loading checkpointed weights ...")
         model.load_state_dict(ckpt['model_state_dict'])
         optimizer.load_state_dict(ckpt['optim_state_dict'])
         best_metrics = ckpt['best_metrics']
         train_env.ix = ckpt['data_idx']
+        import pdb; pdb.set_trace()
+    else:
+        if hparams.load_pretrained:
+            print("Loading pretrained weights ...")
+            # Load model wts from pretrained_ckpt
+            pretrained_dict = pretrained_ckpt['model_state_dict']
+            model_dict = model.state_dict()
+            pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+            print("Updating {}/{} sets of weights...".format(len(pretrained_dict.keys()), len(model_dict.keys())))
+            model_dict.update(pretrained_dict)
+            model.load_state_dict(model_dict)
+
+            if not hparams.finetune:
+                print ("Freezing pretrained weights:")
+                # freeze pretrained weights
+                for name, param in model.named_parameters():
+                    if name in pretrained_dict.keys():
+                        param.requires_grad = False
+                        print("{} requires grad set to False".format(name))
 
     print('')
     pprint(vars(hparams), width=1)

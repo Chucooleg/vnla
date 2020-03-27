@@ -16,6 +16,7 @@ import torch
 
 import utils
 sys.path.append('../../build')
+sys.path.append('/opt/MatterSim/build/')
 import MatterSim
 
 class ShortestPathOracle(object):
