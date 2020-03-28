@@ -35,8 +35,7 @@ def set_path():
     # Set general output dir
     hparams.exp_dir = os.getenv('PT_EXP_DIR')
 
-    hparams.model_prefix = '%s_nav_%s_ask_%s' % (hparams.exp_name,
-        hparams.nav_feedback, hparams.ask_feedback)
+    hparams.model_prefix = "{}_{}".format(hparams.exp_name, hparams.job_name)
 
     # Set tensorboard log dir
     if hparams.local_run:

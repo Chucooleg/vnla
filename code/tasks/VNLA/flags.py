@@ -3,6 +3,16 @@
 
 import argparse
 
+def str2bool(v):
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 def make_parser():
    parser = argparse.ArgumentParser()
 
@@ -130,15 +140,15 @@ def make_parser():
         help='number of filters for each kernel size for CNN')
    parser.add_argument('-input_window_size', type=int,
         help='input_window_size for CNN')
-   parser.add_argument('-conv_include_actions', type=int,
+   parser.add_argument('-conv_include_actions', type=str2bool,
         help='whether convolutions include action tuples. 1/0')
 
    # Pretrained weights loading
    parser.add_argument('-pretrained_path', type=str,
         help='path to ckpt containing pretrained weights. str.')
-   parser.add_argument('-load_pretrained', type=int,
+   parser.add_argument('-load_pretrained', type=str2bool,
         help='whether to load pretrained weights. 1/0')
-   parser.add_argument('-finetune', type=int,
+   parser.add_argument('-finetune', type=str2bool,
         help='whether finetune pretrained weights. 1/0')
 
    # Model Name

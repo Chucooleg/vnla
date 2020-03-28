@@ -4,7 +4,7 @@ from train import vs_code_debug
 
 # from train_experiments.sh
 exp_name = "20200327_debug_main"
-job_name = "debug_main_agent_1"
+job_name = "debug_main_agent_3"
 config_file = "/home/hoyeung/Documents/vnla/code/tasks/VNLA/configs/verbal_hard.json"
 
 # from scripts/define_vars.sh
@@ -54,7 +54,7 @@ args['data_suffix'] = "original"
 # args['load_pretrained'] = True
 # args['finetune'] = False
 # args['pretrained_path'] = '/home/hoyeung/blob_experiments/output_local/20200326_pretraining/no_language_no_action/20200326_pretraining_last.ckpt'
-
+ 
 # OK
 # args['model_name'] = 'ConvolutionalStateNavModel'
 # args['load_pretrained'] = True
@@ -62,17 +62,17 @@ args['data_suffix'] = "original"
 # args['pretrained_path'] = '/home/hoyeung/blob_experiments/output_local/20200326_pretraining/no_language_no_action/20200326_pretraining_last.ckpt'
 
 # OK
-args['conv_include_actions'] = True
-args['model_name'] = 'ConvolutionalStateNavModel'
-args['load_pretrained'] = True
-args['finetune'] = False
-args['pretrained_path'] = '/home/hoyeung/blob_experiments/output_local/20200326_pretraining/no_language_include_action/20200326_pretraining_last.ckpt'
-
-
-# args['conv_include_actions'] = False
-# args['model_name'] = 'ConvolutionalAttentionNavModel'
+# args['conv_include_actions'] = True
+# args['model_name'] = 'ConvolutionalStateNavModel'
 # args['load_pretrained'] = True
 # args['finetune'] = False
-# args['pretrained_path'] = '/home/hoyeung/blob_experiments/output_local/20200326_pretraining/no_language_no_action/20200326_pretraining_combined.ckpt'
+# args['pretrained_path'] = '/home/hoyeung/blob_experiments/output_local/20200326_pretraining/no_language_include_action/20200326_pretraining_last.ckpt'
+
+
+args['conv_include_actions'] = False
+args['model_name'] = 'ConvolutionalAttentionNavModel'
+args['load_pretrained'] = True
+args['finetune'] = False
+args['pretrained_path'] = '/home/hoyeung/blob_experiments/output_local/20200326_pretraining/no_language_no_action/20200326_pretraining_combined.ckpt'
 
 vs_code_debug(args)
